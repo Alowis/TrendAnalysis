@@ -10,633 +10,19 @@ library(ggplot2)
 library(viridis)
 library(rnaturalearth)
 library(hydroGOF)
-source("~/LFRuns_utils/TS-EVA/functions_dvlp.R")
 
-#  Function declaration ---------------------------------------------------
-get_density <- function(x, y, ...) {
-  dens <- MASS::kde2d(x, y, ...)
-  ix <- findInterval(x, dens$x)
-  iy <- findInterval(y, dens$y)
-  ii <- cbind(ix, iy)
-  return(dens$z[ii])
-}
-log10_minor_break <- function(...){
-  function(x) {
-    minx         = floor(min(log10(x), na.rm=T))-1;
-    maxx         = ceiling(max(log10(x), na.rm=T))+1;
-    n_major      = maxx-minx+1;
-    major_breaks = seq(minx, maxx, by=1)
-    minor_breaks = 
-      rep(log10(seq(1, 9, by=1)), times = n_major)+
-      rep(major_breaks, each = 9)
-    return(10^(minor_breaks))
-  }
-}
-disNcopenloc=function(ncd,outloc,idc){
-  name.vb=names(ncd[['var']])
-  namev="dis"
-  time <- ncvar_get(ncd,"time")
-  lt=length(time)
-  
-  #timestamp corretion
-  name.lon = "lon"
-  name.lat="lat"
-  londat = ncvar_get(ncd,name.lon) 
-  llo=length(londat)
-  latdat = ncvar_get(ncd,name.lat) 
-  lla=length(latdat)
-  
-  idm=1+(idc-1)*lt
-  outloc$llcoord[idc]
-  outloc$LisfloodX[idc]
-  start=c(outloc$idlo[idc],outloc$idla[idc],1)
-  count=c(1,1,lt)
-  outlets = ncvar_get(ncd,namev,start = start, count= count)
-  outlets=as.vector(outlets)
-  plot(outlets)
-  print(outloc$StationID[idc])
-  outid=rep(outloc$StationID[idc],length(time))
-  #lonlatloop=expand.grid(c(1:lla),c(1:lt))
-  lon=rep(londat[start[1]],length(time))
-  lat=rep(latdat[start[2]],length(time))
-  outll=data.frame(outlets,outid,lon,lat,time)
-  
-  return (outll)
-}
-UpAopen=function(dir,outletname,Sloc_final){
-  ncbassin=paste0(dir,outletname)
-  ncb=nc_open(ncbassin)
-  name.vb=names(ncb[['var']])
-  namev=name.vb[2]
-  #time <- ncvar_get(ncb,"time")
-  
-  #timestamp corretion
-  name.lon="lon"
-  name.lat="lat"
-  londat = ncvar_get(ncb,name.lon) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat)
-  lla=length(latdat)
-  start=c(1,1)
-  count=c(llo,lla)
+source("~/LFRuns_utils/TrendAnalysis/R/function_loading.R")
 
-  
-  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
-  lla=length(latdat)
-  outlets = ncvar_get(ncb,namev,start = start, count= count) 
-  outlets=as.vector(outlets)/1000000
-  outll=expand.grid(londat,latdat)
-  lonlatloop=expand.grid(c(1:llo),c(1:lla))
-  outll$upa=outlets
-  outll$idlo=lonlatloop$Var1
-  outll$idla=lonlatloop$Var2
-  
-  outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
-  outfinal=inner_join(outll, Sloc_final, by="idlalo")
-  return (outfinal)
-}
-SpatialSkillPlot<-function(points,metric,inputfile){
-  #Plot parameters
-  cord.dec=points[,c(1,2)]
-  cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
-  cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
-  nco=cord.UTM@coords
-  world <- ne_countries(scale = "medium", returnclass = "sf")
-  Europe <- world[which(world$continent == "Europe"),]
-  e2=st_transform(Europe,  crs=3035)
-  w2=st_transform(world,  crs=3035)
-  tsize=12
-  osize=12
-  basemap=w2
-  
-  myfile=inputfile
-  skill=read.csv(paste0(valid_path,myfile))
-  if (length(skill[1,])>2){
-    years=c(1950:2020)
-    skill=skill[-73]
-    names(skill)[c(2:72)]=years
-  }
-  names(skill)[1]="Station_ID"
-  
-  #Only keep valid stations
-  valid=match(points$V1, skill$Station_ID)
-  skillv=skill[valid,]
-  skillm<-melt(skillv,id.vars ="Station_ID")
-  skillm2=skillm[which(skillm$value!=0),]
-  skillm2$value[which(is.infinite(skillm2$value))]=NA
-  
-  #average
-  if (length(skill[1,])>2){
-    dat_skill=aggregate(list(skill=skillm2$value),
-                        by = list(Station_ID=skillm2$Station_ID),
-                        FUN = function(x) c(mean= mean(x,na.rm=T),median=median(x,na.rm=T),max=max(x,na.rm=T)))
-    
-    dat_skill <- do.call(data.frame, dat_skill)
-  }else{
-    dat_skill=skillm2[,c(1,3)]
-  }
-  
-  
-  points=inner_join(points,dat_skill,by=c("V1"="Station_ID"))
-  if (length(skill[1,])>2){
-    points$skill=points$skill.mean
-    
-  }else{
-    points$skill=points$value
-  }
-  
-  #For correlation
-  if (metric=="r"){
-    palet=c(hcl.colors(9, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
-    limi=c(0,1)
-    var="r"
-  }
-  #For Bias
-  if (metric=="b"){
-    palet=c(hcl.colors(9, palette = "RdBu", alpha = NULL, rev = F, fixup = TRUE))
-    limi=c(0,2)
-    var="b"
-  }
-  #For Variability
-  if (metric=="v"){
-    palet=c(hcl.colors(9, palette = "RdBu", alpha = NULL, rev = F, fixup = TRUE))
-    #palet = c('#f61f0f','#f4cccc','#f6ebeb','#ffffff','#e4edf5','#91bfdb','#1c87d8')
-    limi=c(0,2)
-    var="v"
-  }
-  if (metric=="kge"){
-    colorz = c('#d73027','orange','#fee090','lightblue','royalblue',"darkblue")
-    kgelabs=c("< -0.41","-0.41 - 0","0 - 0.2", "0.2 - 0.5","0.5 - 0.75", ">0.75")
-    points$skill=as.numeric(points$skill)
-    points$kgecode=0
-    points$kgecode[which(is.na(points$skill))]=NA
-    points$kgecode[which(points$skill>(-0.41) & points$skill<=0)]=1
-    points$kgecode[which(points$skill>0 & points$skill<=0.2)]=2
-    points$kgecode[which(points$skill>0.2 & points$skill<=0.5)]=3
-    points$kgecode[which(points$skill>0.5 & points$skill<=0.75)]=4
-    points$kgecode[which(points$skill>0.75)]=5
-    var="kge"
-  }
-  parpl <- st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
-  parpl <- st_transform(parpl, crs = 3035)
-  parpef=parpl[which(parpl$calib==TRUE),]
-  if (metric =="kge"){
-    tsize=size=12
-    map=ggplot(basemap) +
-      geom_sf(fill="gray95", color=NA) +
-      geom_sf(data=parpl,aes(geometry=geometry),col="black",alpha=1,size=1.4,stroke=0.05,shape=1)+ 
-      geom_sf(data=parpl,aes(geometry=geometry,colour=factor(kgecode)),alpha=.9,size=1.4,stroke=0,shape=16)+ 
-      geom_sf(data=parpef,aes(geometry=geometry),col="black",alpha=1,size=1.4,stroke=0.1,shape=8)+ 
-      geom_sf(fill=NA, color="grey20") +
-      scale_x_continuous(breaks=seq(-30,40, by=5)) +
-      labs(x="Longitude", y = "Latitude")+
-      coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-      scale_color_manual(values = colorz, labels= kgelabs, name="KGE")   +
-      labs(x="Longitude", y = "Latitude") +
-      guides(colour = guide_legend(override.aes = list(size = 4)))+
-      theme(axis.title=element_text(size=tsize),
-            panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-            panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-            legend.title = element_text(size=tsize),
-            legend.text = element_text(size=osize),
-            legend.position = "bottom",
-            panel.grid.major = element_line(colour = "grey85",linetype="dashed"),
-            panel.grid.minor = element_line(colour = "grey90"),
-            legend.key = element_rect(fill = "transparent", colour = "transparent"),
-            legend.key.size = unit(.8, "cm"))
-  }else{
-    print(metric)
-    #plot for correlation even if called skill
-    map=ggplot(basemap) +
-      geom_sf(fill="gray95", color=NA) +
-      geom_sf(data=parpl,aes(geometry=geometry,fill=skill,size=UpA),color="transparent",alpha=.9,shape=21,stroke=0)+ 
-      geom_sf(fill=NA, color="grey20") +
-      geom_sf(data=parpl,aes(geometry=geometry,size=UpA),col="black",alpha=1,stroke=0.1,shape=1)+ 
-      scale_x_continuous(breaks=seq(-30,40, by=5)) +
-      scale_size(range = c(1, 3), trans="sqrt")+
-      scale_fill_gradientn(
-        colors=palet,n.breaks=5,oob = scales::squish, limits=limi, name=metric) +
-      coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-      labs(x="Longitude", y = "Latitude") +
-      guides(fill = guide_colourbar(barwidth = 0.5, barheight = 12,reverse=F))+
-      theme(axis.title=element_text(size=tsize),
-            panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-            panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-            legend.title = element_text(size=tsize),
-            legend.text = element_text(size=osize),
-            legend.position = "right",
-            panel.grid.major = element_line(colour = "grey85",linetype="dashed"),
-            panel.grid.minor = element_line(colour = "grey90"),
-            legend.key = element_rect(fill = "transparent", colour = "transparent"),
-            legend.key.size = unit(.8, "cm"))
-  }
-  return(list(points,map))
-}
-ScatterValid=function(obsin,nobs,simin,nsim,scplot,valid_path,ValidSta){
-  
-  # obs=read.csv(paste0(valid_path,fileobs))
-  # sim=read.csv(paste0(valid_path,filesim))
-  # names(obs)[1] = names(sim)[1]="Station_ID"
-  # 
-  # 
-  # if (length(obs[1,])>2){
-  #   years=c(1950:2020)
-  #   obs=obs[-73]
-  #   names(obs)[c(2:72)]=years
-  #   sim=sim[-73]
-  #   names(sim)[c(2:72)]=years
-  # }
-  # 
-  # #Only keep valid stations
-  # valid=match(ValidSta$V1, obs$Station_ID)
-  # obsv=obs[valid,]
-  # obstest<-melt(obsv,id.vars ="Station_ID")
-  # obstest2=obstest[which(obstest$value>0),]
-  # 
-  # length(unique(obstest2$Station_ID))
-  # 
-  # valid=match(ValidSta$V1, sim$Station_ID)
-  # simv=sim[valid,]
-  # simtest<-melt(simv,id.vars ="Station_ID")
-  # simtest2=simtest[which(simtest$value>0),]
-  # 
-  # length(unique(simtest2$Station_ID))
-  # 
-  
-  #Output plots
-  
-  if (length(obsin[1,])>3){
-    obs_sim=inner_join(obsin,simin, by=c("Station_ID","variable"))
-    obs_sim$value.x[which(is.infinite(obs_sim$value.x))]=NA
-    obs_sim$value.y[which(is.infinite(obs_sim$value.y))]=NA
-    length(unique(obs_sim$Station_ID))
-    names(obs_sim)[c(3,4)]=c("obs","sim")
-    dat=as.data.frame(obs_sim[c(1,2,3,4)])
-    
-    #average
-    dat_av=aggregate(list(obs=dat$obs,sim=dat$sim),
-                     by = list(station=dat$Station_ID),
-                     FUN = function(x) c(mean=mean(x,na.rm=T)))
-    
-    dat <- do.call(data.frame, dat_av)
-    dat=dat[which(!is.na(dat$obs)),]
-  }else{
-    obsin=obsin[,c(1,3)]
-    simin=simin[,c(1,3)]
-    obs_sim=inner_join(obsin,simin, by=c("Station_ID"))
-    obs_sim$value.x[which(is.infinite(obs_sim$value.x))]=NA
-    obs_sim$value.y[which(is.infinite(obs_sim$value.y))]=NA
-    length(unique(obs_sim$Station_ID))
-    names(obs_sim)[c(2,3)]=c("obs","sim")
-    dat=obs_sim
-  }
-  r=cor(dat$sim,dat$obs)
-  r2=round(r^2,3)
-  
-  mmax=max(max(dat$obs,dat$sim))
-  mmin=min(min(dat$obs,dat$sim))
-  tmax=round(mmax/1000)*1000
-  tmin=max(mmin,1e-3)
-  
-  bi=2000
-  if (tmax<10000) bi=1000
-  if (tmax<4000) bi=500
-  #dat$year=as.numeric(as.character(dat$variable))
-  # dat$obsj=jitter(dat$obs,0.001)+0.0001
-  # dat$simj=jitter(dat$sim,0.001)+0.0001
-  dat$density <- get_density(log(dat$obs), log(dat$sim), n = 100)
-  #dat$density <- get_density(log(dat$obsj), log(dat$simj), n = 100)
-  ggplot(dat,environment=environment()) + 
-    # geom_point(aes(x=obs, y=sim,col=density),stroke=0,size=3,alpha=0.2,shape=16) +
-    # geom_point(aes(x=obs, y=sim,col=density),stroke=0,size=3,alpha=0.2,shape=16) +
-    geom_jitter(aes(x=obs, y=sim,col=density),stroke=0,size=3,alpha=0.5,shape=16, height=.1, width=.0)+
-    geom_abline(slope=1, intercept=0, lwd =1, alpha=1,col="darkgreen",linetype="dashed")+
-    scale_x_log10(name=nobs,
-                  breaks=c(0.1,1,10,100,1000,10000), minor_breaks = log10_minor_break(),
-                  labels=c("0.1","1","10","100","1000","10000"), limits=c(tmin,tmax)) +
-    scale_y_log10(name=nsim,
-                  breaks=c(0.1,1,10,100,1000,10000), minor_breaks = log10_minor_break(),
-                  labels=c("0.1","1","10","100","1000","10000"), limits=c(tmin,tmax)) +
-    # scale_x_continuous(name=nobs,breaks=seq(0,tmax, by=bi))+
-    # scale_y_continuous(name=nsim,breaks=seq(0,tmax, by=bi))+
-    annotate("label", x=3*tmin, y=max(tmax), label= paste0("R2 = ",r2),size=5)+
-    scale_color_viridis(option="A")+
-    theme(axis.title=element_text(size=16, face="bold"),
-          axis.text = element_text(size=16),
-          panel.background = element_rect(fill = "white", colour = "white"),
-          panel.grid = element_blank(),
-          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-          legend.title = element_text(size=14),
-          legend.text = element_text(size=12),
-          legend.position = "none",
-          plot.margin = margin(1,1,1,1, "cm"),
-          panel.grid.major = element_line(colour = "grey80"),
-          panel.grid.minor = element_line(colour = "grey90",linetype="dashed"),
-          legend.key = element_rect(fill = "transparent", colour = "transparent"),
-          legend.key.size = unit(.8, "cm"))
-  
-  #dat$rat=dat$sim/dat$obs
-  #return(dat)
-  #ggsave(paste0(scplot,".jpg"), width=20, height=15, units=c("cm"),dpi=1500)
-}
-StatEpisode <- function (data, date.deb = NA, win = 10, qx.min = NULL, mode = "FL",obs=TRUE,plot=FALSE){
-  x <- data
-  # if (class(x$date)[1] == "POSIXt") {
-  # if (inherits(x$date,"POSIXt")){
-  #   date.deb <- as.POSIXct(date.deb, tz = "utc")
-  # }
-  if (mode=="FL"){
-    ind <- which(x$date >= date.deb-win/2)
-    ip <- which(ind >= min(ind) & ind <= (min(ind) + win))
-    ind <- ind[ip]
-  }
-  if (mode=="DR"){
-    ind <- which(x$date >= date.deb-1)
-    ip <- which(ind >= min(ind) & ind <= (min(ind) + win+1))
-    ind <- ind[ip]
-  }
-  
-  if (length(ind) < 3) {
-    cat("Episodes du ", format(date.deb, "%d-%b-%y"), "ignore (n<3)\n")
-    return(NULL)
-  }
-  if (obs==T) xep <- x[ind, c("date", "Q" , "Qs")]
-  if (obs==F) {xep <- x[ind, c("date", "Qs")]
-  xep$Q=xep$Qs}
-  # if (!is.null(fp)) {
-  #   tmp <- abat.niv(xep, fp)
-  #   xep <- data.frame(xep, Peff = tmp$P)
-  # }
-  if (is.null(qx.min))
-    qx.min <- max(x$Q, na.rm = TRUE)
-  #     if (is.null(px.min))
-  #         px.min <- max(x$P, na.rm = TRUE)
-  if (mode=="FL"){
-    q.max <- max(c(xep$Q, xep$Qs, qx.min), na.rm = TRUE)
-    q.maxsim<-max(na.omit(xep$Qs))
-    if (obs==T) {q.maxobs<-max(na.omit(xep$Q))
-    ec.pic = round((q.maxobs-q.maxsim)/q.maxobs*100,1)}
-    # p.max <- max(c(xep$P, px.min), na.rm = TRUE)
-    q.range <- c(0, 1.5 * q.max)
-    # p.range <- c(0, 3 * p.max)
-    ec=ec.pic
-  }
-  if (mode=="DR"){
-    q.max <- max(c(xep$Q, xep$Qs, qx.min), na.rm = TRUE)
-    q.minsim<-min(na.omit(xep$Qs))
-    if (obs==T){ q.minobs<-min(na.omit(xep$Q))
-    ec.vol = round((sum(na.omit(xep$Qs)-na.omit(xep$Q)))/sum(na.omit(xep$Q))*100,1)}
-    # p.max <- max(c(xep$P, px.min), na.rm = TRUE)
-    q.range <- c(0, 1.2 * q.max)
-    # p.range <- c(0, 3 * p.max)
-    ec=ec.vol
-  }
-  if (obs==T) kge<-c(kge=KGE(xep$Q,xep$Qs),r=cor(xep$Q,xep$Qs))
-  if (plot==T){
-    par(mar = c(2, 3, 2, 3), mgp = c(1.7, 0.5, 0))
-    # plot.window(range(xep$date))#, p.range)
-    plot.new()
-    
-    #     plot.hyeto(xep$date, xep$P, curve = TRUE, ylim = rev(p.range),
-    #         grid = FALSE, col = "lightblue", border = "azure", lwd = 2)
-    #     abline(v = axis.POSIXct(1, xep$date), col = "lightgrey",
-    #         lty = 3)
-    #     if (!is.null(fp))
-    #         plot.hyeto(xep$date, xep$Peff, curve = TRUE, ylim = rev(p.range),
-    #             grid = FALSE, border = NA)
-    #     axis(4, pretty(c(0, p.max), n = 5))
-    #     mtext("PrÃ©cipitations (mm)", 4, 1.7, cex = par()$cex)
-    
-    par(new = TRUE)
-    plot(xep$date, xep$Qs, ylim = q.range, type = "n", axes = FALSE,
-         xlab = "", ylab = expression(paste("Discharge ", (m^3/s),
-                                            sep = " ")))
-    h = axis(2, pretty(c(0, q.max*1.5), n = 5))
-    axis(1,xep$date, label=format(xep$date,"%d %b"),cex.axis=.8)
-    box()
-    points(xep$date, xep$Qs, type = "l", col = "red", pch = 2,
-           lwd = 2, cex = 0.6)
-    
-    if (obs==T) {points(xep$date, xep$Q, type = "l", col = "royalblue", lwd = 2)
-      legend("left", legend = c("Histo.", "Recal."), 
-             col = c("royalblue","red"), pch = c(NA, NA), lwd = 2, bty = "n", cex = 0.7)
-    }else{
-      
-    }
-    if (mode =="FL"){
-      #abline(h=quantile(data$Q,0.90,na.rm=T),col="darkgrey",lwd=2) 
-      if (obs==T){
-        txt.lab <- paste("KGE =", round(kge[1],2), "\nEc-pic =",ec.pic," %","\nr =",round(kge[2],3))
-        text(mean(xep$date), 1.2*q.max-0.1*q.max, pos=4, lab=txt.lab,cex=0.7)
-      }
-      titre <- paste("Episode du ", format(xep$date[which.max(xep$Q)],
-                                           "%a %d %B %Y"))
-      ec=ec.pic
-    }
-    if (mode =="DR"){
-      abline(h=quantile(data$Qs,0.05,na.rm=T),col="darkgrey",lwd=2) 
-      if (obs==T){
-        txt.lab <- paste("KGE =", round(kge[1],2), "\nEc-vol =",ec.vol," %","\nr =",round(kge[2],3))
-        text(mean(xep$date), 1.2*q.max-0.1*q.max, pos=4, lab=txt.lab,cex=0.7)
-      }
-      titre <- paste("Episode du ", format(xep$date[1],"%a %d %B %Y") ,"au ",
-                     format(xep$date[win], "%a %d %B %Y"))
-      ec=ec.vol
-    }
-    mtext(titre,3,font = 2,adj = 0,line = 0.5,cex = .75)
-    # legend("right", legend = c("Pluie", "Neige"), pch = 22, lwd = NA,
-    # lty = NA, col = "lightblue", pt.bg = c("lightblue", "azure"),
-    # pt.lwd = 1, pt.cex = 2, bty = "n", cex = 0.7)
-    # legend("right", legend = "Pluie", pch = 22, lwd = NA,
-    #         lty = NA, col = "azure", pt.bg = "lightblue",
-    #         pt.lwd = 1, pt.cex = 2, bty = "n", cex = 0.7)
-  }
-  if (obs==T) return(c(kge,error=ec,QmObs=q.maxobs,QmObs=q.maxobs,year=year(xep$date)[1]))
-}
-computeAnnualMaxima <- function(timeAndSeries) {
-  timeStamps <- timeAndSeries[,1]
-  srs <- timeAndSeries[,2]
-  
-  tmvec <- as.Date(timeStamps)
-  years <- format(tmvec, "%Y")
-  
-  findMax <- function(subIndxs) {
-    subIndxMaxIndx <- which.max(srs[subIndxs])[1]
-    subIndxs[subIndxMaxIndx]
-  }
-  annualMaxIndx <- tapply(1:length(srs), years, findMax)
-  annualMaxIndx <- annualMaxIndx[!is.na(annualMaxIndx)]
-  annualMax <- srs[annualMaxIndx]
-  annualMaxDate <- timeStamps[annualMaxIndx]
-  
-  return(list(annualMax = annualMax, annualMaxDate = annualMaxDate, annualMaxIndx = annualMaxIndx))
-}
-computeAnnualMinima <- function(timeAndSeries) {
-  timeStamps <- timeAndSeries[,1]
-  srs <- timeAndSeries[,2]
-  
-  tmvec <- as.Date(timeStamps)
-  years <- format(tmvec, "%Y")
-  
-  findMin <- function(subIndxs) {
-    subIndxMinIndx <- which.min(srs[subIndxs])[1]
-    subIndxs[subIndxMinIndx]
-  }
-  annualMinIndx <- tapply(1:length(srs), years, findMin)
-  annualMinIndx <- annualMinIndx[!is.na(annualMinIndx)]
-  annualMin <- srs[annualMinIndx]
-  annualMinDate <- timeStamps[annualMinIndx]
-  
-  return(list(annualMin = annualMin, annualMinDate = annualMinDate, annualMinIndx = annualMinIndx))
-}
-#Circular statistics for mean date
-seasony=function(x){
-  theta=x*(2*pi/365.25)
-  #plot(cos(theta),sin(theta),xlim=c(-1,1),ylim=c(-1,1))
-  xi=1/(length(theta))*sum(cos(na.omit(theta)))
-  yi=1/(length(theta))*sum(sin(na.omit(theta)))
-  if (xi<=0){
-    Di=(atan(yi/xi)+pi)*(365.25/(2*pi))
-  }else if(xi>0 & yi>=0){
-    Di=(atan(yi/xi))*(365.25/(2*pi))
-  }else if(xi>0 & yi<0){
-    Di=(atan(yi/xi)+2*pi)*(365.25/(2*pi))
-  }
-  R=sqrt(xi^2+yi^2)
-  return(c(Di,R))
-}
-season1=function(x){
-  l1=length(which(!is.na(x)))
-  if(l1>0){
-    x=x[which(!is.na(x))]
-    theta=x*(2*pi/365.25)
-    # plot(theta)
-    
-    xi=1/(length(theta))*sum(cos(theta))
-    yi=1/(length(theta))*sum(sin(theta))
-    if (xi<=0){
-      Di=(atan(yi/xi)+pi)*(365.25/(2*pi))
-    }else if(xi>0 & yi>=0){
-      Di=(atan(yi/xi))*(365.25/(2*pi))
-    }else if(xi>0 & yi<0){
-      Di=(atan(yi/xi)+2*pi)*(365.25/(2*pi))
-    }
-    R=sqrt(xi^2+yi^2)
-  }else{Di=NA}
-  return(Di)
-}
-season2=function(x){
-  l1=length(which(!is.na(x)))
-  if(l1>0){
-    x=x[which(!is.na(x))]
-    theta=x*(2*pi/365.25)
-    # plot(theta)
-    
-    xi=1/(length(theta))*sum(cos(theta))
-    yi=1/(length(theta))*sum(sin(theta))
-    if (xi<=0){
-      Di=(atan(yi/xi)+pi)*(365.25/(2*pi))
-    }else if(xi>0 & yi>=0){
-      Di=(atan(yi/xi))*(365.25/(2*pi))
-    }else if(xi>0 & yi<0){
-      Di=(atan(yi/xi)+2*pi)*(365.25/(2*pi))
-    }
-    R=sqrt(xi^2+yi^2)
-  }else{Di=NA
-  R=NA}
-  return(R)
-}
-resOpen=function(dir,outletname,ValidSY){
-  ncbassin=paste0(dir,outletname)
-  ncb=nc_open(ncbassin)
-  name.vb=names(ncb[['var']])
-  namev=name.vb[1]
-  #time <- ncvar_get(ncb,"time")
-  
-  #timestamp corretion
-  name.lon="lon"
-  name.lat="lat"
-  londat = ncvar_get(ncb,name.lon) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat)
-  lla=length(latdat)
-  start=c(1,1)
-  count=c(llo,lla)
-  
-  
-  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
-  lla=length(latdat)
-  outlets = ncvar_get(ncb,namev,start = start, count= count) 
-  outlets=as.vector(outlets)
-  outll=expand.grid(londat,latdat)
-  lonlatloop=expand.grid(c(1:llo),c(lla:1))
-  outll$res.ratio=outlets
-  outll$idlo=lonlatloop$Var1
-  outll$idla=lonlatloop$Var2
-  
-  outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
-  outlp=outll[which(!is.na(outll$res.ratio)),]
-  mf=match(ValidSY$idlalo,outlp$idlalo)
-  ValidSY$res.ratio=outlp$res.ratio[mf]
-  return (ValidSY)
-}
 
-outletopen=function(dir,outletname,nrspace=rep(NA,5)){
-  ncbassin=paste0(dir,"/",outletname,".nc")
-  ncb=nc_open(ncbassin)
-  name.vb=names(ncb[['var']])
-  namev=name.vb[1]
-  #time <- ncvar_get(ncb,"time")
-  
-  #timestamp corretion
-  name.lon="lon"
-  name.lat="lat"
-  if (!is.na(nrspace[1])){
-    start=as.numeric(nrspace[c(2,4)])
-    count=as.numeric(nrspace[c(3,5)])-start+1
-  }else{
-    londat = ncvar_get(ncb,name.lon) 
-    llo=length(londat)
-    latdat = ncvar_get(ncb,name.lat)
-    lla=length(latdat)
-    start=c(1,1)
-    count=c(llo,lla)
-  }
-  
-  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
-  lla=length(latdat)
-  outlets = ncvar_get(ncb,namev,start = start, count= count) 
-  outlets=as.vector(outlets)
-  outll=expand.grid(londat,latdat)
-  lonlatloop=expand.grid(c(1:llo),c(1:lla))
-  outll$idlo=lonlatloop$Var1
-  outll$idla=lonlatloop$Var2
-  
-  mierda=which(!is.na(outlets))
-  outll=outll[mierda,]
-  outlets=outlets[which(!is.na(outlets))]
-  outll=data.frame(outlets,outll)
-  return (outll)
-}
 # Files paths -------------------------------------------------------------
 main_path = 'D:/tilloal/Documents/06_Floodrivers/'
 valid_path = paste0(main_path,'DataPaper/')
 dis_path<-paste0(main_path,'dis/calibrated/filtered/Histo/')
 setwd(valid_path)
+outletname = "outletsv8_hybas07_01min"
+hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
 # Part 1: Create the Valid station file -------------------------------------------
-min_daily_value <- function(timeseries) {
-  # Convert the 6-hourly time series to daily time series
-  daily_timeseries <- apply.daily(timeseries, min)
-  tday=unique(as.Date(timeseries[,1]))
-  return(data.frame(date=tday,Qmd=daily_timeseries))
-}
 timeseries=frostserie
 #Loading all txt files with matching locations
 #load matching coordinates
@@ -722,16 +108,6 @@ dat=obs_sim
 # TSEVA on observed values
 ValidSf=read.csv(file="Stations/Stations_Validation.csv")[,-1]
 ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
-length(ValidSY$comment[which(ValidSY$UpA<=250)])/2901
-length(ValidSY$comment[which(ValidSY$skill>-0.41)])
-median(ValidSY$skill)
-
-vEFAS=ValidSY[which(ValidSY$csource=="EFAS"),]
-median(vEFAS$skill)
-
-######################################################################################
-outletname = "outletsv8_hybas07_01min"
-hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
 #load frost days
 # load(file=paste0(hydroDir,"/Drought/catchment_frost.Rdata"))
@@ -783,16 +159,22 @@ HERA_comp<-HERA_data2[-1,SelectHera]
 
 station_Q<-Q_data[1,-1]
 SelectQ=which(station_Q %in% ValidSLong$V1)
+station_ido=data.frame(id=t(station_Q[SelectQ]))
+
 Q_dates<-Q_data[,1]
 Q_data2<-Q_data[,-1]
 Q_comp<-Q_data2[-1,SelectQ]
 
+plot(station_ido$X2,station_ids$X1)
 
 station_idplus=left_join(station_ids,mycat,by=c("X1"="V1"))
 
 #Fit TSEVA on observed values
 dates_Hera <- seq(as.Date("1950-01-04"), as.Date("2020-12-31"), by = "days")
 dates_Q <- seq(as.Date("1950-01-01"), as.Date("2020-12-31"), by = "days")
+id=3
+plot(Q_comp[,id])
+plot(HERA_comp[,id])
 #load TSEVA functions
 source("~/LFRuns_utils/TSEVA_demo/demo_functions.R")
 library(xts)
@@ -1121,8 +503,217 @@ save(parlist,file=paste0(hydroDir,"/TSEVA_hybas/outputs/parValid_",haz,"_",dset,
 save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResValid_",haz,"_",dset,"_1950_2020.Rdata"))
 
 
+
 #Now I have to compare the trends
 
+# Part 3: Trend comparisons------------------------------------
+
+################################################################################
+##########    Comparison between calibrated and uncalibrated run    ############
+################################################################################
+
+#Plotting function
+Diff.plots.points=function(basemap,sppoints, lims=c(-50,50),trans="identity", brk=NULL, scale="diverging",title=" ",name= " "){
+  if (scale=="diverging")  palet=c(hcl.colors(8, palette = "RdYlBu", alpha = NULL, rev = TRUE, fixup = TRUE))
+  if (scale=="sequential")  palet=c(hcl.colors(8, palette = "YlGnBu", alpha = NULL, rev = TRUE, fixup = TRUE))
+  ggplot(basemap) +
+    geom_sf(fill="gray85")+
+    geom_sf(fill=NA, color="grey") +
+    geom_sf(data=sppoints,aes(color=diffplot,geometry=geometry),alpha=1,size=0.1,stroke=0,shape=15)+ 
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    scale_color_gradientn(
+      colors=palet, limits=lims,oob = scales::squish,
+      name=name, trans=trans,breaks=brk)   +
+    labs(x="Longitude", y = "Latitude")+
+    guides(fill = guide_colourbar(barwidth = 15, barheight = .8))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "right",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle(title)
+}
+Diff.plots.catch=function(basemap,spcatch, lims=c(-50,50),trans="identity", brk=NULL, scale="diverging",title=" ",name= " "){
+  
+  if (scale=="diverging")  palet=c(hcl.colors(8, palette = "RdYlBu", alpha = NULL, rev = FALSE, fixup = TRUE))
+  if (scale=="sequential")  palet=c(hcl.colors(8, palette = "YlGnBu", alpha = NULL, rev = TRUE, fixup = TRUE))
+  ggplot(basemap) +
+    geom_sf(fill="gray85")+
+    geom_sf(data=spcatch,aes(fill=diffplot,geometry=geometry),color="transparent",alpha=1,size=0.1,stroke=0,shape=15)+ 
+    geom_sf(fill=NA, color="grey") +
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    scale_fill_gradientn(
+      colors=palet, limits=lims, breaks=brk, trans=trans, oob = scales::squish,name=name)   +
+    labs(x="Longitude", y = "Latitude")+
+    guides(fill = guide_colourbar(barwidth = 15, barheight = .8))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle (title)
+  
+}
+
+
+#observed
+load(paste0(hydroDir,"/TrendAnalysis/ResValid_flood_obs_1950_2020.Rdata"))
+dataObs=Results
+
+#simulated
+load(paste0(hydroDir,"/TrendAnalysis/ResValid_flood_sim_1950_2020.Rdata"))
+dataSim=Results
+
+
+plot(dataObs$catrest$catlist,dataSim$catrest$catlist)
+#add latitude and longitude to input
+ValidSf=read.csv(file=paste0(valid_path,"Stations/Stations_Validation.csv"))[,-1]
+ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
+#compute Rls for modelled and observed
+
+dataObs$catrest
+
+#use station_idplus to get the correponding station
+
+Catnames=data.frame(dataObs$catrest,station_idplus$X1)
+
+RLObs=data.frame(dataObs$RetLevGPD,unikout=as.numeric(station_ido$X2))
+RLSim=data.frame(dataSim$RetLevGPD,unikout=station_ids$X1)
+
+
+#generate the changes
+period=c(1965,2005)
+years=c(period[1]:period[2])
+valuenames=paste0("X",years)
+
+datacol=names(RLObs)
+valcol=match(valuenames,datacol)
+datatwin=RLObs
+valcol2=valcol
+datatwin=as.data.frame(datatwin)
+
+cref=paste0("X",period[1])
+crefloc=match(cref,dtc)
+finalperiod=paste0("X",period[2])
+colsel=match(finalperiod,datacol)
+
+palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+# title=paste0("Relative change in 10-years ",haz," Return Level between ", period[1], " and ", period[2])
+legend="Relative Change (%)"
+tmpval=(datatwin[,valcol2])/(datatwin[,crefloc])*100-100
+datatwin[,valcol2]=tmpval
+RLObs_ch=datatwin
+
+
+datacol=names(RLSim)
+valcol=match(valuenames,datacol)
+datatwin=RLSim
+valcol2=valcol
+datatwin=as.data.frame(datatwin)
+
+cref=paste0("X",period[1])
+crefloc=match(cref,dtc)
+finalperiod=paste0("X",period[2])
+colsel=match(finalperiod,datacol)
+
+tmpval=(datatwin[,valcol2])/(datatwin[,crefloc])*100-100
+datatwin[,valcol2]=tmpval
+RLSim_ch=datatwin
+
+
+
+br=c(-100,-80,-60,-40,-20,0,20,40,60,80,100)
+limi=c(-100,100)
+trans=scales::modulus_trans(.8)
+colNA="green"
+
+data_compObsSim=inner_join(RLObs,RLSim,by="unikout")
+plot(data_compObsSim$X2005.y,data_compObsSim$X2005.x,log="xy")
+abline(a=0,b=1,col=2,lwd=2)
+
+data_compObsSim=inner_join(RLObs_ch,RLSim_ch,by="unikout")
+
+
+#make a plot with four squares showing the success areas
+plot(data_compObsSim$X2005.y,data_compObsSim$X2005.x)
+abline(a=0,b=1,col=2,lwd=2)
+model <- cor.test(data_compObsSim$X2005.y,data_compObsSim$X2005.x)
+model
+
+#agreement in sign of change
+lp1=length(which(data_compObsSim$X2005.y>0 & data_compObsSim$X2005.x>0))
+ln1=length(which(data_compObsSim$X2005.y<=0 & data_compObsSim$X2005.x<=0))
+
+lp2=length(which(data_compObsSim$X2005.y>0 & data_compObsSim$X2005.x<=0))
+ln2=length(which(data_compObsSim$X2005.y<=0 & data_compObsSim$X2005.x>0))
+
+lt=lp1+lp2+ln1+ln2
+truesign=(lp1+ln1)/lt
+
+data_compObsSim$diffplot=data_compObsSim$X2005.y - data_compObsSim$X2005.x
+
+plot(data_compObsSim$diffplot)
+data_plot=data.frame(loc=data_compObsSim$unikout,var=data_compObsSim$diffplot)
+data_plot=inner_join(data_plot,ValidSY,by=c("loc"="V1"))
+ppl <- st_as_sf(data_plot, coords = c("Var1", "Var2"), crs = 4326)
+ppl <- st_transform(ppl, crs = 3035)
+
+
+#twek the plot to have changing sizes for the points
+
+plot(ppl$var)
+ggplot(basemap) +
+  geom_sf(fill="gray85")+
+  geom_sf(fill=NA, color="grey") +
+  geom_sf(data=ppl,aes(color=var,geometry=geometry),alpha=1,size=0.1,stroke=0,shape=15)+ 
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_color_gradientn(
+    colors=palet, limits=lims,oob = scales::squish,
+    name=name, trans=trans,breaks=brk)   +
+  labs(x="Longitude", y = "Latitude")+
+  guides(fill = guide_colourbar(barwidth = 15, barheight = .8))+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))+
+  ggtitle(title)
+
+
+
+t1="Comparison of changes in 10-years RL flood between simulated and observed data"
+n1="Cal - Uncal \n relative difference (%)"
+dp1=Diff.plots.points(basemap,data_diffCalUncal,c(-50,50), brk=c(-50,-25,0,25,50),scale="diverging",t1,n1)
+dp1
+#Catchment level
+data_changecal=Plot.change[[4]]
+data_changeuncal=Plot.change2[[4]]
+st_geometry(data_changecal)=NULL
+st_geometry(data_changeuncal)=NULL
+
+data_diffCalUncal=inner_join(data_changecal,data_changeuncal,by="HYBAS_ID")
+data_diffCalUncal$diffplot=data_diffCalUncal$Rchange.mean.x - data_diffCalUncal$Rchange.mean.y
+data_diffCalUncal=inner_join(hybasf7,data_diffCalUncal,by= "HYBAS_ID")
+
+t2="Comparison of changes in 100-years RL flood between uncalibrated and calibrated runs"
+n2="Cal - Uncal \n relative difference (%)"
+dp2=Diff.plots.catch(basemap,data_diffCalUncal,c(-50,50), brk=c(-50,-25,0,25,50),scale="diverging",t2,n2)
+dp2
 #load the simulated discharge
 
 #compute the changes, plot the changes, save the changes, compare
