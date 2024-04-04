@@ -511,7 +511,7 @@ save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResValid_",haz,"_",dset
 ################################################################################
 ##########    Comparison between calibrated and uncalibrated run    ############
 ################################################################################
-
+setwd("~/LFRuns_utils/TrendAnalysis")
 #Plotting function
 Diff.plots.points=function(basemap,sppoints, lims=c(-50,50),trans="identity", brk=NULL, scale="diverging",title=" ",name= " "){
   if (scale=="diverging")  palet=c(hcl.colors(8, palette = "RdYlBu", alpha = NULL, rev = TRUE, fixup = TRUE))
@@ -589,8 +589,9 @@ Catnames=data.frame(dataObs$catrest,station_idplus$X1)
 
 RLObs=data.frame(dataObs$RetLevGPD,unikout=as.numeric(station_ido$X2))
 RLSim=data.frame(dataSim$RetLevGPD,unikout=station_ids$X1)
-
-
+order(RLObs$unikout)
+RLSim=RLSim[order(RLSim$unikout),]
+order(RLSim$unikout)
 #generate the changes
 period=c(1965,2005)
 years=c(period[1]:period[2])
@@ -650,38 +651,194 @@ abline(a=0,b=1,col=2,lwd=2)
 model <- cor.test(data_compObsSim$X2005.y,data_compObsSim$X2005.x)
 model
 
-#agreement in sign of change
-lp1=length(which(data_compObsSim$X2005.y>0 & data_compObsSim$X2005.x>0))
-ln1=length(which(data_compObsSim$X2005.y<=0 & data_compObsSim$X2005.x<=0))
-
-lp2=length(which(data_compObsSim$X2005.y>0 & data_compObsSim$X2005.x<=0))
-ln2=length(which(data_compObsSim$X2005.y<=0 & data_compObsSim$X2005.x>0))
-
-lt=lp1+lp2+ln1+ln2
-truesign=(lp1+ln1)/lt
 
 data_compObsSim$diffplot=data_compObsSim$X2005.y - data_compObsSim$X2005.x
 
 plot(data_compObsSim$diffplot)
-data_plot=data.frame(loc=data_compObsSim$unikout,var=data_compObsSim$diffplot)
+
+#legend="Kendall tau"
+mkoa=c()
+mksa=c()
+corv=c()
+for (it in 1:length(RLSim[,1])){
+  if (it%%1000==0) print(it)
+  mks=NA
+  mkt=NA
+  miniTSim=as.numeric(RLSim[it,-71])
+  miniTObs=as.numeric(RLObs[it,-71])
+  Kor=cor(miniTSim,miniTObs)
+  if (!is.na(miniTS[2])){
+    #mk=MannKendall(miniTS[-1])
+    mko1=mmkh(miniTObs[-1],ci=0.95)
+    mks1=mmkh(miniTSim[-1],ci=0.95)
+    mko2=data.frame(sens=mko1[7],sl=mko1[2])
+    mks2=data.frame(sens=mks1[7],sl=mks1[2])
+    #compute trend as well with sen.slope
+  }else{
+    mko2=data.frame(sens=NA,sl=NA)
+    mks2=data.frame(sens=NA,sl=NA)
+
+  }
+  mkoa=rbind(mkoa,mko2)
+  mksa=rbind(mksa,mks2)
+  corv=c(corv,Kor)
+}
+
+hist(corv,breaks=50)
+mkoa$siglvl=0
+mkoa$siglvl[which(mkoa$sl<=0.1)]=1
+length(mkoa$sens[which(mkoa$siglvl==1)])
+
+mksa$siglvl=0
+mksa$siglvl[which(mksa$sl<=0.1)]=1
+length(mksa$sens[which(mksa$siglvl==1)])
+
+Recap=cbind(mkoa,mksa,corv)
+colnames(Recap)=c("senslope_o","pval_o","siglevel_o","senslope_s","pval_s","siglevel_s","correlation")
+Recap$doublesig=0
+Recap$doublesig[which(Recap$siglevel_o==1 & Recap$siglevel_s==1)]=1
+plot(Recap$senslope_o,Recap$senslope_s,col=Recap$siglevel_o+3)
+
+
+#Add the 1965-2005 changes to Recap
+Recap$ObsChange=data_compObsSim$X2005.x
+Recap$SimChange=data_compObsSim$X2005.y
+Recap$alpha=1/(round(Recap$pval_o,2)+1e-2)/100
+plot(Recap$ObsChange,Recap$SimChange)
+abline(a=0,b=1,col=2,lwd=2)
+
+
+#agreement in sign of change
+lp1=length(which(Recap$ObsChange>0 & Recap$SimChange>0))
+ln1=length(which(Recap$ObsChange<=0 & Recap$SimChange<=0))
+
+lp2=length(which(Recap$ObsChange>0 & Recap$SimChange<=0))
+ln2=length(which(Recap$ObsChange<=0 & Recap$SimChange>0))
+
+lt=lp1+lp2+ln1+ln2
+truesign=(lp1+ln1)/lt
+
+
+Rsig=Recap[which(Recap$siglevel_o==1),]
+# lp1=length(which(Rsig$ObsChange>0 & Rsig$SimChange>0))
+# ln1=length(which(Rsig$ObsChange<=0 & Rsig$SimChange<=0))
+# 
+# lp2=length(which(Rsig$ObsChange>0 & Rsig$SimChange<=0))
+# ln2=length(which(Rsig$ObsChange<=0 & Rsig$SimChange>0))
+median(Rsig$correlation)
+r=cor(Recap$ObsChange,Recap$SimChange)
+r2=round(r^2,3)
+# Assuming 'data' is your data frame, 'x' and 'y' are your variables, and 'z' is the variable for transparency
+ps<-ggplot() +
+  annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=0, fill="lightskyblue", alpha=0.4) +
+
+  annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=0, fill="lightsalmon", alpha=0.4) +
+
+  annotate("rect", xmin=0, xmax=Inf, ymin=0, ymax=Inf, fill="lightskyblue", alpha=0.4) +
+
+  annotate("rect", xmin=-Inf, xmax=0, ymin=0, ymax=Inf, fill="lightsalmon", alpha=0.4) +
+
+  geom_point(data=Recap, aes(x=ObsChange, y=SimChange, color=correlation),alpha=0.7,size=2) +
+  geom_point(data= Rsig, aes(x=ObsChange, y=SimChange),fill="transparent", color="gray25",shape=21,size=2)+
+  geom_abline(slope=1,intercept=0,col="gray25",lwd=1.5,alpha=.5)+
+
+  annotate("label", x=-90, y=100, label= paste0("N = ",ln2),size=5)+
+  annotate("label", x=90, y=100, label= paste0("N = ",lp1),size=5)+
+  annotate("label", x=90, y=-100, label= paste0("N = ",lp2),size=5)+
+  annotate("label", x=-90, y=-100, label= paste0("N = ",ln1),size=5)+
+  
+  scale_x_continuous(name="Observed change (%)",breaks = seq(-100,100,by=25), limits = c(-100,100))+
+  scale_y_continuous(name="Simulated change (%)",breaks = seq(-100,100,by=25), limits = c(-100,100))+
+  scale_color_gradientn(
+    colors=palet, limits=c(-1,1),oob = scales::squish,
+    name="temporal correlation",breaks=seq(-1,1, by=0.2))+
+  # scale_alpha_continuous(name="trend significance",range = c(0.5, 1))+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))+
+  ggtitle("Observed and simulated relative changes in 10y-RL flood between 1965 and 2005")# adjust transparency range if needed
+
+ggsave("plots/scatter_correlation_floodtrends.jpg", ps, width=20, height=15, units=c("cm"),dpi=1500)
+
+
+
+#Histogram of correlation like in Validation
+Recap$bins <-(cut(Recap$correlation, breaks = 20))
+Recag=Recap %>%
+  group_by(bins) %>%
+  summarise(mean = mean(correlation), n = length(correlation))
+plot(Recap$correlation)
+colors <- c(hcl.colors(19, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+length(Recap$correlation[which(Recap$correlation>0)])
+length(Recap$correlation[which(Recap$correlation>0.5)])
+length(Recap$correlation[which(Recap$correlation>0.5 & Recap$siglevel_o==1)])
+length(Recap$correlation[which(Recap$siglevel_o==1)])
+name="Temporal correlation"
+
+p<-ggplot(data=Recap, aes(x=correlation)) + 
+  geom_histogram(fill=colors,color="grey20",alpha=0.9,lwd=1,bins=20) +
+  #geom_bar( data=Recap, aes(x=binN, fill=binN, group=bins),color="grey20",alpha=0.9,lwd=1) +
+  geom_point(x=median(Recap$correlation,na.rm=T),y=0,pch=21,size=4,stroke=2,fill="royalblue")+
+  geom_vline(xintercept=1,col=2,lwd=2)+
+  # scale_fill_gradientn(
+  #   colors=palet,oob = scales::squish,
+  #   name="temporal correlation",breaks=seq(-1,1, by=0.2))+
+  scale_y_continuous(name="Number of stations")+
+  scale_x_continuous(name=name,breaks=seq(-1,1,by=0.2), limit=c(-1,1)) +
+  #scale_x_discrete(labels= c("< -0.41","-0.41-0.2", "0.2-0.5","0.5-0.7","0.7-0.8", ">0.8"), name="KGE")+
+  theme(axis.title=element_text(size=16, face="bold"),
+        axis.text = element_text(size=13),
+        panel.background = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=14),
+        legend.text = element_text(size=12),
+        legend.position = "none",
+        panel.grid.major = element_line(colour = "grey80"),
+        panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+p
+ggsave("plots/histo_correlation_floodtrends.jpg", p, width=20, height=15, units=c("cm"),dpi=1500)
+#TP TN etc plots
+
+
+data_plot=data.frame(loc=data_compObsSim$unikout,var=Recap$correlation, sigo=Recap$siglevel_o)
 data_plot=inner_join(data_plot,ValidSY,by=c("loc"="V1"))
 ppl <- st_as_sf(data_plot, coords = c("Var1", "Var2"), crs = 4326)
 ppl <- st_transform(ppl, crs = 3035)
 
-
-#twek the plot to have changing sizes for the points
-
+ppl2=ppl[which(ppl$sigo==1),]
+br=c(-1,-0.75,-0.5,-0.25,0,0.25,0.50,0.75,1)
+lims=c(-1,1)
+tsize=12
+osize=12
+title="Correlation between simulated and observed 10y-RL flood trends between (1965-2005)"
+palet=c(hcl.colors(8, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 plot(ppl$var)
-ggplot(basemap) +
+
+pm<-ggplot(basemap) +
   geom_sf(fill="gray85")+
   geom_sf(fill=NA, color="grey") +
-  geom_sf(data=ppl,aes(color=var,geometry=geometry),alpha=1,size=0.1,stroke=0,shape=15)+ 
+  geom_sf(data=ppl,aes(color=var,geometry=geometry,size=UpA),alpha=.9,shape=19,stroke=0)+ 
+  geom_sf(data=ppl2,aes(geometry=geometry,size=UpA),color="black",alpha=.9,shape=21,stroke=0.1,fill=NA)+ 
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(1, 4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                  sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"))+
   scale_color_gradientn(
-    colors=palet, limits=lims,oob = scales::squish,
-    name=name, trans=trans,breaks=brk)   +
+    colors=palet,oob = scales::squish,
+    name="r",breaks=br, labels=br)   +
   labs(x="Longitude", y = "Latitude")+
-  guides(fill = guide_colourbar(barwidth = 15, barheight = .8))+
+  guides(fill = guide_colourbar(barwidth = 1, barheight = 12))+
   theme(axis.title=element_text(size=tsize),
         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
@@ -693,6 +850,9 @@ ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))+
   ggtitle(title)
+
+ggsave("plots/map_correlation_floodtrends.jpg", pm, width=20, height=15, units=c("cm"),dpi=1500)
+
 
 
 
