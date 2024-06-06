@@ -720,11 +720,11 @@ truesign=(lp1+ln1)/lt
 
 
 Rsig=Recap[which(Recap$siglevel_o==1),]
-# lp1=length(which(Rsig$ObsChange>0 & Rsig$SimChange>0))
-# ln1=length(which(Rsig$ObsChange<=0 & Rsig$SimChange<=0))
-# 
-# lp2=length(which(Rsig$ObsChange>0 & Rsig$SimChange<=0))
-# ln2=length(which(Rsig$ObsChange<=0 & Rsig$SimChange>0))
+lp1=length(which(Rsig$ObsChange>0 & Rsig$SimChange>0))
+ln1=length(which(Rsig$ObsChange<=0 & Rsig$SimChange<=0))
+
+lp2=length(which(Rsig$ObsChange>0 & Rsig$SimChange<=0))
+ln2=length(which(Rsig$ObsChange<=0 & Rsig$SimChange>0))
 median(Rsig$correlation)
 r=cor(Recap$ObsChange,Recap$SimChange)
 r2=round(r^2,3)
@@ -777,8 +777,8 @@ Recag=Recap %>%
 plot(Recap$correlation)
 colors <- c(hcl.colors(19, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 length(Recap$correlation[which(Recap$correlation>0)])
-length(Recap$correlation[which(Recap$correlation>0.5)])
-length(Recap$correlation[which(Recap$correlation>0.5 & Recap$siglevel_o==1)])
+length(Recap$correlation[which(Recap$correlation>0.5)])/length(Recap$correlation)
+length(Recap$correlation[which(Recap$SimChange>0.5 & Recap$siglevel_o==1)])
 length(Recap$correlation[which(Recap$siglevel_o==1)])
 name="Temporal correlation"
 
@@ -1102,9 +1102,7 @@ nobs=paste0("Q",qtil,"_obs")
 nsim=paste0("Q",qtil,"_sim")
 scplot=paste0("scatterplot_Q",qtil)
 qloc=match(myq,colnames(obs))
-def my_function():
-  # This is a comment explaining the purpose of this function
-  print("Hello, world!")
+
   scale_x_log10(name=expression(paste("Upstream area ", (km^2),sep = " ")),
                 breaks=c(100,1000,10000,100000), minor_breaks = log10_minor_break(),
                 labels=c("100","1 000","10 000","100 000")) +
