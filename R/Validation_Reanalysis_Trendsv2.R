@@ -10,9 +10,16 @@ library(ggplot2)
 library(viridis)
 library(rnaturalearth)
 library(hydroGOF)
-
+library(readxl)
 source("~/LFRuns_utils/TrendAnalysis/R/function_loading.R")
 
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
 
 # Files paths -------------------------------------------------------------
 main_path = 'D:/tilloal/Documents/06_Floodrivers/'
@@ -23,158 +30,186 @@ outletname = "outletsv8_hybas07_01min"
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
 # Part 1: Create the Valid station file -------------------------------------------
-timeseries=frostserie
-#Loading all txt files with matching locations
-#load matching coordinates
-Sloc=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_1950.txt"),sep=",")
-yrlist=c(1951:2020)
-for (yi in yrlist){
-  print(yi)
-  Slocy=read.table(paste0(valid_path,"out/Stations_locations_EFAS_grid_",yi,".txt"),sep=",")
-  Slocrep=Slocy[which(Sloc$V2==0),]
-  Sloc[which(Sloc$V2==0),]=Slocrep
-}
-Sloc_final=Sloc[which(Sloc$V2!=0),]
-Sloc_final$csource="SpatialQMatch"
-
-#transalting to R indexing after python
-Sloc_final$V2=Sloc_final$V2+1
-Sloc_final$V3=Sloc_final$V3+1
-
-#load file of stations from EFAS
-flefas=read.csv(paste0(valid_path,"Stations/efas_flooddriver_match.csv"))
-efasmatch=match(flefas$StationID,Sloc_final$V1)
-faichier=inner_join(flefas,Sloc_final,by=c("StationID"="V1"))
-Sloc_final$csource[efasmatch]="EFAS"
-Sloc_final$idlalo=paste(Sloc_final$V3,Sloc_final$V2, sep=" ")
-
-#Now the upstream area
-outletname="GIS/upArea_European_01min.nc"
-dir=valid_path
-UpArea=UpAopen(valid_path,outletname,Sloc_final)
-head(UpArea)
-ValidSta=UpArea[which(UpArea$upa>100),]
-
-
-## Flag stations that have very different mean discharges -------------
-fileobs="out/obs_meanAY.csv"
-filesim="out/EFAS_meanAY.csv"
-obs=read.csv(paste0(valid_path,fileobs))
-names(obs)=c("Station_ID","mean")
-sim=read.csv(paste0(valid_path,filesim))
-names(sim)=c("Station_ID","mean")
-
-years=c(1950:2020)
-obstest=obs[which(!is.infinite(obs$mean)),]
-simtest=sim[which(!is.infinite(sim$mean)),]
-obs_sim=inner_join(obstest,simtest, by=c("Station_ID"))
-names(obs_sim)[c(2,3)]=c("obs","sim")
-
-#Remove stations that were removed in the first step
-rmv0=which(!is.na(match(obs_sim$Station_ID,ValidSta$V1)))
-obs_sim=obs_sim[rmv0,]
-rmv1=match(obs_sim$Station_ID,ValidSta$V1)
-obs_sim$UpA=ValidSta$upa[rmv1]
-## Flag EFAS stations that were used for calibration --------
-efas_stations_orig=read.csv("Stations/stations_efas_meta.csv",sep=";")
-efas_stations_orig$latlong=paste(efas_stations_orig$LisfloodX, efas_stations_orig$LisfloodY, sep=" ")
-efas_stations=flefas
-efas_stations$latlong=paste(efas_stations$LisfloodX, efas_stations$LisfloodY, sep=" ")
-efas_stations2=inner_join(efas_stations, efas_stations_orig,by="latlong")
-efas_stations_cal=efas_stations2[which(efas_stations2$EC_calib==1),]
-ValidSta$calib=FALSE
-matchcal=match(efas_stations_cal$StationID,ValidSta$V1)
-ValidSta$calib[matchcal]=TRUE
-
-## Number of years with data ------------
-Q_data <- read.csv(paste0('Q_19502020.csv'), header = F)  # CSVs with observations
-HERA_data<-read.csv(file="out/EFAS_19502020.csv")
-Q_data=Q_data[-1,-1]
-Station_data_IDs <- as.vector(t(Q_data[1, -1]))
-lR=c()
-for (id in 1:length(Station_data_IDs)){
-  Qs=Q_data[-1,id+1]
-  xl=length(Qs)
-  l=length(which(!is.na(Qs)))
-  lR=c(lR,l)
-}
-plot(lR[order(lR)])
-RecordLen=data.frame(Station_data_IDs,lR)
-rmv2=match(obs_sim$Station_ID,RecordLen[,1])
-obs_sim$Rlen=RecordLen$lR[rmv2]
-dat=obs_sim
 
 # Part 2: TSEVA on observed values------------------------------------
 # TSEVA on observed values
-ValidSf=read.csv(file="Stations/Stations_Validation.csv")[,-1]
+ValidSf=read.csv(file="Stations/Stations_ValidationF.csv")[,-1]
 ValidSY=ValidSf[which(ValidSf$removal!="YES"),]
+ValidSY$Rlenyr=ValidSY$Rlen/365
 
+#Here I need at least 40 years betwee 1960 and 2010
+#ValidSY=ValidSY[-which(ValidSY$Rlenyr<40),]
 #load frost days
 # load(file=paste0(hydroDir,"/Drought/catchment_frost.Rdata"))
 # saveRDS(frostcat,paste0(hydroDir,"/Drought/catchment_frost.RDS"))
-
-frostcat=readRDS(paste0(hydroDir,"/Drought/catchment_frost.RDS"))
+#frostcat=readRDS(paste0(hydroDir,"/Drought/catchment_frost.RDS"))
 #Hybas07
-Catchmentrivers7=read.csv(paste0(hydroDir,"/Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
-
-#location of the outlets
-
-outletname = "outletsv8_hybas07_01min"
-outhyb07=outletopen(hydroDir,outletname)
-outhyb07$latlong=paste(round(outhyb07$Var2,4),round(outhyb07$Var1,4),sep=" ")
-head(outhyb07)
-UpArea$latlong=paste(round(UpArea$Var2,4),round(UpArea$Var1,4),sep=" ")
-Catchmentrivers7$latlong=paste(round(Catchmentrivers7$POINT_Y,4),round(Catchmentrivers7$POINT_X,4),sep=" ")
-head(Catchmentrivers7)
-CRplus=inner_join(outhyb07,Catchmentrivers7,by="latlong")
-outboost=inner_join(UpArea,Catchmentrivers7,by="latlong")
-head(CRplus)
-head(outboost)
-
-mycat=inner_join(outboost,CRplus, by="HYBAS_ID")
-head(mycat)
+#Catchmentrivers7=read.csv(paste0(hydroDir,"/Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
 
 
-hybas07 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev07_v1c.shp"))
-hybasf7=fortify(hybas07) 
-Catamere07=inner_join(hybasf7,outboost,by= "HYBAS_ID")
-Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ") 
-Catf7=Catamere07
-head(Catf7)
-st_geometry(Catf7)=NULL
-min(Catf7$pointid)
-#Extract only catchments where there is at least 40 years of observation
-#70 years in days
-yind<-50*365
-ValidSLong=ValidSY[which(ValidSY$Rlen>=yind),]
-length(ValidSLong$calib)
+
+
+## MHM loading ---------------
+mHM_loc=read.table(paste0(valid_path,"Revisions/mHM_EU/mHM_locations_EFAS_grid.txt"),sep=",")
+
+#transalting to R indexing after python
+mHM_loc$V2=as.numeric(mHM_loc$V2)+1
+mHM_loc$V3=as.numeric(mHM_loc$V3)+1
+
+#load the xls file for catchment area
+# Load the Excel file into a tibble
+data <- read_excel(paste0(valid_path,"Revisions/mHM_EU/european_catchments_with_filename.xlsx"))
+
+
+mHM_sta=full_join(data,mHM_loc, by=c("filename"="V1"))
+
+
+#load the mHM discharge
+mHM_dis=read.table(paste0(valid_path,"Revisions/mHM_EU/Q_mHM_filename.txt"),sep=" ")
+mHM_dis=as.data.frame(mHM_dis)
+colnames(mHM_dis)=mHM_dis[1,]
+mHM_dis=mHM_dis[-1,]
+mHM_dis[] <- lapply(mHM_dis, as.numeric)
+name_vector=colnames(mHM_dis)
+#extract mhm_station that are in the dataset
+
+matm=na.omit(match(name_vector,mHM_sta$filename))
+mHM_sta=mHM_sta[matm,]
+#find the date
+date1=seq(as.Date("1960-01-01"),as.Date("2010-12-31"),by="days")
+
+
+
+## Observation loading --------------------
+Q_data <- read.csv(paste0('Q_19502020.csv'), header = T)  # CSVs with observations
+Station_data_IDs <- as.vector(t(Q_data[1, -c(1,2)]))
+#remove first days to match with HERA
+
+Q_data=Q_data[-c(1:4),]
+
+## HERA loading ---------------------
+
+HERA_data<-read.csv(file="out/HERA_Val2_19502020.csv")
+HERA_cordata<-read.csv(file="out/HERA_CorStat_19502020.csv")
+
+replax=match(as.numeric(HERA_cordata[1,]),as.numeric(HERA_data[1,]))[-1]
+HERA_data[,replax]=HERA_cordata[,-1]
+
+date2=seq(as.Date("1950-01-04"),as.Date("2020-12-31"),by="days")
+
+
+#Sample Q_data and HERA only for the 1960-2010 period
+# mtime=match(date1,date2)
+# Q_data=Q_data[mtime,-1]
+######
+
+# lR=c()
+# for (id in 1:length(Station_data_IDs)){
+#   Qs=Q_data[,id+1]
+#   xl=length(Qs)
+#   l=length(which(!is.na(Qs)))
+#   lR=c(lR,l)
+# }
+# 
+# #match station data with validSY
+# val_lr=match(ValidSY$V1,Station_data_IDs)
+# 
+# ValidSY$Rlen_trend=lR[val_lr]/365.25
+
+#keep only stations with more than 30yrs
+ValidST=ValidSY[-which(ValidSY$Rlenyr<=30),]
+
+
 
 #now extract the HERA discharge for catchments in ValidSLong
 station_HERA<-HERA_data[1,-1]
-SelectHera=which(station_HERA %in% ValidSLong$V1)
+SelectHera=which(station_HERA %in% ValidST$V1)
 station_ids=data.frame(id=t(station_HERA[SelectHera]))
-HERA_dates<-HERA_data[,1]
-HERA_data2<-HERA_data[,-1]
-HERA_comp<-HERA_data2[-1,SelectHera]
+HERA_dates<-date2
+HERA_data2<-HERA_data[-1,-1]
+#HERA_data2=HERA_data2[mtime,]
+HERA_comp<-HERA_data2[,SelectHera]
 
-station_Q<-Q_data[1,-1]
-SelectQ=which(station_Q %in% ValidSLong$V1)
-station_ido=data.frame(id=t(station_Q[SelectQ]))
+station_Q<-Station_data_IDs
+SelectQ=which(station_Q %in% ValidST$V1)
+station_ido=data.frame(id=station_Q[SelectQ])
 
-Q_dates<-Q_data[,1]
-Q_data2<-Q_data[,-1]
-Q_comp<-Q_data2[-1,SelectQ]
+Q_dates<-date1
+Q_data2<-Q_data[,-c(1,2)]
+Q_comp<-Q_data2[,SelectQ]
+Q_comp=Q_comp[,order(station_ido$id)]
+HERA_comp<-HERA_comp[,order(station_ids$X1)]
+station_ido=station_ido$id[order(station_ido$id)]
+station_ids=station_ids$X1[order(station_ids$X1)]
 
-plot(station_ido$X2,station_ids$X1)
+#match station_ids with mHM
+## Distance between "official gauges" and efas points -----------------------
+hera=ValidST[,c(1,2,3)]
+heraloc=st_as_sf(hera, coords = c("Var1", "Var2"), crs = 4326)
+mhml=mHM_sta[,c(3,2,4)]
+mhmloc=st_as_sf(mhml, coords = c("LON", "LAT"), crs = 4326)
+dist=c()
+mlm=c()
+for (r in 1:length(heraloc$upa)){
+  cat(paste0(r,"\n"))
+  v1=heraloc[r,]
+  v2=mhmloc
+  oula=st_distance(v1,v2)
+  oula=oula/1000
+  ziz=which.min(oula)
+  guez=oula[ziz]
+  dist=c(dist,guez)
+  mlm=c(mlm,ziz)
+}
 
-station_idplus=left_join(station_ids,mycat,by=c("X1"="V1"))
+hist(dist)
 
-#Fit TSEVA on observed values
+ValidST$dist2mhm=dist
+mhm_candidate=mHM_sta[mlm,]
+
+finalcom=data.frame(ValidST,mhm_candidate)
+finalcom$UpA=finalcom$upa
+plot(finalcom$UpA,finalcom$Area_given_km2)
+difupa=(finalcom$UpA)/(finalcom$Area_given_km2)
+
+plot(finalcom$dist2mhm[order(finalcom$dist2mhm)], ylim=c(0,10))
+hist(difupa,breaks=20000,xlim=c(0,4))
+finalcom_upaclean=finalcom[which(difupa<=1.25 & difupa>=0.85 & dist<5),]
+
+un_st=unique(finalcom_upaclean$filename)
+
+#loop to remove double stations
+rmf=c()
+for (s in 1:length(un_st)){
+  st=un_st[s]
+  matsta=which(!is.na(match(finalcom_upaclean$filename,st)))
+  if (length(matsta)>1){
+    print("multi match")
+    print(length(matsta))
+    print(st)
+    torm=which.min(finalcom_upaclean$dist2mhm[matsta])
+    rmt=matsta[-torm]
+    rmf=c(rmf,rmt)
+  }
+}
+
+finalcom_upaclean=finalcom_upaclean[-rmf,]
+
+
+
+plot(finalcom_upaclean$UpA,finalcom_upaclean$Area_given_km2)
+
+
+
+
+# Fit TSEVA on observed values ------------------------
 dates_Hera <- seq(as.Date("1950-01-04"), as.Date("2020-12-31"), by = "days")
 dates_Q <- seq(as.Date("1950-01-01"), as.Date("2020-12-31"), by = "days")
-id=3
+id=56
+station_ids[id]
+station_ido[id]
 plot(Q_comp[,id])
-plot(HERA_comp[,id])
+plot(HERA_comp[,id-1])
 #load TSEVA functions
 source("~/LFRuns_utils/TSEVA_demo/demo_functions.R")
 library(xts)
@@ -503,15 +538,592 @@ save(parlist,file=paste0(hydroDir,"/TSEVA_hybas/outputs/parValid_",haz,"_",dset,
 save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResValid_",haz,"_",dset,"_1950_2020.Rdata"))
 
 
+# Part 2.2: Trend computation using Bloshl (2019) method------------------------------------
 
 
+#Extract annual maxima for Observed and HERA
+dates_Hera <- seq(as.Date("1950-01-04"), as.Date("2020-12-31"), by = "days")
+dates_Q <- seq(as.Date("1950-01-01"), as.Date("2020-12-31"), by = "days")
+id=56
+station_ids[id]
+station_ido[id]
+plot(Q_comp[,id])
+plot(HERA_comp[,id])
+
+Q_sim1=data.frame(time=dates_Hera,Q=HERA_comp[,id])
+Amax_HERA=computeAnnualMaxima(Q_sim1)
+
+Q_obs=data.frame(time=dates_Hera,Q=Q_comp[,id])
+Amax_obs=computeAnnualMaxima(Q_obs)
+
+
+station_fx=finalcom_upaclean$V1
+
+station_f=station_ido
+#keep only station_f discharge data 4all
+
+vecto=which(!is.na((match(station_ido,finalcom_upaclean$V1))))
+
+station_f=station_ido[vecto]
+Q_comp=Q_comp[,vecto]
+HERA_comp<-HERA_comp[,vecto]
+crap=finalcom_upaclean$filename[order(finalcom_upaclean$V1)]
+vecto=which(!is.na((match(name_vector,crap))))
+
+name_vector2=name_vector[vecto]
+
+woow=match(crap,name_vector2)
+
+verif=data.frame(name_vector2[woow],crap)
+
+mHM_comp<-mHM_dis[,vecto][woow]
+##################################
+
+timeAndSeries=Q_obs
+computeAnnualMean<-function(timeAndSeries) {
+  timeStamps <- timeAndSeries[,1]
+  srs <- timeAndSeries[,2]
+  
+  tmvec <- as.Date(timeStamps)
+  years <- format(tmvec, "%Y")
+  
+  findMean <- function(subIndxs) {
+    meanX <- mean(srs[subIndxs])
+
+  }
+  annualMean <- tapply(1:length(srs), years, findMean)
+  random_days <- timeAndSeries %>%
+    group_by(year = year(time)) %>%
+    sample_n(1)
+  annualMeanDate <- random_days$time
+  annualMeanIndx <- match(annualMeanDate,timeStamps)
+
+  
+  return(list(annualMean = annualMean, annualMeanDate = annualMeanDate, annualMeanIndx = annualMeanIndx))
+}
+# Q_comp=Q_comp[,order(station_f)]
+# HERA_comp=HERA_comp[,order(station_f)]
+### 1- Anmax for every station-----------------------------
+hit_out=c()
+rs_obs=c()
+rs_sim=c()
+#rs_sim2=c()
+for (id in 1:length(station_f)){
+  print(id)
+  s=station_ids[id]
+  
+  Q_sim1=data.frame(time=date2,Q=HERA_comp[,id])
+  #Q_sim2=data.frame(time=date1,Q=mHM_comp[,id])
+  Q_obs=data.frame(time=date2,Q=Q_comp[,id])
+  rmv=which(as.integer(format(date2, "%Y"))==1950)
+  Q_sim1=Q_sim1[-rmv,]
+  Q_obs=Q_obs[-rmv,]
+  # Q_sim1$Q=tsEvaNanRunningMean(Q_sim1$Q,30)
+  # Q_obs$Q=tsEvaNanRunningMean(Q_obs$Q,30)
+  iy=which(is.na(Q_obs$Q))
+  hit=NA
+  if (length(iy)>0){
+    Q_obs=Q_obs[-iy,]
+    Q_sim1=Q_sim1[-iy,]
+    #Q_sim2=Q_sim2[-iy,]
+    
+  }
+  if (length(Q_obs$Q>0)){
+    AMAX_obs <- computeAnnualMaxima(Q_obs)
+    AMAX_sim <- computeAnnualMaxima(Q_sim1)
+    
+    # AMAX_obs <- computeAnnualMinima(Q_obs)
+    # AMAX_sim <- computeAnnualMinima(Q_sim1)
+    # 
+    # AMAX_obs <- computeAnnualMean(Q_obs)
+    # AMAX_sim <- computeAnnualMean(Q_sim1)
+    # 
+    # AMAX_obs <- (Q_obs)
+    # AMAX_sim <- computeAnnualMinima(Q_sim1)
+    #AMAX_sim2 <- computeAnnualMaxima(Q_sim2)
+    if (length(AMAX_sim[[3]])==length(AMAX_obs[[3]])){
+      AMAX_diff=AMAX_obs[[3]]-AMAX_sim[[3]]
+      hit=length(which(abs(AMAX_diff)<8))/length(AMAX_diff)
+    }
+    data=data.frame(Q_obs,sim=Q_sim1$Q)
+    names(data)=c("date","Q","Qs")
+    # data=data.frame(Q_obs,sim=Q_sim1$Q,sim2=Q_sim2$Q)
+    # names(data)=c("date","Q","Qs","Qs2")
+    
+    res_obs=data.frame(Station=rep(s,length(AMAX_obs[[1]])),
+                       AnMax=AMAX_obs[[1]],AnMaxDate=AMAX_obs[[2]],
+                       Year=as.integer(format(AMAX_obs[[2]], "%Y")))
+    res_sim=data.frame(Station=rep(s,length(AMAX_sim[[1]])),
+                       AnMax=AMAX_sim[[1]],AnMaxDate=AMAX_sim[[2]], 
+                       Year=as.integer(format(AMAX_sim[[2]], "%Y")))
+    # res_sim2=data.frame(Station=rep(s,length(AMAX_sim2$annualMax)),
+    #                    AnMax=AMAX_sim2$annualMax,AnMaxDate=AMAX_sim2$annualMaxDate, 
+    #                    Year=as.integer(format(AMAX_sim2$annualMaxDate, "%Y")))
+    
+    rs_obs=rbind(rs_obs,res_obs)
+    rs_sim=rbind(rs_sim,res_sim)
+   # rs_sim2=rbind(rs_sim2,res_sim2)
+  }else{print("no observations")}
+  hit_out=c(hit_out,hit)
+}
+
+rs_obsx=as_tibble(rs_obs[,-3])
+rs_obsx$Year=as.character(rs_obsx$Year)
+rs_obs2=rs_obsx %>% pivot_wider(names_from=Year,values_from=AnMax)
+
+rs_simx=as_tibble(rs_sim[,-3])
+rs_simx$Year=as.character(rs_simx$Year)
+rs_simlf=rs_simx %>% pivot_wider(names_from=Year,values_from=AnMax)
+
+# rs_simo=as_tibble(rs_sim2[,-3])
+# rs_simo$Year=as.character(rs_simo$Year)
+# rs_simhh=rs_simo %>% pivot_wider(names_from=Year,values_from=AnMax)
+
+#reading in the data; path needs to be changed to file-location on computer
+# setwd("~/06_Floodrivers/DataPaper/European_floods/europe_floods-master")
+# data_europe = read.csv2("europe_data.csv",
+#                         header=T,stringsAsFactors = F,dec=".")
+# 
+
+
+##############################################################################
+#fitting the trend and evaluating the significance
+##############################################################################
+# Fig. 1 & EDF 2a |Sen-slope and Mann-Kendall
+
+#two-sided test for trend
+mann_kendall_trend <- function(dframe,discharge_name="Qmax",year_name="year",continuity=TRUE) {
+  
+  #Remove NAs
+  if(length(which(is.na(dframe[,discharge_name])))>0) {
+    dframe <- dframe[-which(is.na(dframe[,discharge_name])),]
+  }
+  
+  #mann-kendall
+  mk <- NA
+  for(i in c(1:(nrow(dframe)-1) )) {
+    for(j in c((i+1):nrow(dframe))) {
+      mk <- c(mk,sign(dframe[j,discharge_name]-dframe[i,discharge_name]) )
+    }
+  }
+  mk <- mk[-1]
+  mk <- sum(mk,na.rm=T)
+  
+  #for variance, need number of ties
+  series <- dframe[,discharge_name]
+  n <- length(series)
+  if(any(duplicated(series))) {
+    #indices of elements, that occur multiple times
+    duplicate_indices <- which(duplicated(series))
+    #number of elements with multiple occurences
+    p <- length(unique(series[duplicate_indices]))
+    #first occurrence of element with multiple occurrences
+    t_index <- sapply(unique(series[duplicate_indices]), function(k) min(which(series==k)) )
+    #number of occurrences of a duplicated element
+    t <- sapply(unique(series[duplicate_indices]), function(k) length(which(series==k)))
+    
+    var_mk <- (n*(n-1)*(2*n+5) - sum(sapply(t, function(j) j*(j-1)*(2*j+5))) )/18
+  }
+  #no ties
+  else if(!any(duplicated(series))) {
+    var_mk <- (n*(n-1)*(2*n+5))/18
+  }
+  #actual test-statistic
+  if(continuity==FALSE) {
+    Z <- mk/sqrt(var_mk)
+  }
+  else if(continuity==TRUE) {
+    Z <- sign(mk)*(abs(mk)-1)/sqrt(var_mk)
+  }
+  #p-value with normal distribution, assuming two-sided test here
+  p_val <- (1-pnorm(abs(Z)))*2
+  
+  return(c(sign_sum=mk,test_stat=Z,p_val=p_val))
+}
+#calculating sen-slope on original scale and percentage of mean per decade
+sen_slope <- function(dframe,discharge_name="Qmax",year_name="year") {
+  
+  #check for duplicated values 
+  if(length(which(duplicated(dframe)))>0) {
+    dframe <- dframe[-which(duplicated(dframe)),]
+  }
+  #check for NAs
+  if(length(which(is.na(dframe[,discharge_name])))>0) {
+    dframe <- dframe[-which(is.na(dframe[,discharge_name])),]
+  }
+  #slopes
+  mk <- 0
+  for(i in c(1:(nrow(dframe)-1) )) {
+    for(j in c((i+1):nrow(dframe))) {
+      mk <- c(mk,ifelse(!is.na((dframe[j,discharge_name]-dframe[i,discharge_name])/(dframe[j,year_name]-dframe[i,year_name]) ),
+                        (dframe[j,discharge_name]-dframe[i,discharge_name])/(dframe[j,year_name]-dframe[i,year_name]) ,
+                        NA))
+      
+    }
+  }
+  mk <- mk[-1]
+  sen <- median(mk,na.rm=TRUE)
+  
+  mean_flow <- mean(dframe[,discharge_name],na.rm=TRUE)
+  #slope as percentage of mean per decade
+  sen_pct_of_mean_per_dec = (sen/mean_flow)*100*10
+  return(c(sen=sen,sen_pct_of_mean_per_dec=sen_pct_of_mean_per_dec))
+}
+
+
+#applying to data
+rs_obs2$mk_pval = rep(NA,nrow(rs_obs2))
+rs_obs2$sen_original = rep(NA,nrow(rs_obs2))
+rs_obs2$pct_of_mean_per_decade = rep(NA,nrow(rs_obs2))
+
+rs_simlf$mk_pval = rep(NA,nrow(rs_simlf))
+rs_simlf$sen_original = rep(NA,nrow(rs_simlf))
+rs_simlf$pct_of_mean_per_decade = rep(NA,nrow(rs_simlf))
+rs_simlf$cor = rep(NA,nrow(rs_simlf))
+
+rs_simhh$mk_pval = rep(NA,nrow(rs_simhh))
+rs_simhh$sen_original = rep(NA,nrow(rs_simhh))
+rs_simhh$pct_of_mean_per_decade = rep(NA,nrow(rs_simhh))
+rs_simhh$cor = rep(NA,nrow(rs_simhh))
+
+ylen=71
+for(j in (1:length(rs_obs2$Station)) ) {
+  print(j)
+  #p-value of mann-kendall test
+  rs_obs2$mk_pval[j] = mann_kendall_trend(dframe=data.frame(year=c(1951:2020),Qmax=as.numeric(rs_obs2[j,c(2:ylen)]) ) )[3] 
+  #sen-slope on scale of data and as percentage of mean per decade
+  sen_tmp = sen_slope(dframe=data.frame(year=c(1951:2020),Qmax=as.numeric(rs_obs2[j,c(2:ylen)]) ) )
+  rs_obs2$sen_original[j] = sen_tmp[1]
+  rs_obs2$pct_of_mean_per_decade[j] = sen_tmp[2]
+  
+  #p-value of mann-kendall test
+  rs_simlf$mk_pval[j] = mann_kendall_trend(dframe=data.frame(year=c(1951:2020),Qmax=as.numeric(rs_simlf[j,c(2:ylen)]) ) )[3] 
+  #sen-slope on scale of data and as percentage of mean per decade
+  sen_tmp = sen_slope(dframe=data.frame(year=c(1951:2020),Qmax=as.numeric(rs_simlf[j,c(2:ylen)]) ) )
+  rs_simlf$sen_original[j] = sen_tmp[1]
+  rs_simlf$pct_of_mean_per_decade[j] = sen_tmp[2]
+  
+  #p-value of mann-kendall test
+  # rs_simhh$mk_pval[j] = mann_kendall_trend(dframe=data.frame(year=c(1960:2010),Qmax=as.numeric(rs_simhh[j,c(2:52)]) ) )[3] 
+  # #sen-slope on scale of data and as percentage of mean per decade
+  # sen_tmp = sen_slope(dframe=data.frame(year=c(1960:2010),Qmax=as.numeric(rs_simhh[j,c(2:52)]) ) )
+  # rs_simhh$sen_original[j] = sen_tmp[1]
+  # rs_simhh$pct_of_mean_per_decade[j] = sen_tmp[2]
+  
+  Qmax_simlf=(as.numeric(rs_simlf[j,c(2:ylen)]))
+  #Qmax_simhh=(as.numeric(rs_simhh[j,c(2:52)]))
+  Qmax_obs=(as.numeric(rs_obs2[j,c(2:ylen)]))
+  if (length(which(is.na(Qmax_simlf)))>0){
+    Qmax_obs=Qmax_obs[-which(is.na(Qmax_simlf))]
+   # Qmax_simhh=Qmax_simhh[-which(is.na(Qmax_simlf))]
+    Qmax_simlf=Qmax_simlf[-which(is.na(Qmax_simlf))]
+  }
+  # Kor=cor(Qmax_simhh,Qmax_obs)
+  # print(Kor)
+  # rs_simhh$cor[j]=Kor
+  
+  Kor=cor(Qmax_simlf,Qmax_obs)
+  print(Kor)
+  rs_simlf$cor[j]=Kor
+  
+}
+
+plot(rs_simlf$cor,rs_simhh$cor)
+abline(a=0,b=1)
+mean(rs_simlf$cor)
+mean(rs_simhh$cor)
 #Now I have to compare the trends
+
+# Recap=data.frame(stat=rs_obs2$Station, pval_obs=rs_obs2$mk_pval,pval_simlf=rs_simlf$mk_pval,pval_simhh=rs_simhh$mk_pval,
+#                  sen_obs=rs_obs2$pct_of_mean_per_decade,sen_simlf=rs_simlf$pct_of_mean_per_decade,
+#                  sen_simhh=rs_simhh$pct_of_mean_per_decade, corr_lf=rs_simlf$cor, corr_hh=rs_simhh$cor)
+
+Recap=data.frame(stat=rs_obs2$Station, pval_obs=rs_obs2$mk_pval,pval_simlf=rs_simlf$mk_pval,
+                 sen_obs=rs_obs2$pct_of_mean_per_decade,sen_simlf=rs_simlf$pct_of_mean_per_decade,
+                  corr_lf=rs_simlf$cor)
+#Recap=Recap[-which(is.na(Recap$sen_simlf)),]
+Rsig=Recap[which(Recap$pval_obs<0.1),]
+
+
+#I need to match the coordinates with Recap
+
+Recaplus=inner_join(Recap, ValidST,by = c("stat"="V1"))
 
 # Part 3: Trend comparisons------------------------------------
 
-################################################################################
-##########    Comparison between calibrated and uncalibrated run    ############
-################################################################################
+
+#agreement in sign of change
+lp1=length(which(Recap$sen_obs>0 & Recap$sen_simlf>0))
+ln1=length(which(Recap$sen_obs<=0 & Recap$sen_simlf<=0))
+
+lp2=length(which(Recap$sen_obs>0 & Recap$sen_simlf<=0))
+ln2=length(which(Recap$sen_obs<=0 & Recap$sen_simlf>0))
+
+lt=lp1+lp2+ln1+ln2
+truesign=round((lp1+ln1)/lt*100)
+
+lp1=length(which(Recap$sen_obs>0 & Recap$sen_simhh>0))
+ln1=length(which(Recap$sen_obs<=0 & Recap$sen_simhh<=0))
+
+lp2=length(which(Recap$sen_obs>0 & Recap$sen_simhh<=0))
+ln2=length(which(Recap$sen_obs<=0 & Recap$sen_simhh>0))
+
+lt=lp1+lp2+ln1+ln2
+truesign=round((lp1+ln1)/lt*100)
+
+# Recaplus=Recaplus[-which(is.na(Recaplus$sen_simlf)),]
+# Recaplus=Recaplus[-which(is.na(Recaplus$sen_obs)),]
+
+R2lf=round(summary(lm(sen_obs ~ sen_simlf, data=Recap))$r.squared,2)
+R2hh=round(summary(lm(sen_obs ~ sen_simhh, data=Recap))$r.squared,2)
+
+rmself=round(sqrt(mean((Recaplus$sen_obs - Recaplus$sen_simlf)^2)),1)
+rmsehh=round(sqrt(mean((Recaplus$sen_obs - Recaplus$sen_simhh)^2)),1)
+
+wallou=expression(paste("R",(km^2)))
+palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+tsize=16
+osize=16
+lims=c(-40,40)
+
+Recaplus$density <- get_density(Recaplus$sen_obs, Recaplus$sen_sim, n = 100)
+ps<-ggplot() +
+  # annotate("rect", xmin=-Inf, xmax=0, ymin=-Inf, ymax=0, fill="lightskyblue", alpha=0.4) +
+  # 
+  # annotate("rect", xmin=0, xmax=Inf, ymin=-Inf, ymax=0, fill="lightsalmon", alpha=0.4) +
+  # 
+  # annotate("rect", xmin=0, xmax=Inf, ymin=0, ymax=Inf, fill="lightskyblue", alpha=0.4) +
+  # 
+  # annotate("rect", xmin=-Inf, xmax=0, ymin=0, ymax=Inf, fill="lightsalmon", alpha=0.4) +
+  # 
+  geom_point(data=Recaplus, aes(x=sen_obs, y=sen_simlf, size=upa, col=density),alpha=0.6) +
+  #geom_point(data= Rsig, aes(x=ObsChange, y=SimChange),fill="transparent", color="gray25",shape=21,size=2)+
+  geom_abline(slope=1,intercept=0,col="gray25",lwd=1.5,alpha=.5)+
+  scale_color_viridis(option="F")+
+  # 
+  # annotate("label", x=-40, y=50, label= paste0("N = ",ln2),size=5)+
+  # annotate("label", x=40, y=50, label= paste0("N = ",lp1),size=5)+
+  # annotate("label", x=40, y=-50, label= paste0("N = ",lp2),size=5)+
+  # annotate("label", x=-40, y=-50, label= paste0("N = ",ln1),size=5)+
+  
+  annotate("label", x=-32, y=36, label= paste0("R2 = ",R2lf,"\nRMSE = ",rmself,"%"),size=5)+
+  scale_size(range = c(2, 8), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                  sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"))+
+  scale_x_continuous(name="Observed change (% of mean annual maximum discharge per decade)",breaks = seq(-50,50,by=10), limits = lims)+
+  scale_y_continuous(name="Simulated change (% of mean annual maximum discharge per decade)",breaks = seq(-100,100,by=10), limits = lims)+
+  # scale_color_gradientn(
+  #   colors=palet, limits=c(0,1),oob = scales::squish,
+  #   name="temporal correlation",breaks=seq(0,1, by=0.2))+
+  # scale_alpha_continuous(name="trend significance",range = c(0.5, 1))+
+  guides( size= "none",col="none")+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        axis.text =element_text(size=tsize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))+
+  ggtitle(paste0("HERA - Observed and simulated trends of\nannual maximum discharge (1951-2020) (n = ",lt,")"))# adjust transparency range if needed
+
+ps
+
+ggsave("Revisions/scatter2_correlation_HERAvsobs_19512020_AMAX.jpg", ps, width=20, height=20, units=c("cm"),dpi=300)
+
+
+
+
+#Now spatialized map
+##############################################################################
+#interpolating the sen-slopes via kriging
+##############################################################################
+
+library("sp")
+library("rworldmap")
+newmap <- getMap(resolution = "high")
+europe_frame <- data.frame(country=NA,long=NA,lat=NA,plot_group=NA)
+for(j in c(1:nrow(newmap@data))) {
+  print(j)
+  if(newmap@data$REGION[j]!="Europe"|is.na(newmap@data$REGION[j])) {next}
+  else {
+    n_polys = length(newmap@polygons[[j]]@Polygons)
+    for(k in c(1:n_polys)) {
+      tmp_frame <- data.frame(country=rep(newmap@polygons[[j]]@ID,nrow(newmap@polygons[[j]]@Polygons[[k]]@coords)),
+                              long=newmap@polygons[[j]]@Polygons[[k]]@coords[,1],
+                              lat=newmap@polygons[[j]]@Polygons[[k]]@coords[,2],
+                              plot_group = rep(paste(newmap@polygons[[j]]@ID,k,sep="-"),nrow(newmap@polygons[[j]]@Polygons[[k]]@coords)))
+      europe_frame <- rbind(europe_frame,tmp_frame)
+    }
+  }
+}
+europe_frame <- europe_frame[-1,]
+
+
+#in order to perform kriging we need a different coordinate system than long-lat and a grid
+
+laea_proj="+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs"
+lambert_proj="+proj=laea +lat_0=55 +lon_0=20 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=km +no_defs"
+
+spatial_krig = SpatialPointsDataFrame(coords=Recaplus[,c("Var1", "Var2")], data=Recaplus[,c("sen_obs","pval_obs")],proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+
+spatial_krig_trafo = spTransform(spatial_krig,CRS(laea_proj))
+
+# spatial_krig = SpatialPointsDataFrame(coords=data_europe[,c("LON", "LAT")], data=data_europe[,c("pct_of_mean_per_decade","mk_pval")],proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+# spatial_krig_trafo = spTransform(spatial_krig,CRS("+proj=laea +lat_0=55 +lon_0=20 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=km +no_defs"))
+# data_europe$lambert_x = spatial_krig_trafo@coords[,1]
+# data_europe$lambert_y = spatial_krig_trafo@coords[,2]
+
+Recaplus$laea_x = spatial_krig_trafo@coords[,1]
+Recaplus$laea_y = spatial_krig_trafo@coords[,2]
+
+europe_krig = SpatialPointsDataFrame(coords=europe_frame[,c("long", "lat")], data=europe_frame[,c(1:4)],proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+europe_krig_trafo = spTransform(europe_krig,CRS(laea_proj))
+
+europe_frame$laea_x = europe_krig_trafo@coords[,1]
+europe_frame$laea_y = europe_krig_trafo@coords[,2]
+
+
+#cover of europe for spatial grid
+europe_cover = data.frame(x=c(-2700,-2700,2000,2000),y=c(-2500,2000,2000,-2500),data=rep("data",4))
+#another europe cover
+lims=c(xmin=2665274, xmax=6528705, ymin=1464363, ymax=5360738)
+europe_cover = data.frame(x=c(2000000,2000000,7000000,7000000),y=c(1000000,6000000,6000000,1000000),data=rep("data",4))
+
+coordinates(europe_cover) =~x+y
+my_big_grid = makegrid(europe_cover,cellsize=20000)
+keep_point = rep(0,nrow(my_big_grid))
+relevant_countries = unique(europe_frame$plot_group)
+relevant_countries <- relevant_countries[-grep("Rus|Aze|Turk|Ukr|Isra", relevant_countries, ignore.case = TRUE)]
+
+#for the grid, we check which points are contained in any country
+for(country in relevant_countries)  {
+  tmp_country = europe_frame[which(europe_frame$plot_group==country),]
+  pt_in_country_tmp = point.in.polygon(point.x=my_big_grid[,1], point.y=my_big_grid[,2], pol.x=tmp_country[,"laea_x"], pol.y=tmp_country[,"laea_y"], mode.checked=FALSE)
+  if(length(which(pt_in_country_tmp==1))>0) {
+    keep_point[which(pt_in_country_tmp==1)] = 1
+  }
+  print(which(country==relevant_countries)/length(relevant_countries))
+}
+hist(keep_point)
+my_grid = my_big_grid[which(keep_point==1),]
+names(my_grid) = c("lambert_x","lambert_y")
+
+grid_krig = SpatialPointsDataFrame(coords=my_grid[,c(1,2)], data=my_grid[,c(1,2)],proj4string=CRS(laea_proj))
+
+#grid_krig = SpatialPointsDataFrame(coords=my_grid[,c(1,2)], data=my_grid[,c(1,2)],proj4string=CRS("+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs"))
+
+#kriging
+library("automap")
+kriging_result <- autoKrige(sen_obs~1, input_data=spatial_krig_trafo, new_data = grid_krig)
+
+
+# Convert kriging results to a data frame
+kriging_data <- as.data.frame(kriging_result$krige_output)
+
+# Extract the coordinates from the SpatialPointsDataFrame
+coords <- coordinates(kriging_result$krige_output)
+
+# Combine the coordinates with the kriging data
+kriging_data$lon <- coords[, 1]
+kriging_data$lat <- coords[, 2]
+
+
+library(dplyr)
+# Transform back to longlat projection if necessary
+kriging_data_out = SpatialPointsDataFrame(coords=kriging_data[,c("lon", "lat")], data=kriging_data[,c(3:5)],proj4string=CRS(laea_proj))
+kriging_data_longlat <- spTransform(kriging_data_out, CRS("+proj=longlat +datum=WGS84"))
+
+kriging_data_longlat=as.data.frame(kriging_data_out)
+
+
+# Create a ggplot map of the kriging results
+m3<-kriging_data_longlat
+m4 <- m3 %>%
+  # create a new variable from count
+  mutate(countv1=cut(var1.pred, breaks=c(-24,-12,-5,-2, 0,2, 5, 12),
+                     labels=c( "-24 - -12", "-12 - -5", "-5 - -2","-2 - 0","0 - 2", "0 - 5", "5 - 12"))) %>%
+  # change level order
+  mutate(countv1=factor(as.character(countv1), levels=rev(levels(countv1))))
+
+
+outll=outletopen(hydroDir,outletname)
+cord.dec=outll[,c(2,3)]
+cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
+cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
+nco=cord.UTM@coords
+coord.lamb=spTransform(cord.dec, CRS(laea_proj))
+nci=coord.lamb@coords
+
+coord.laea=spTransform(cord.dec, CRS(laea_proj))
+nci=coord.laea@coords
+
+world <- ne_countries(scale = "medium", returnclass = "sf")
+Europe <- world[which(world$continent == "Europe"),]
+e2=st_transform(Europe,  crs=3035)
+w2=st_transform(world,  crs=3035)
+basemap=w2
+basemap=st_transform(basemap, CRS(laea_proj))
+
+Recapoint <- st_as_sf(Recaplus, coords = c("Var1", "Var2"), crs = 4326)
+Recapoint <- st_transform(Recapoint, crs = 3035)
+mp <- Recapoint %>%
+  # create a new variable from count
+  mutate(countv1=cut(sen_obs, breaks=c(-100,-24,-12,-5,-2, 0,2, 5, 12,100),
+                     labels=c("< -24", "-24 - -12", "-12 - -5", "-5 - -2","-2 - 0","0 - 2", "0 - 5", "5 - 12","> 12"))) %>%
+  # change level order
+  mutate(countv1=factor(as.character(countv1), levels=rev(levels(countv1))))
+
+
+tsize=12
+osize=10
+
+paletc=c(hcl.colors(9, palette = "RdYlBu", alpha = NULL, rev = T, fixup = TRUE))
+paletf=c(hcl.colors(7, palette = "RdYlBu", alpha = NULL, rev = T, fixup = TRUE))
+pl3<-ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_tile(data=m4, aes(x = lon, y = lat, fill = countv1)) +
+  #metR::geom_contour_fill(data=kriging_data_longlat, aes(x = lon, y = lat, z = var1.pred),binwidth=2,alpha=1) +
+  geom_sf(fill=NA, color="grey") +
+  geom_sf(data=mp,aes(geometry=geometry,color=countv1),size=1.5,alpha=.5,shape=16,stroke=0.5)+ 
+  geom_sf(data=mp,aes(geometry=geometry),color="black",size=1.5,alpha=.5,shape=21,stroke=0.5)+ 
+  #scale_fill_distiller(palette = "RdYlBu",limits=c(-12,12),oob = scales::squish,guide="coloursteps",direction=1)+
+  #scale_fill_gradientn(colors=paletx,limits=c(-12,12),oob = scales::squish) +
+  scale_fill_manual(values=paletf, na.value = "grey90")+
+  scale_color_manual(values=paletc, na.value = "grey90")+
+  coord_sf(xlim = c(min(nci[,1]),max(nci[,1])), ylim = c(min(nci[,2]),max(nci[,2])))+
+  labs(x="Longitude", y = "Latitude")+
+  # guides(fill = guide_coloursteps(barwidth = 1, barheight = 10))+
+  labs(fill = "change in mean annual flood per decade (%)") +
+  guides( color= "none",
+          fill = guide_legend(theme = theme(
+            legend.title.position = "right")))+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(angle = 90 , size=tsize),
+        legend.text = element_text(size=osize),
+        legend.key.height= unit(1.6, 'cm'),
+        legend.key.width= unit(.2, 'cm'),
+        legend.position = "right",
+        legend.text.position = "left",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))+
+  ggtitle("Flood trends (observed) (1960-2010)")
+pl3
+
+ggsave("Revisions/Obs_floodtrends_1960-2010.jpg", pl3, width=20, height=20, units=c("cm"),dpi=300)
+
+
+
+
+
+
 setwd("~/LFRuns_utils/TrendAnalysis")
 #Plotting function
 Diff.plots.points=function(basemap,sppoints, lims=c(-50,50),trans="identity", brk=NULL, scale="diverging",title=" ",name= " "){
