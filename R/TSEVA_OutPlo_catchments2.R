@@ -333,8 +333,7 @@ plotchangemaps=function(basemap,catmap,datar,law="GPD",type,period=c(1951,1952),
 
 
 #Initial functions to plot changes and trends at catchment level
-haz="drought"
-datar=datarD
+
 plotchangemaps_qsp=function(basemap,catmap,datar,upArea, GHR_riv, HydroRsf, law="GPD",type,period=c(1965,2005),parlist,valuenames,haz){
 
   data=right_join(GHR_riv,datar,by = c("outlets"="unikout"))
