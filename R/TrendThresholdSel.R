@@ -47,13 +47,14 @@ check_timeserie2=function(timeseries,yro){
   year_check <- yro %in% ts_years
   runs <- rle(year_check)
   rf=which(runs$values==FALSE)
-  if (any(runs$lengths[rf] >= 4)) {
+  if (any(runs$lengths[rf] >= 2)) {
     return(FALSE)
   }
   else {
     return(TRUE)
   }
 }
+
 tsEvaFindTrendThreshold2<-function(series, timeStamps, timeWindow){
   ptn = timeStamps[which(!is.na(series))]
   bounds = unique(lubridate::year(ptn))
@@ -78,22 +79,26 @@ tsEvaFindTrendThreshold2<-function(series, timeStamps, timeWindow){
     }
     rs <- tsEvaDetrendTimeSeries(timeStamps, serieb, timeWindow, 
                                  fast = T)
-    # varianceSeries <- tsEvaNanRunningVariance(serieb, rs@nRunMn)
-    # varianceSeries <- tsEvaNanRunningMean(varianceSeries, 
-    #                                       ceiling(rs@nRunMn/2))
-    # norm_trend <- rs@trendSeries/mean(rs@trendSeries, na.rm = TRUE)
+
+    norm_trend <- rs@trendSeries/mean(rs@trendSeries, na.rm = TRUE)
     dtr1 = serieb - rs@trendSeries
     lneg = length(which(dtr1 < 0))
-    # stab <- cor(nr, norm_trend, use = "pairwise.complete.obs")
-    # if (iter == 1) 
-    #   nr <- norm_trend
+    stab <- cor(nr, norm_trend, use = "pairwise.complete.obs")
+    if (iter == 1) 
+       nr <- norm_trend
     if (lneg >= 1) 
       lnegs = c(lnegs, lneg)
-      # sts <- c(sts, stab)
+      sts <- c(sts, stab)
       pctd = c(pctd, pcts[iter])
     }
-
+  dow=abs(diff(sts))[-1]
+  
   rval = pctd[length(pctd)]
+  
+  if(max(dow)>0.2){
+    print("breaking point")
+    rval = pctd[which.max(dow)+1]
+  }
   if (sum(lnegs) > 1) {
     rval = pctd[which.min(lnegs)]
   }
@@ -102,6 +107,26 @@ tsEvaFindTrendThreshold2<-function(series, timeStamps, timeWindow){
 }
 
 
+#modify the function by using findpeaks instead
+tsEvaFindTrendThreshold3<-function(series, timeStamps){
+  #compute monthly maxs
+  tserie=data.frame(series,timeStamps)
+  
+  monthly_max=tserie %>% 
+    mutate(month = floor_date(timeStamps, "month")) %>% 
+    group_by(month) %>% 
+    summarise(max_value = max(series))
+  
+  #use findpeaks
+  med=median(series,na.rm=T)
+  peakox=findpeaks(tserie$series,threshold = med)
+  peakos=data.frame(time=timeStamps[peakox[,2]],values=peakox[,1])
+
+  
+  return(list(peaks=peakos,monmax=monthly_max))
+}
+
+trendPeaks=tsEvaFindTrendThreshold3(series,timeStamps)
 timeWindow = 365.25*30; #time windows in days, the correction is done within the functions
 # Trth_H_list=c()
 # Trth_R_list=c()
@@ -287,6 +312,11 @@ Trth_H_list <- foreach(id = 1:length(Station_data_IDs), .combine = rbind, .packa
   if (is.null(TrendTh_H1))TrendTh_H1=NA
   
   TrendTh_H2 <- tsEvaFindTrendThreshold2(series=timeAndSeriesH$data, timeStamps=timeAndSeriesH$timestamp, timeWindow)
+  m1=median(timeAndSeriesH$data)
+  o=findpeaks(timeAndSeriesH$data, threshold = m1)
+  plot(o[,1])
+  mean(o[,1])
+  m1=mean(timeAndSeriesH$data)
   if (is.null(TrendTh_H2))TrendTh_H2=NA
   Trth_H <- c(catch,TrendTh_H1,TrendTh_H2)
   
@@ -437,10 +467,7 @@ plot(Trth_H_list[,3], Trth_S_list[,3],ylim=c(0.5,1),xlim=c(0.5,1))
 
 
 dx=data.frame(hist=Trth_H_list[,3],scf=Trth_S_list[,3], catch=Trth_H_list[,1])
-
-
 dx2=dx[which(dx$hist!=dx$scf),]
-
 dx$common=dx$hist
 dx$common[which(dx$hist>1)]=0.5
 

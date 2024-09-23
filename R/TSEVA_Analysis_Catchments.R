@@ -106,10 +106,11 @@ TsEvaNs<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDis
     if (is.na(TrendTh)){
       TrendTh=try(tsEvaFindTrendThreshold(series, timeStamps, timeWindow),T)
       if(length(TrendTh)==0){
-        TrendTh=NA
+        TrendTh=0.1
       }
     }
-    trasfData = tsEvaTransformSeriesToStationaryPeakTrend( timeStamps, series, timeWindow, TrendTh);
+    #trasfData = tsEvaTransformSeriesToStationaryPeakTrend( timeStamps, series, timeWindow, TrendTh);
+    trasfData = tsEvaTransformSeriesToStationaryMMXTrend( timeStamps, series, timeWindow);
     gevMaxima = 'annual'
     potEventsPerYear = epy
     minEventsPerYear = 1
@@ -370,6 +371,51 @@ TsEvaNs<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDis
   return(list(nonStationaryEvaParams=nonStationaryEvaParams,stationaryTransformData=stationaryTransformData))
   
 }
+
+
+tsEvaTransformSeriesToStationaryMMXTrend<-function (timeStamps, series, timeWindow) 
+{
+  tserie=data.frame(timeStamps,series)
+  monthly_max=tserie %>% 
+    mutate(month = floor_date(timeStamps, "month")) %>% 
+    group_by(month) %>% 
+    summarise(max_value = max(series))
+  
+  
+  serieb <- series
+  tm=match(as.Date(as.character(monthly_max$month)),as.Date(timeStamps))
+  serieb[-tm] <- NA
+  rs <- tsEvaDetrendTimeSeries(timeStamps, serieb, timeWindow)
+  detrendSeries <- series - rs@trendSeries
+  detrendSerie1 <- serieb - rs@trendSeries
+  qd2 <- min(detrendSerie1, na.rm = T)
+  nRunMn <- rs@nRunMn
+  varianceSeries <- tsEvaNanRunningVariance(detrendSerie1, 
+                                            nRunMn)
+  varianceSeries <- tsEvaNanRunningMean(varianceSeries, ceiling(nRunMn/2))
+  stdDevSeries1 <- varianceSeries^0.5
+  stdDevSeries <- stdDevSeries1
+  avgStdDev <- mean(stdDevSeries)
+  S <- 2
+  N <- timeWindow * 4
+  stdDevError <- avgStdDev * (2 * S^2/N^3)^(1/4)
+  statSeries <- detrendSeries/stdDevSeries
+  xtremS <- statSeries
+  xtremS <- na.omit(xtremS)
+  allS <- na.omit(serieb)
+  statSer3Mom <- tsEvaNanRunningStatistics(statSeries, nRunMn)$rn3mom
+  statSer4Mom <- tsEvaNanRunningStatistics(statSeries, nRunMn)$rn4mom
+  statSer3Mom <- tsEvaNanRunningMean(statSer3Mom, ceiling(nRunMn))
+  statSer4Mom <- tsEvaNanRunningMean(statSer4Mom, ceiling(nRunMn))
+  trendError <- mean(stdDevSeries)/N^0.5
+  trasfData <- list(runningStatsMulteplicity = nRunMn, stationarySeries = statSeries, 
+                    trendSeries = rs@trendSeries, trendSeriesNonSeasonal = NULL, 
+                    trendError = trendError, stdDevSeries = stdDevSeries, 
+                    stdDevSeriesNonSeasonal = NULL, stdDevError = stdDevError * 
+                      rep(1, length(stdDevSeries)), timeStamps = timeStamps, 
+                    nonStatSeries = series, statSer3Mom = statSer3Mom, statSer4Mom = statSer4Mom)
+  return(trasfData)
+}
 ##########################################################################################
 
 
@@ -414,7 +460,7 @@ setwd(valid_path)
 # tqx=as.POSIXct((Q_sim[,1]*3600*24), origin="1979-01-01 00:00:00")
 # txx=tqx[-1]
 #######################  Arguments importation #############################
-haz = "drought"
+haz = "flood"
 var = "dis"
 outlets="Hybas07"
 outletname = "outletsv8_hybas07_01min"
@@ -461,8 +507,8 @@ reservoir_bg=inner_join(reservoirdog,outhyb07,by="llcoord")
 load("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/thresholds_catchments.rdata")
 load("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/thresholds_low_catchments.rdata")
 thtable=dx
-#scenari=c("Histo","RWstat","SocCF")
-scenari=c("RWstat","SocCF")
+scenari=c("Histo","RWstat","SocCF")
+#scenari=c("RWstat","SocCF")
 for (sce in scenari){
   print(sce)
   if (sce=="Histo"){
@@ -514,7 +560,7 @@ for (sce in scenari){
   Reservoir_i=c()
   for (id in 1:length(Station_data_IDs)){
     #id=1993
-    id=which(Station_data_IDs==23610)
+    #id=which(Station_data_IDs==23610)
     Reservoir_alteration=0
     outlet=Q_sim2[1,id+1]
     df.dis=Q_sim2[,id+1][-1]
@@ -636,8 +682,6 @@ for (sce in scenari){
     print(paste0("GEV shape: ",round(nonStationaryEvaParams$gevObj$parameters$epsilon,2)))
     #   
     stationaryTransformData=Nonstat[[2]]
-    plot(stationaryTransformData$stdDevSeries)
-    which(is.na(stationaryTransformData$stdDevSeries))
     #   
     ExRange= c(min(nonStationaryEvaParams$potObj$parameters$peaks),max(nonStationaryEvaParams$potObj$parameters$peaks))
   
@@ -818,7 +862,7 @@ for (sce in scenari){
   Results$Peaks
   
   #save(parlist,file=paste0(hydroDir,"/TSEVA_hybas/outputs/parCat07_",sce,"_",haz,"_1950_2020.Rdata"))
-  save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResCat07_",sce,"_",haz,"v2_1951_2020.Rdata"))
+  save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResCat07_",sce,"_",haz,"v3_1951_2020.Rdata"))
 
 # save(parlist,file=paste0(hydroDir,"/TSEVA_hybas/outputs/parCat07_ResCF_",haz,"_1950_2020.Rdata"))
 # save(Results, file=paste0(hydroDir,"/TSEVA_hybas/outputs/ResCat07_ResCF_",haz,"_1950_2020.Rdata"))
