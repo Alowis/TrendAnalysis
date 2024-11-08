@@ -1646,6 +1646,33 @@ hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 # Pre-loaded results -----------
 
 
+#still need to create the outlets file outf
+if (!exists("outf")){
+  outf=c()
+  for( Nsq in 1:88){
+    print(Nsq)
+    rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
+    rspace=rspace[,-1]
+    nrspace=rspace[Nsq,]
+    #outletname="outletsv8_hybas07_01min"
+    #outletname="outlets_hybas09_01min"
+    outletname="efas_rnet_100km_01min"
+    
+    outhybas=outletopen(hydroDir,outletname,nrspace)
+    Idstart=as.numeric(Nsq)*10000
+    Idstart2=as.numeric(Nsq)*100000
+    if (length(outhybas$outlets)>0){
+      outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
+      outhybas$outl2=seq((Idstart2+1),(Idstart2+length(outhybas$outlets)))
+      outhybas$latlong=paste(round(outhybas$Var1,4),round(outhybas$Var2,4),sep=" ")
+      #outcut=which(!is.na(match(outhybas$outlets,parlist$catchment)))
+      # zebi=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
+      # outcut=which(!is.na(match(outhybas$outlets,zebi)))
+      outhloc=outhybas
+      outf=rbind(outf,outhloc)
+    }
+  }
+}
 ## Spatial data for catchments ----
 
 ### Hybas07 ----
@@ -1668,6 +1695,36 @@ GHR_riv=inner_join(GHR,outf,by= c("llcoord"="latlong"))
 GHshpp <- read_sf(dsn ="Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted.shp")
 HydroRsf=fortify(GHshpp) 
 
+
+### NUTS3 ----
+
+
+# NUTS3 <- read_sf(dsn = paste0(hydroDir,"/Countries/NUTS3/NUTS3_Extended_domain.shp"))
+# NUTS3$N3ID=c(1:length(NUTS3$NUTS_ID))
+# N2ID=unique(NUTS3$NUTS2_ID)
+# N2IDn=c(1:length(N2ID))
+# mati=match(NUTS3$NUTS2_ID,N2ID)
+# NUTS3$N2ID=N2IDn[mati]
+# st_write(NUTS3, paste0(hydroDir,"/Countries/NUTS3/NUTS3_modified.shp"), driver = "ESRI Shapefile")
+
+NUTS3 <- read_sf(dsn = paste0(hydroDir,"/Countries/NUTS3/NUTS3_modified.shp"))
+GridNUTS3=raster( paste0(hydroDir,"/Countries/NUTS3/NUTS3_Raster3ID.tif"))
+GN3=as.data.frame(GridNUTS3,xy=T)
+GN3=GN3[which(!is.na(GN3[,3])),]
+GN3$llcoord=paste(round(GN3$x,4),round(GN3$y,4),sep=" ") 
+GN3_riv=right_join(GN3,outf,by= c("llcoord"="latlong"))
+
+GridNUTS2=raster( paste0(hydroDir,"/Countries/NUTS3/NUTS3_Raster2ID.tif"))
+GN2=as.data.frame(GridNUTS2,xy=T)
+GN2=GN2[which(!is.na(GN2[,3])),]
+GN2$llcoord=paste(round(GN2$x,4),round(GN2$y,4),sep=" ") 
+GN2_riv=right_join(GN2,outf,by= c("llcoord"="latlong"))
+
+GNF=right_join(GN3,GN2_riv,by="llcoord")
+
+GNUTS3sf=fortify(NUTS3) 
+
+GNFx=GNF[which(is.na(GNF$NUTS3_Raster3ID)),]
 ### Plot parameters ----
 palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
 outletname="efas_rnet_100km_01min"
@@ -1688,35 +1745,6 @@ catmap=cst7
 basemap=w2
 
 
-
-#still need to create the outlets file outf
-outf=c()
-for( Nsq in 1:88){
-  print(Nsq)
-  rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
-  rspace=rspace[,-1]
-  nrspace=rspace[Nsq,]
-  #outletname="outletsv8_hybas07_01min"
-  #outletname="outlets_hybas09_01min"
-  outletname="efas_rnet_100km_01min"
-  
-  outhybas=outletopen(hydroDir,outletname,nrspace)
-  Idstart=as.numeric(Nsq)*10000
-  Idstart2=as.numeric(Nsq)*100000
-  if (length(outhybas$outlets)>0){
-    outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
-    outhybas$outl2=seq((Idstart2+1),(Idstart2+length(outhybas$outlets)))
-    outhybas$latlong=paste(round(outhybas$Var1,4),round(outhybas$Var2,4),sep=" ")
-    #outcut=which(!is.na(match(outhybas$outlets,parlist$catchment)))
-    # zebi=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
-    # outcut=which(!is.na(match(outhybas$outlets,zebi)))
-    outhloc=outhybas
-    outf=rbind(outf,outhloc)
-  }
-  
-  
-}
-
 #load UpArea
 #load upstream area
 main_path = 'D:/tilloal/Documents/06_Floodrivers/'
@@ -1732,9 +1760,11 @@ head(UpArea)
 ##Loading saved results in .Rdata ---------------------------
 
 #load historical run
-load(file=paste0(hydroDir,"/Flood/params.flood.Histo4.Rdata"))
-load(file=paste0(hydroDir,"/Flood/RL100.flood.Histo4.Rdata"))
-Peaksave=data.table(Peaksave)
+haz="Flood"
+namefile="flood.Histo4"
+load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+#Peaksave=data.table(Peaksave)
 gc()
 
 Paramsfl=data.table(Paramsfl[,-c(4:9,17)])
@@ -1744,8 +1774,9 @@ rm(Paramsfl,RLGPDfl)
 gc()
 
 #load results from Socio-CF run
-load(file=paste0(hydroDir,"/Flood/params.flood.socCF4.Rdata"))
-load(file=paste0(hydroDir,"/Flood/RL100.flood.socCF4.Rdata"))
+namefile="flood.SocCF4"
+load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
 
 RLGPDflSCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
@@ -1754,8 +1785,9 @@ rm(Paramsfl,RLGPDfl)
 gc()
 
 #load results from Res+WU CF run
-load(file=paste0(hydroDir,"/Flood/params.flood.RWCF4.Rdata"))
-load(file=paste0(hydroDir,"/Flood/RL100.flood.RWCF4.Rdata"))
+namefile="flood.RWCF4"
+load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
 
 RLGPDflRWCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
@@ -1763,34 +1795,93 @@ ParamsflRWCF=data.table(Paramsfl)
 rm(Paramsfl,RLGPDfl)
 gc()
 
-## Change attribution-----------------------
+#load results from Res CF run
+namefile="flood.RCF4"
+load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+
+RLGPDflRCF=RLGPDfl
+Paramsfl=Paramsfl[,-c(4:9,17)]
+ParamsflRCF=data.table(Paramsfl)
+rm(Paramsfl,RLGPDfl)
+gc()
+
+
+
 RLGPDflSCF=as.data.frame(RLGPDflSCF)
 RLGPDflH=as.data.frame(RLGPDflH)
+RLGPDflRCF=as.data.frame(RLGPDflRCF)
 RLGPDflRWCF=as.data.frame(RLGPDflRWCF)
+
+
+### For drought ----------------
+
+if (haz=="Drought"){
+#Histo
+  RLGPDflH[,c(1:70)]=-RLGPDflH[,c(1:70)]
+  for (id in c(1:70)){
+    RLGPDflH[which(RLGPDflH[,id]<0),id]=0
+    RLGPDflH[which(is.infinite(RLGPDflH[,id])),id]=NA
+  }
+  
+  
+  RLGPDflRCF[,c(1:70)]=-RLGPDflRCF[,c(1:70)]
+  for (id in c(1:70)){
+    RLGPDflRCF[which(RLGPDflRCF[,id]<0),id]=0
+    RLGPDflRCF[which(is.infinite(RLGPDflRCF[,id])),id]=NA
+  }
+  
+  
+  RLGPDflSCF[,c(1:70)]=-RLGPDflSCF[,c(1:70)]
+  for (id in c(1:70)){
+    RLGPDflSCF[which(RLGPDflSCF[,id]<0),id]=0
+    RLGPDflSCF[which(is.infinite(RLGPDflSCF[,id])),id]=NA
+  }
+  
+  
+  RLGPDflRWCF[,c(1:70)]=-RLGPDflRWCF[,c(1:70)]
+  for (id in c(1:70)){
+    RLGPDflRWCF[which(RLGPDflRWCF[,id]<0),id]=0
+    RLGPDflRWCF[which(is.infinite(RLGPDflRWCF[,id])),id]=NA
+  }
+}
+## Change attribution-----------------------
+
 
 ### change from climate--------------------
 Climtrend=RLGPDflSCF[,c(1:70)]-(RLGPDflSCF[,1])
 
+mato=match(RLGPDflSCF[,71],RLGPDflH[,71])
 #1 I remove the climate trend
 RLGPDflSt=RLGPDflSCF[,c(1:70)]-Climtrend
-RLGPDflRWt=RLGPDflRWCF[,c(1:70)]-Climtrend
-RLGPDflHt=RLGPDflH[,c(1:70)]-Climtrend
+RLGPDflRWt=RLGPDflRWCF[mato,c(1:70)]-Climtrend
+RLGPDflRt=RLGPDflRCF[mato,c(1:70)]-Climtrend
+RLGPDflHt=RLGPDflH[mato,c(1:70)]-Climtrend
 
 ### change from socoeconomy -----------
 
 
 ## socioeconomic trend (land use) -----------
 RLGPDflRWtp=RLGPDflRWt-(RLGPDflRWt-RLGPDflSt)
+RLGPDflRtp=RLGPDflRt-(RLGPDflRt-RLGPDflSt)
 RLGPDflHtp=RLGPDflHt-(RLGPDflRWt-RLGPDflSt)
 
 Soctrend=(RLGPDflRWt-RLGPDflSt)
 
 plot(as.numeric(Soctrend[6786,]))
-## the reservoir + water use trend ----------
-RLGPDflHtpx=RLGPDflHtp-(RLGPDflHtp-RLGPDflRWtp)
-Restrend=(RLGPDflHtp-RLGPDflRWtp)
 
-plot(as.numeric(Restrend[6786,]))
+## the water use trend ----------
+RLGPDflRtpx=RLGPDflRtp-(RLGPDflRtp-RLGPDflRWtp)
+RLGPDflHtpx=RLGPDflHtp-(RLGPDflRtp-RLGPDflRWtp)
+WUtrend=(RLGPDflRtp-RLGPDflRWtp)
+
+plot(as.numeric(Restrend[68845,]))
+
+## the reservoir trend ----------
+RLGPDflHtpxf=RLGPDflHtpx-(RLGPDflHtpx-RLGPDflRtpx)
+Restrend=(RLGPDflHtpx-RLGPDflRtpx)
+
+plot(as.numeric(Restrend[68640,]))
 ### Upstream area vector --------
 UpAvec=UpArea[,c(12,3)]
 
@@ -1800,106 +1891,164 @@ UpAvec=UpArea[,c(12,3)]
 Shapepar1=ParamsflH[,c(1,2,4)]
 Shapepar2=ParamsflSCF[,c(1,2,4)]
 Shapepar3=ParamsflRWCF[,c(1,2,4)]
+Shapepar4=ParamsflRCF[,c(1,2,4)]
 rmfuckers1=which(Shapepar1$epsilonGPD>1.5)
 rmfuckers2=which(Shapepar2$epsilonGPD>1.5)
 rmfuckers3=which(Shapepar3$epsilonGPD>1.5)
+rmfuckers4=which(Shapepar4$epsilonGPD>1.5)
 
 rmfuckers=unique(c(rmfuckers1,rmfuckers2,rmfuckers3))
-# Shapepar=Shapepar[-rmfuckers,]
-# unikout=unique(Shapepar$catchment)
-# unm=match(unikout,Shapepar$catchment)
-# Shapepar=Shapepar[unm,]
-## Aggregation by HR of all trends ----------------
-data = data.frame(Climtrend,unikout=RLGPDflSCF[,71])
+
+
+## Aggregation by Regions of initial RL ----------------
+data = data.frame(RLGPDflSCF$Y1951,unikout=RLGPDflSCF[,71])
 rmfck2=unique(ParamsflSCF$catchment[rmfuckers])
 data=data[-match(rmfck2,data$unikout),]
 data=right_join(data,UpAvec,by = c("unikout"="outl2"))
-DataC=right_join(GHR_riv,data,by = c("outl2"="unikout"))
 
-HRM=match(DataC$HydroRegions_raster_WGS84,GHshpp$Id)
 
-### Climate trend ----------
-DataC$HR_id=GHshpp$CODEB[HRM]
-DataC$upaHR=GHshpp$SURF_KM2[HRM]
+### Spatial aggregation to desired regions: NUTS3 ----------
 
-DataCL=DataC[which(DataC$upa>DataC$upaHR),]
-DataC=DataC[-which(DataC$upa>DataC$upaHR)]
+DataI=right_join(GNF,data,by = c("outl2"="unikout"))
 
-DataC[,c(12:81)]=DataC[,c(12:81)]*1000/(DataC$upa)
+HRM=match(DataI$NUTS3_Raster3ID,NUTS3$N3ID)
+N2M=match(DataI$NUTS3_Raster2ID,NUTS3$N2ID)
 
-pointagg=aggregate(list(Rchange=DataC$Y2020),
-                   by = list(HydroR=DataC$HR_id),
+### RL in 1951 aggregated to NUTS3 ----------
+DataI$NUTS3_id=NUTS3$NUTS_ID[HRM]
+DataI$NUTS2_id=NUTS3$NUTS2_ID[N2M]
+
+#DataC$upaHR=GHshpp$SURF_KM2[HRM]
+# DataCL=DataC[which(DataC$upa>DataC$upaHR),]
+# DataC=DataC[-which(DataC$upa>DataC$upaHR)]
+
+DataI$RLGPDflSCF.Y1951=DataI$RLGPDflSCF.Y1951*1000/(DataI$upa)
+
+NUTSRLi=aggregate(list(RL10=DataI$RLGPDflSCF.Y1951),
+                   by = list(HydroR=DataI$NUTS3_id),
                    FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-pointClim <- do.call(data.frame, pointagg)
+NUTSRLi <- do.call(data.frame, NUTSRLi)
 
-trendagg=aggregate(list(Rchange=DataC[,c(12:81)]),
-                   by = list(HydroR=DataC$HR_id),
-                   FUN = function(x) c(mean=median(x,na.rm=T)))
-trendClim <- do.call(data.frame, trendagg)
+ziz=match(NUTS3$NUTS_ID,NUTSRLi$HydroR)
+NUTMiss=NUTS3[which(is.na(ziz)),]
 
-### Land use trend ----------
-data = data.frame(Soctrend,unikout=RLGPDflSCF[,71])
-rmfck2=unique(ParamsflSCF$catchment[rmfuckers])
-data=data[-match(rmfck2,data$unikout),]
-data=right_join(data,UpAvec,by = c("unikout"="outl2"))
-DataL=right_join(GHR_riv,data,by = c("outl2"="unikout"))
-
-HRM=match(DataL$HydroRegions_raster_WGS84,GHshpp$Id)
-
-DataL$HR_id=GHshpp$CODEB[HRM]
-DataL$upaHR=GHshpp$SURF_KM2[HRM]
-
-DataLL=DataL[which(DataL$upa>DataL$upaHR),]
-DataL=DataL[-which(DataL$upa>DataL$upaHR)]
-
-DataL[,c(12:81)]=DataL[,c(12:81)]*1000/(DataL$upa)
-
-pointagg=aggregate(list(Rchange=DataL$Y2020),
-                   by = list(HydroR=DataL$HR_id),
-                   FUN = function(x)  c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-pointSoc <- do.call(data.frame, pointagg)
-
-trendagg=aggregate(list(Rchange=DataL[,c(12:81)]),
-                   by = list(HydroR=DataC$HR_id),
-                   FUN = function(x) c(mean=mean(x,na.rm=T)))
-trendSoc <- do.call(data.frame, trendagg)
-
-### Reservoir and WU trend ----------
-data = data.frame(Restrend,unikout=RLGPDflSCF[,71])
-rmfck2=unique(ParamsflSCF$catchment[rmfuckers])
-data=data[-match(rmfck2,data$unikout),]
-data=right_join(data,UpAvec,by = c("unikout"="outl2"))
-DataRW=right_join(GHR_riv,data,by = c("outl2"="unikout"))
-
-HRM=match(DataRW$HydroRegions_raster_WGS84,GHshpp$Id)
-
-DataRW$HR_id=GHshpp$CODEB[HRM]
-DataRW$upaHR=GHshpp$SURF_KM2[HRM]
-
-DataRWL=DataRW[which(DataRW$upa>DataRW$upaHR),]
-DataRW=DataRW[-which(DataRW$upa>DataRW$upaHR)]
-
-DataRW[,c(12:81)]=DataRW[,c(12:81)]*1000/(DataRW$upa)
-
-pointagg=aggregate(list(Rchange=DataRW$Y2020),
-                   by = list(HydroR=DataRW$HR_id),
+NUTS2RLi=aggregate(list(RL10=DataI$RLGPDflSCF.Y1951),
+                   by = list(HydroR=DataI$NUTS2_id),
                    FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-pointResWus <- do.call(data.frame, pointagg)
-
-trendagg=aggregate(list(Rchange=DataRW[,c(12:81)]),
-                   by = list(HydroR=DataRW$HR_id),
-                   FUN = function(x) c(mean=mean(x,na.rm=T)))
-trendRW <- do.call(data.frame, trendagg)
+NUTS2RLi <- do.call(data.frame, NUTS2RLi)
 
 
-PointAll=inner_join(pointClim,pointSoc,by="HydroR")
+replace= data.frame(N3=NUTMiss$NUTS_ID,NUTS2RLi[match(NUTMiss$NUTS2_ID,NUTS2RLi$HydroR),])
+replace=replace[-which(is.na(replace$RL10.mean)),]
+replace$HydroR=replace$N3
+replace=replace[,-1]
 
-#Boxplot as for catchment analysis
+NUTSRLi=rbind(NUTSRLi,replace)
 
-#boxplot of the different contributions... in 2020
 
-df_2020=rbind(pointClim[,c(1,2)],pointSoc[,c(1,2)],pointResWus[,c(1,2)])
-idvec=c(rep("Clim",length(pointClim$HydroR)),rep("LUC",length(pointClim$HydroR)),rep("ResWu",length(pointClim$HydroR)))
+
+## Aggregation by Regions of all trends ----------------
+
+### parameter definition
+yrange=c(14:83)
+unikout=RLGPDflSCF[, 71]
+parameters=ParamsflSCF
+rmpixels=rmfuckers
+
+RegionAggregate<- function(Drivertrend, unikout, parameters, rmpixels, UpAvec, GNF, NUTS3, GHshpp, yrange) {
+  
+  # Data preparation
+  data <- data.frame(Drivertrend, unikout = unikout)
+  rmfck2 <- unique(parameters$catchment[rmpixels])
+  data <- data[-match(rmfck2, data$unikout), ]
+  data <- right_join(data, UpAvec, by = c("unikout" = "outl2"))
+  
+  # Aggregation choice
+  DataC <- right_join(GNF, data, by = c("outl2" = "unikout"))
+  
+  # Matching NUTS3 and NUTS2 IDs
+  HRM <- match(DataC$NUTS3_Raster3ID, NUTS3$N3ID)
+  N2M <- match(DataC$NUTS3_Raster2ID, NUTS3$N2ID)
+  
+  # Adding NUTS3 and NUTS2 IDs to the data
+  DataC$NUTS3_id <- NUTS3$NUTS_ID[HRM]
+  DataC$NUTS2_id <- NUTS3$NUTS2_ID[N2M]
+  
+  # Normalize the data by area (upa)
+  DataC[, yrange] <- DataC[, yrange] * 1000 / DataC$upa
+  
+  # Point aggregation by NUTS3
+  pointagg <- aggregate(list(Rchange = DataC$Y2020),
+                        by = list(HydroR = DataC$NUTS3_id),
+                        FUN = function(x) c(mean = mean(x, na.rm = TRUE), 
+                                            dev = sd(x, na.rm = TRUE), 
+                                            len = length(x), 
+                                            med = median(x, na.rm = TRUE), 
+                                            q1 = quantile(x, 0.05, na.rm = TRUE), 
+                                            q3 = quantile(x, 0.95, na.rm = TRUE)))
+  pointD <- do.call(data.frame, pointagg)
+  
+  # Handling missing NUTS3 IDs
+  ziz <- match(NUTS3$NUTS_ID, pointClim$HydroR)
+  NUTMiss <- NUTS3[which(is.na(ziz)), ]
+  
+  # Point aggregation by NUTS2
+  pointagg2 <- aggregate(list(Rchange = DataC$Y2020),
+                         by = list(HydroR = DataC$NUTS2_id),
+                         FUN = function(x) c(mean = mean(x, na.rm = TRUE), 
+                                             dev = sd(x, na.rm = TRUE), 
+                                             len = length(x), 
+                                             med = median(x, na.rm = TRUE), 
+                                             q1 = quantile(x, 0.05, na.rm = TRUE), 
+                                             q3 = quantile(x, 0.95, na.rm = TRUE)))
+  pointD2 <- do.call(data.frame, pointagg2)
+  
+  # Replace missing NUTS3 data with NUTS2 data
+  replace <- data.frame(N3 = NUTMiss$NUTS_ID, pointD2[match(NUTMiss$NUTS2_ID, pointD2$HydroR), ])
+  replace <- replace[-which(is.na(replace$Rchange.mean)), ]
+  replace$HydroR <- replace$N3
+  replace <- replace[, -1]
+  
+  pointD <- rbind(pointD, replace)
+  
+  # Climate trend aggregation by NUTS3
+  trendagg <- aggregate(list(Rchange = DataC[, yrange]),
+                        by = list(HydroR = DataC$NUTS3_id),
+                        FUN = function(x) c(mean = mean(x, na.rm = TRUE)))
+  trendD <- do.call(data.frame, trendagg)
+  
+  # Climate trend aggregation by NUTS2
+  trendagg2 <- aggregate(list(Rchange = DataC[, yrange]),
+                         by = list(HydroR = DataC$NUTS2_id),
+                         FUN = function(x) c(mean = mean(x, na.rm = TRUE)))
+  trendD2 <- do.call(data.frame, trendagg2)
+  
+  # Replace missing NUTS3 data in trendClim with NUTS2 data
+  replace <- data.frame(N3 = NUTMiss$NUTS_ID, trendD2[match(NUTMiss$NUTS2_ID, trendD2$HydroR), ])
+  replace <- replace[-which(is.na(replace$Rchange.mean)), ]
+  replace$HydroR <- replace$N3
+  replace <- replace[, -1]
+  
+  trendD <- rbind(trendD, replace)
+  
+  # Return the final trendClim as the main output
+  return(list(trend=trendD,change=pointD))
+}
+
+ClimAgg=RegionAggregate(Drivertrend=Climtrend, unikout, parameters, rmpixels, UpAvec, GNF, NUTS3, GHshpp, yrange)
+LuAgg=RegionAggregate(Drivertrend=Soctrend, unikout, parameters, rmpixels, UpAvec, GNF, NUTS3, GHshpp, yrange)
+ResAgg=RegionAggregate(Drivertrend=Restrend, unikout, parameters, rmpixels, UpAvec, GNF, NUTS3, GHshpp, yrange)
+WuAgg=RegionAggregate(Drivertrend=WUtrend, unikout, parameters, rmpixels, UpAvec, GNF, NUTS3, GHshpp, yrange)
+
+#### Plot 1: boxplot of the different contributions... in 2020 ----------
+
+pointClim=ClimAgg$change
+pointSoc=LuAgg$change
+pointRes=ResAgg$change
+pointWu=WuAgg$change
+df_2020=rbind(pointClim[,c(1,2)],pointSoc[,c(1,2)],pointRes[,c(1,2)],pointWu[,c(1,2)])
+idvec=c(rep("Clim",length(pointClim$HydroR)),rep("LUC",length(pointClim$HydroR)),
+        rep("Res",length(pointClim$HydroR)),rep("WU",length(pointClim$HydroR)))
 names(df_2020)[2]="value"
 df_2020$driver=idvec
 
@@ -1908,18 +2057,18 @@ q <- c(by(df_2020$value, df_2020$driver, quantile))
 merdecol=match(df_2020$driver,names(meds))
 df_2020$col=meds[merdecol]
 palet=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = T, fixup = TRUE))
-colorz = c("ResWu" ='darkgrey',"LUC" ='orange',"Clim" ='royalblue')
+colorz = c("Res" ='tomato4',"LUC" ='orange',"Clim" ='royalblue',"WU"="limegreen")
 
 ggplot(df_2020, aes(x=factor(driver), y=value,fill=driver)) +
-  ggdist::stat_halfeye(adjust = 1.5, width = .6, justification = -.3, .width = .1,scale=0.6,
+  ggdist::stat_halfeye(adjust = 1, width = .6, justification = -.3, .width = .1,scale=0.6,
                        trim=F, point_colour = NA, normalize="groups") + 
   #ggdist::stat_dots(side = "left", dotsize = .1, justification = 1.1, binwidth = .1) +
   #geom_boxplot(width = .1, outlier.shape = NA) +
   geom_boxplot(notch=F,width = .1,position=position_dodge(.9),alpha=.8,aes(fill=driver),linewidth=0.8,outlier.alpha = 0.4)+
   scale_y_continuous(limits = c(-200,200),name="Contribution to change in 10y Flood RL(l/s/km2) (1951-2020)",breaks = seq(-100,100,by=10),minor_breaks = seq(-100,100,5))+
-  scale_x_discrete(labels=c("Dres" = "Reservoirs", "Dsoc" = "Land use + water use",
-                            "Dclim" = "Climate"),name="Driver")+
-  coord_cartesian(ylim = c(-50,50))+
+  scale_x_discrete(labels=c("Res" = "Reservoirs", "LUC" = "Land use",
+                            "Clim" = "Climate","WU"="Water use"),name="Driver")+
+  coord_cartesian(ylim = c(-30,30))+
   scale_fill_manual(values = colorz, name=" ") +
   theme(axis.title=element_text(size=16, face="bold"),
         axis.text = element_text(size=12),
@@ -1935,67 +2084,30 @@ ggplot(df_2020, aes(x=factor(driver), y=value,fill=driver)) +
         legend.key.size = unit(.8, "cm"))
 
 
-#Ok BG, same plot with all data to see if it looks different
-
-# 
-# df_2020=rbind(DataC[,c(10,81)],DataL[,c(10,81)],DataRW[,c(10,81)])
-# idvec=c(rep("Clim",length(DataC$x)),rep("LUC",length(DataC$x)),rep("ResWu",length(DataC$x)))
-# names(df_2020)[2]="value"
-# df_2020$driver=idvec
-# 
-# length(df_2020[which(abs(df_2020$value)<1),1])
-# df_2020i=df_2020[-which(abs(df_2020$value)<1),]
-# meds <- c(by(df_2020i$value, df_2020i$driver, median, na.rm=T))
-# q <- c(by(df_2020i$value, df_2020i$driver, quantile,na.rm=T))
-# merdecol=match(df_2020i$driver,names(meds))
-# df_2020i$col=meds[merdecol]
-# palet=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = T, fixup = TRUE))
-# colorz = c("ResWu" ='darkgrey',"LUC" ='orange',"Clim" ='royalblue')
-# 
-# ggplot(df_2020, aes(x=factor(driver), y=value,fill=driver)) +
-#   ggdist::stat_halfeye(adjust = 1.5, width = .6, justification = -.3, .width = .1,scale=0.6,
-#                        trim=TRUE, point_colour = NA, normalize="groups") + 
-#   #ggdist::stat_dots(side = "left", dotsize = .1, justification = 1.1, binwidth = .1) +
-#   #geom_boxplot(width = .1, outlier.shape = NA) +
-#   geom_boxplot(notch=F,width = .1,position=position_dodge(.9),alpha=.8,aes(fill=driver),linewidth=0.8,outlier.alpha = 0.4)+
-#   scale_y_continuous(limits = c(-200,200),name="Contribution to change in 10y Flood RL(l/s/km2) (1951-2020)",breaks = seq(-100,100,by=10),minor_breaks = seq(-100,100,5))+
-#   scale_x_discrete(labels=c("Dres" = "Reservoirs", "Dsoc" = "Land use + water use",
-#                             "Dclim" = "Climate"),name="Driver")+
-#   coord_cartesian(ylim = c(-50,50))+
-#   scale_fill_manual(values = colorz, name=" ") +
-#   theme(axis.title=element_text(size=16, face="bold"),
-#         axis.text = element_text(size=12),
-#         panel.background = element_rect(fill = "white", colour = "white"),
-#         panel.grid = element_blank(),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=14),
-#         legend.text = element_text(size=12),
-#         legend.position = "none",
-#         panel.grid.major = element_line(colour = "grey60"),
-#         panel.grid.minor.y = element_line(colour = "grey80",linetype="dashed"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-
-
-#try a lolipop plot
 br=c(-20,-15,-10,-5,0,5,10,15,20)
 labels=br
 limi=c(-50,50)
-# Plot
+colNA="transparent"
+# Plot of ordered change by region, can be important
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 title=paste0("Change in 10-years ",haz," Return Level between ", period[1], " and ", period[2])
 legend="Change in specific discharge (l/s/km2)"
 pointP=pointClim
 pointP=pointP[order(pointP$Rchange.mean),]
-pointP$id=c(1:131)
-ggplot(pointP, aes(y=id, x=Rchange.mean, color=Rchange.mean)) +
+pointP$id=c(1:length(pointP$Rchange.mean))
+
+limi=c(-1000,1000)
+ggplot() +
+  geom_point(data=pointP, aes(y=id, x=Rchange.mean, color=Rchange.mean)) + 
+  geom_point(data=pointP, aes(y=id, x=Rchange.mean), pch=21, colour="gray3",alpha=1) + 
   geom_vline(xintercept = 0,lwd=1, col="black")+
-  geom_point() + 
+  scale_x_continuous(limits=limi,breaks=br)+
   scale_color_gradientn(colors=palet,
                         breaks=br,limits=c(-10,10),
                         oob = scales::squish,na.value=colNA, name=legend)+
-  geom_segment( aes(y=id, yend=id, x=Rchange.q1.5.,
-                    xend=Rchange.q3.95.))+
+  coord_cartesian(xlim=c(-50,50))+
+  geom_segment(data=pointP,aes(y=id, yend=id, x=Rchange.q1.5.,
+                    xend=Rchange.q3.95.,color=Rchange.mean), alpha=.5)+
   guides(color = guide_colourbar(barwidth = 12, barheight = 0.5,reverse=F, title.position = "top")) +
   theme(axis.title=element_text(size=14, face="bold"),
         axis.text = element_text(size=10),
@@ -2012,28 +2124,31 @@ ggplot(pointP, aes(y=id, x=Rchange.mean, color=Rchange.mean)) +
 
 
 
-pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
-st_geometry(pointap)<-NULL
-#natch pointagg with hybasf
 
 
 PointAI=data.frame(clim=abs(pointClim$Rchange.mean),lu=abs(pointSoc$Rchange.mean),
-                   resw=abs(pointResWus$Rchange.mean))
+                   res=abs(pointRes$Rchange.mean),wu=abs(pointWu$Rchange.mean))
 
 max_col_numbers <- apply(PointAI, 1, function(x) which.max(x))
 
-colorz = c("3" ='darkgrey',"2" ='orange',"1" ='royalblue')
+colorz = c("4"="limegreen","3" ='tomato4',"2" ='orange',"1" ='royalblue')
 
-cmat=match(GHshpp$CODEB,pointClim$HydroR)
+
+#pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
+pointap=full_join(NUTS3,pointClim,by=c("NUTS_ID"="HydroR"))
+st_geometry(pointap)<-NULL
+#match pointagg with hybasf
+cmat=match(NUTS3$NUTS_ID,pointClim$HydroR)
 pointap$maxcol=max_col_numbers[cmat]
 #Map plot of which driver is the largest
 pointap=pointap[-which(is.na(pointap$maxcol)),]
-pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
+
+#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
+pointplot=inner_join(GNUTS3sf,pointap,by= c("NUTS_ID"))
 period=c(1951,2020)
 haz="flood"
 
-
-points <- st_transform(pointplot, crs = 3035)
+nutplot <- st_transform(pointplot, crs = 3035)
 
 br=c(-50,-20,-10,0,10,20,50)
 labels=br
@@ -2042,7 +2157,7 @@ limi=c(-50,50)
 pl1=ggplot(basemap) +
   geom_sf(fill="gray95")+
   geom_sf(fill=NA, color="grey") +
-  geom_sf(data=points,aes(fill=factor(maxcol),geometry=geometry),color="transparent",alpha=1,size=0.25,stroke=0,shape=15)+ 
+  geom_sf(data=nutplot,aes(fill=factor(maxcol),geometry=geometry),color="transparent",alpha=1,size=0.25,stroke=0,shape=15)+ 
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   scale_fill_manual(values = colorz, name=" ") +
   labs(x="Longitude", y = "Latitude")+
@@ -2062,10 +2177,74 @@ pl1
 ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/map_test_soc1.jpg", pl1, width=20, height=20, units=c("cm"),dpi=1000) 
 
 
+#Main driver at pixel level
+
+#pixel level drivers 
+
+DataC1=DataC[,c(13,yrange)]
+DataL1=DataL[,c(13,83,84)]
+DataW1=DataW[,c(13,83,84)]
+DataR1=DataR[,c(13,83,84)]
+
+
+DataAI=data.frame(clim=abs(DataC1$Y2020),lu=abs(DataL1$Y2020),
+                   resw=abs(DataR1$Y2020),wu=abs(DataW1$Y2020))
+
+max_col_numbers <- apply(DataAI, 1, function(x) which.max(x))
+max_col_numbers=as.numeric(max_col_numbers)
+
+datap=DataC
+datap$maxcol=max_col_numbers
+datap=datap[-which(is.na(datap$maxcol)),]
+points <- st_as_sf(datap, coords = c("Var1", "Var2"), crs = 4326)
+points <- st_transform(points, crs = 3035)
+
+lab1=c("Climate","Land use","Reservoirs","Water demand")
+
+ok<-ggplot(basemap) +
+  geom_sf(fill="gray95",color="gray10",size=0.5)+
+  #geom_sf(data=pointsag,aes(fill=mkta,geometry=geometry),alpha=0.3,color="transparent")+
+  geom_sf(data=nutplot,aes(fill=factor(maxcol),geometry=geometry),color="transparent",alpha=.6,size=0.25,stroke=0,shape=15)+ 
+  geom_sf(data=points,aes(col=factor(maxcol),geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_colour_manual(values = colorz, name="Largest change driver", labels=lab1) +
+  scale_fill_manual(values = colorz, name="Largest change driver",labels=lab1) +
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                  sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  #ggtitle(title)+
+  labs(x="Longitude", y = "Latitude")+
+  guides(colour = guide_legend(override.aes = list(size = 10)))+
+  theme(axis.title=element_text(size=tsize),
+        title = element_text(size=osize),
+        axis.text=element_text(size=osize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(1, "cm"))
+
+
+
+ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/largestdriverDroughtMMX.jpg", ok, width=20, height=20, units=c("cm"),dpi=1000) 
+
+
+trtest <- melt(DataC1, id.vars = "outl2", variable.name = "variable", value.name = "value")
+
+
 yrlist=c(1951:2020)
+trendPlot=trendRes
+datap=DataR
+pointagg=pointRes
+RLbase=RLGPDflSCF[,c(1,71)]
 #significance at HR level
 legend="Relative change (%)"
-tmpval=(trendSoc[,-1])
+tmpval=(trendPlot[,-1])
 mkta=c()
 mksa=c()
 chlist=c()
@@ -2089,7 +2268,7 @@ for (it in 1:length(pointClim[,1])){
   dirchange=sign(c(dmt[1],dmt[sign_change-1]))
   yrchange <- c(yrlist[1],yrlist[sign_change])
   
-  if (!is.na(miniTS[2])){
+  if (!is.na(miniTS[2]) & max(diff(miniTS[-1]),na.rm=T)>0){
     #mk=MannKendall(miniTS[-1])
     mk2=mmkh(miniTS[-1],ci=0.95)
     mk=data.frame(tau=mk2[7],sl=mk2[2])
@@ -2109,40 +2288,29 @@ for (it in 1:length(pointClim[,1])){
   chlist=rbind(chlist,changes)
 }
 
-chlist2=chlist[-which(chlist$yrchange==1951),]
-hist(chlist2$yrchange,breaks=30)
-# br=c(-1,-.80,-.60,-.40,-.20,0,.20,.40,.60,.80,1)
-# limi=c(-1,1)
-trans=scales::modulus_trans(.6)
-colNA="darkgrey"
-#title="Trends in 100 years Re flood magnitude"
+pointagg$mkta=mkta
+pointagg$sl=mksa
+#natch pointagg with hybasf
+#pointsag=inner_join(GHshpp,pointagg,by=c("CODEB"="HydroR"))
+pointsag=inner_join(NUTS3,pointagg,by=c("NUTS_ID"="HydroR"))
+pointsag$change=0
+pointsag$change[which(pointsag$Rchange.mean>0)]=1
+pointsag$change[which(pointsag$Rchange.mean<(-0))]=-1
+pointsag$change[which(pointsag$change==1 & pointsag$Rchange.q1.5.>0)]=2
+pointsag$change[which(pointsag$change==-1 & pointsag$Rchange.q3.95.<0)]=-2
+pointsag$change[which(pointsag$Rchange.mean*pointsag$Rchange.med<0)]=0
+
+paggR=pointsag
+
+
 
 
 #plot all the changes through all catchments
-pa_l <- reshape2::melt(trendSoc, id.vars = "HydroR", variable.name = "Year", value.name = "value")
+pa_l <- reshape2::melt(trendPlot, id.vars = "HydroR", variable.name = "Year", value.name = "value")
 pa_l$value=as.numeric(pa_l$value)
 
-# tpmean=aggregate(list(rl=pa_l$value),
-#                  by = list(HydroR=pa_l$HydroR),
-#                  FUN = function(x) c(mean=mean(x,na.rm=T)))
-# tpmean <- do.call(data.frame, tpmean)
-
-# pa_l$value2=pa_l$value/tp
-# # Add the cluster assignments to the data frame
-# pa_l$cluster <- factor(cluster_assignments)
-
-
-
-pointagg=pointResWus
-pointagg$mkta=mkta
-pointagg$sl=mksa
 
 meds <- c(by(pa_l$value, pa_l$HydroR, mean))
-
-plot(meds)
-
-#natch pointagg with hybasf
-pointsag=inner_join(GHshpp,pointagg,by=c("CODEB"="HydroR"))
 
 #for climate
 br=c(-30,-20,-10,0,10,20,30)
@@ -2154,9 +2322,15 @@ legend="Change in Qsp \n(l/s/km2)"
 
 
 #for others
-br=c(-10,-8,-6,-4,-2,0,2,3,6,8,10)
+br=c(-10,-8,-6,-4,-2,0,2,4,6,8,10)
 labels=br
 limi=c(-10,10)
+
+
+colNA="transparent"
+
+palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+paletf=c(hcl.colors(11, palette = "RdBu", alpha = NULL, rev = F, fixup = TRUE))
 
 pointsag$siglvl=0
 pointsag$siglvl[which(pointsag$sl<=0.05)]=1
@@ -2172,25 +2346,53 @@ sf_use_s2(FALSE)
 pointsInside <- sf::st_join(x = my.points, y = catsig, left = FALSE)
 pointsInside$sign="positive"
 pointsInside$sign[which(pointsInside$mkta<=0)]="negative"
+
+pag=catsig
+hist(pag$change)
+pag$sign="positive"
+pag$sign[which((pag$tslop<0))]="negative"
+
 pointsag$siglvl=factor(pointsag$siglvl)
 
-datap=DataL
-datap=datap[-which(is.na(datap$Var1)),]
+
+#datap=datap[-which(is.na(datap$Var1)),]
 points <- st_as_sf(datap, coords = c("Var1", "Var2"), crs = 4326)
 points <- st_transform(points, crs = 3035)
 
+
+
+#for drought
+br=c(-1,-0.5,0,0.5,1)
+labels=br
+limi=c(-1,1)
+tsize=16
+osize=12
+legend="Change in Qsp \n(l/s/km2)"
+
+
+# for nonclimate drought
+
+quantile(points$Y2020,0.00000000001,na.rm=T)
+br=c(-1,-.5,0,0.5,1)
+labels=br
+limi=c(-1,1)
+
 ocrap<-ggplot(basemap) +
-  geom_sf(fill="gray85",color="darkgrey",size=0.5)+
-  #geom_sf(data=pointsag,aes(fill=mkta,geometry=geometry),alpha=0.3,color="transparent")+
-  geom_sf(data=points,aes(col=Y2020,geometry=geometry),alpha=.9,size=0.15,stroke=0,shape=15)+ 
+  geom_sf(fill="gray95",color="darkgrey",size=0.5)+
+  geom_sf(data=pag,aes(fill=sign,geometry=geometry),alpha=0.2,color="transparent")+
+  geom_sf(data=points,aes(col=Y2020,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
   #geom_sf(data=pointplot,aes(geometry=geometry),color="darkgrey",fill=NA)+ 
-  scale_fill_gradientn(
-    colors=palet,
-    breaks=seq(-1,1,by=0.2), limits=c(-1,1),
-    oob = scales::squish,na.value="transparent", name=legend) +
-  guides(fill = "none")+
-  new_scale_fill()+
-  geom_sf(data=pointsInside,aes(geometry=geometry, fill=sign),alpha=.8,size=.6,stroke=0,shape=21,color="black")+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  # scale_fill_gradientn(
+  #   colors=paletf,
+  #   breaks=seq(-.1,.1,by=0.01), limits=c(-.1,.1),
+  #   oob = scales::squish,na.value="transparent", name=legend, guide="none") +
+  scale_fill_manual(values=c("tomato4","steelblue4"), name="Significant trends")+
+  #new_scale_fill()+
+  #geom_sf(data=pointsInside,aes(geometry=geometry, fill=sign),alpha=.8,size=.6,stroke=0,shape=21,color="black")+
   #geom_sf(fill=NA, color="grey") +
   #geom_sf(regiod,mapping=aes(geometry=geometry,group=name),fill=NA,color="orange")+
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
@@ -2200,18 +2402,17 @@ ocrap<-ggplot(basemap) +
   #geom_sf(data=datasig_f,aes(size=siglvl),fill="grey",color="transparent",shape=21,alpha=0.1)+ 
   #scale_color_manual(values=c("blue" ="darkblue","red"="darkred"))+
   #geom_col_pattern(data=pointsag,aes(fill=siglvl,geometry=geometry),colour='black', pattern = 'circle') +
-  scale_fill_manual(values=c("tomato4","steelblue4"), name="Significant trends")+
-  ggtitle(title)+
+ # ggtitle(title)+
   # coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   # geom_point(data=event,aes(x=lon,y=lat,col=dr))+
   # scale_color_distiller(palette = "Spectral",
   #                       direction = -1, limit=c(0,max(eventp$dr)),oob = scales::squish)+
   scale_color_gradientn(
     colors=palet,
-    breaks=br,limits=limi,trans=trans,
+    breaks=br,limits=limi,
     oob = scales::squish,na.value=colNA, name=legend)   +
   labs(x="Longitude", y = "Latitude")+
-  guides(colour = guide_colourbar(barwidth = 1.5, barheight = 10),
+  guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14),
          fill = guide_legend(override.aes = list(size = 10)))+
   theme(axis.title=element_text(size=tsize),
         title = element_text(size=osize),
@@ -2228,8 +2429,302 @@ ocrap<-ggplot(basemap) +
 
 
 
-ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapFLU.jpg", ocrap, width=20, height=20, units=c("cm"),dpi=1000) 
+ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapR_droughtMMX.jpg", ocrap, width=20, height=20, units=c("cm"),dpi=1000) 
 
+
+
+
+#create a barplot with 1 category per driver and number of locations with increasing|decreasing trend
+lm=match(pointsag$NUTS_ID,NUTSRLi$HydroR)
+NUTSRLi$HydroR[lm]
+pointsag$NUTS_ID
+
+paggC$driver="Clim"
+paggL$driver="Lu"
+paggR$driver="Res"
+paggW$driver="Wu"
+colnames(paggC)
+colnames(paggR)
+pointsAD=rbind(paggC,paggL,paggR,paggW)
+
+pointsAD$RChange.o.mean=pointsAD$Rchange.mean/NUTSRLi$RL10.mean[lm]*100
+
+
+abc=abs(pointsAD$Rchange.mean)
+thcor=quantile(abc,0.05,na.rm=T)
+pointsAD$change[which(abs(pointsAD$Rchange.mean)<thcor)]=0
+
+# plot(pointsag$Rchange.mean)
+# sd(pointsag$Rchange.mean)
+# pointsag$change=0
+# pointsag$change[which(pointsag$Rchange.mean>0)]=1
+# pointsag$change[which(pointsag$Rchange.mean<(-0))]=-1
+# pointsag$change[which(pointsag$change==1 & pointsag$Rchange.q1.5.>0)]=2
+# pointsag$change[which(pointsag$change==-1 & pointsag$Rchange.q3.95.<0)]=-2
+# pointsag$change[which(pointsag$Rchange.mean*pointsag$Rchange.med<0)]=0
+# hist(pointsag$Rchange.mean)
+
+
+colorb=rev(c("royalblue","lightblue","lightyellow","rosybrown1","red2"))
+
+colorbp=rev(c("darkblue","dodgerblue","orange","indianred1","brown"))
+
+#ncol=c("negative significant","negative","none","positive","positive significant")
+ncol=c("- -","-","=","+","+ +")
+
+xlabels=c("Climate","Land use","Reservoirs","Water demand")
+
+agbar=aggregate(list(pointsAD$Rchange.mean),
+                by = list(drivers=pointsAD$driver, chsig=pointsAD$change),
+                FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+agbar <- do.call(data.frame, agbar)
+names(agbar)[c(3,4,5,6)]=c("mean","length","q1","q2")
+
+
+# Customize the barplot
+ggplot(agbar, aes(x = drivers, y = length, fill = factor(chsig))) +
+  geom_bar(position="dodge", stat="identity") +
+  scale_fill_manual(values = colorb, name="Change group",labels=ncol) +
+  scale_y_continuous(
+    name = "Cound of NUTS3",
+    breaks=seq(0,2000,100),
+    minor_breaks = seq(-2000,2000,100),
+    sec.axis = sec_axis( transform=~.*0.001, name="Mean change in Qsp (l/s/km2)",
+                         breaks=seq(-2,2,.2))
+  )+
+  geom_point(data=agbar, aes(x=drivers, y = 1000*(mean), color = factor(chsig),group=factor(chsig)),
+             position=position_dodge(width=.9),size=3) +
+  guides(color = guide_legend(override.aes = list(color = colorb)))+
+  scale_x_discrete(labels=xlabels)+
+  geom_linerange(data=agbar,aes(x=drivers, ymin=1000*(q1),ymax=1000*(q2),color = factor(chsig),group=factor(chsig)),
+                 position = position_dodge2(width = .9),lwd=1) +
+  scale_color_manual(values = colorbp, name="Change group",labels=ncol,guide = "none") +
+  theme(axis.title=element_text(size=14, face="bold"),
+        axis.text = element_text(size=10),
+        axis.text.x = element_text(size=12,face="bold"),
+        panel.background = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=14, face="bold"),
+        legend.text = element_text(size=12),
+        axis.ticks.y = element_blank(),  # Remove x-axis tickmarks
+        panel.grid.major.y =element_line(color = "lightgrey"),
+        panel.grid.minor.y = element_line(color = "lightgray"),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey80"),
+        panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/chang_by_drivers_droughtMMX.jpg", width=30, height=20, units=c("cm"),dpi=1000) 
+
+
+trendClim
+
+trtest <- melt(trendClim, id.vars = "HydroR", variable.name = "variable", value.name = "value")
+
+zob=trtest$variable[1]
+trtest$variable=as.character(trtest$variable)
+craplife=(strsplit(trtest$variable,".Y"))
+craplife=data.frame(craplife)
+trtest$yr=as.numeric(craplife[2,])
+trtest$decad=10*round(trtest$yr/10)
+
+tCL=trtest
+trtime=aggregate(list(tCL$value),
+                 by = list(yr=tCL$decad,loc=tCL$HydroR),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+tCL <- do.call(data.frame, trtime)
+names(tCL)[c(3,4,5,6)]=c("changeC","length","cq1","cq2")
+
+trtime=aggregate(list(trtest$value),
+                 by = list(yr=trtest$decad),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+trtclim <- do.call(data.frame, trtime)
+names(trtclim)[c(2,3,4,5)]=c("changeC","length","cq1","cq2")
+
+trtest <- melt(trendSoc, id.vars = "HydroR", variable.name = "variable", value.name = "value")
+
+zob=trtest$variable[1]
+
+trtest$variable=as.character(trtest$variable)
+craplife=(strsplit(trtest$variable,".Y"))
+craplife=data.frame(craplife)
+trtest$yr=as.numeric(craplife[2,])
+trtest$decad=10*round(trtest$yr/10)
+
+
+tLU=trtest
+trtime=aggregate(list(tLU$value),
+                 by = list(yr=tLU$decad,loc=tLU$HydroR),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+tLU <- do.call(data.frame, trtime)
+names(tLU)[c(3,4,5,6)]=c("changeC","length","cq1","cq2")
+
+trtime=aggregate(list(trtest$value),
+                 by = list(yr=trtest$decad),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+trtLu <- do.call(data.frame, trtime)
+names(trtLu)[c(2,3,4,5)]=c("changeC","length","cq1","cq2")
+
+
+
+trtest <- melt(trendR, id.vars = "HydroR", variable.name = "variable", value.name = "value")
+zob=trtest$variable[1]
+
+trtest$variable=as.character(trtest$variable)
+craplife=(strsplit(trtest$variable,".Y"))
+craplife=data.frame(craplife)
+trtest$yr=as.numeric(craplife[2,])
+trtest$decad=10*round(trtest$yr/10)
+
+tR=trtest
+trtime=aggregate(list(tR$value),
+                 by = list(yr=tR$decad,loc=tR$HydroR),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+tR <- do.call(data.frame, trtime)
+names(tR)[c(3,4,5,6)]=c("changeC","length","cq1","cq2")
+
+
+trtime=aggregate(list(trtest$value),
+                 by = list(yr=trtest$decad),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+trtR <- do.call(data.frame, trtime)
+names(trtR)[c(2,3,4,5)]=c("changeC","length","cq1","cq2")
+
+
+
+
+trtest <- melt(trendW, id.vars = "HydroR", variable.name = "variable", value.name = "value")
+zob=trtest$variable[1]
+
+trtest$variable=as.character(trtest$variable)
+craplife=(strsplit(trtest$variable,".Y"))
+craplife=data.frame(craplife)
+trtest$yr=as.numeric(craplife[2,])
+trtest$decad=10*round(trtest$yr/10)
+
+tW=trtest
+trtime=aggregate(list(tW$value),
+                 by = list(yr=tW$decad,loc=tW$HydroR),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+tW <- do.call(data.frame, trtime)
+names(tW)[c(3,4,5,6)]=c("changeC","length","cq1","cq2")
+
+
+trtime=aggregate(list(trtest$value),
+                 by = list(yr=trtest$decad),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x),ql=quantile(x,0.025,na.rm=T),qh=quantile(x,0.975,na.rm=T)))
+trtW <- do.call(data.frame, trtime)
+names(trtW)[c(2,3,4,5)]=c("changeC","length","cq1","cq2")
+
+
+
+
+trtF=rbind(trtclim,trtLu,trtR,trtW)
+
+
+
+trtF$year=rep(seq(1950,2020,10),4)
+trtF$driver=c(rep("Clim",8),rep("LUC",8),rep("Res",8),rep("WU",8))
+
+
+trtAI=data.frame(clim=abs(tCL$changeC),lu=abs(tLU$changeC),
+                   resw=abs(tR$changeC),wu=abs(tW$changeC))
+
+max_col_numbers <- apply(trtAI, 1, function(x) which.max(x))
+
+tCL$maxcol=max_col_numbers
+
+#now aggregate tcl
+tCbar=aggregate(list(tCL$changeC),
+                 by = list(yr=tCL$yr,mcol=tCL$maxcol),
+                 FUN = function(x) c(mean=mean(x,na.rm=T),l=length(x)))
+tCbar <- do.call(data.frame, tCbar)
+names(tCbar)[c(3,4)]=c("mean","length")
+
+#no influence of Water demand, I add it
+tcp=tCbar[c(1:7),]
+tcp$mcol=4
+tcp$mean=0
+tcp$length=0
+
+tCbar=rbind(tCbar,tcp)
+
+colorz = c("Clim" ='dodgerblue4',"LUC" ='gold4',"Res" ='firebrick4',"WU"="olivedrab")
+colorn = c("4" ='limegreen',"3" ='tomato4',"2" ='orange',"1" ='royalblue')
+
+
+#use pointap for bars
+
+
+xlabs=seq(1950,2020,10)
+clabels=c("Climate","Land use","Reservoirs", "Water demand")
+# Customize the barplot
+
+tCbar=tCbar[-which(tCbar$yr==2020),]
+trtF=trtF[-which(trtF$yr==2020),]
+ggplot() +
+  geom_bar(data=tCbar, aes(x = yr, y = length, fill = factor(mcol)),
+           position="dodge", stat="identity",alpha=0.6) +
+  scale_fill_manual(values = colorn, name="Drivers",labels=clabels) +
+  scale_y_continuous(
+    name = "Cound of NUTS3",
+    breaks=seq(0,2000,200),
+    minor_breaks = seq(-1000,2000,100),
+    sec.axis = sec_axis( transform=~.*0.001, name="Mean change in Qsp (l/s/km2)",
+                         breaks=seq(-2,2,.2))
+  )+
+  geom_point(data=trtF, aes(x=year, y = 1000*(changeC), color = factor(driver),group=factor(driver)),
+             position=position_dodge(width=8),size=3) +
+  guides(color = guide_legend(override.aes = list(color = colorz)))+
+  scale_x_continuous(breaks=xlabs,labels=xlabs,name="Decades")+
+  geom_linerange(data=trtF,aes(x=year, ymin=1000*(cq1-1e-5),ymax=1000*cq2,color = factor(driver),group=factor(driver)),
+                 position = position_dodge2(width = 8),lwd=1) +
+  scale_color_manual(values = colorz, name="Drivers",labels=clabels) +
+  theme(axis.title=element_text(size=14, face="bold"),
+        axis.text = element_text(size=12),
+        axis.text.x = element_text(size=12,face="bold"),
+        panel.background = element_rect(fill = "white", colour = "white"),
+        panel.grid = element_blank(),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=14, face="bold"),
+        legend.text = element_text(size=12),
+        axis.ticks.y = element_blank(),  # Remove x-axis tickmarks
+        panel.grid.major.y = element_line(color = "lightgray"),
+        panel.grid.minor.y = element_line(color = "lightgray"),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey80"),
+        panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+ggsave("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/chang_in_time_droughtMMX.jpg", width=30, height=20, units=c("cm"),dpi=1000) 
+
+
+
+
+#save some important outputs
+Climtrend$driver="Clim"
+Restrend$driver="Reservoirs"
+Soctrend$driver="Landuse"
+WUtrend$driver="Wateruse"
+Alltrend=rbind(Climtrend,Restrend,Soctrend,WUtrend)
+
+
+trendClim$driver="Clim"
+trendR$driver="Reservoirs"
+trendSoc$driver="Landuse"
+trendW$driver="Wateruse"
+
+trendNUTS3=rbind(trendClim,trendSoc,trendR,trendW)
+pointsAD
+
+trtF
+Output_dr_nonfrost_MMX=list(TrendPix=Alltrend,TrendNuts=trendNUTS3,Out2020=pointsAD)
+
+save(Output_dr_nonfrost_MMX,file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_MMX.Rdata"))
 # I need to compare this with the change in reservoir influence
 
 #Ok keep going and clean the script
