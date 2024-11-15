@@ -1834,11 +1834,11 @@ head(UpArea)
 ##Loading saved results in .Rdata ---------------------------
 
 #load historical run
-haz="Drought"
-namefile="Drought.nonfrost.Histo3"
+# haz="Drought"
+# namefile="Drought.nonfrost.Histo3"
 
-# haz="Flood"
-# namefile="flood.Histo4"
+haz="Flood"
+namefile="flood.Histo4"
 
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
@@ -1855,7 +1855,7 @@ gc()
 
 #load results from Socio-CF run
 namefile="Drought.nonfrost.SocCF3"
-# namefile="flood.socCF4"
+namefile="flood.socCF4"
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
@@ -1869,7 +1869,7 @@ gc()
 
 #load results from Res+WU CF run
 namefile="Drought.nonfrost.RWCF3"
-# namefile="flood.RWCF4"
+namefile="flood.RWCF4"
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
@@ -1882,7 +1882,7 @@ gc()
 
 #load results from Res CF run
 namefile="Drought.nonfrost.ResCF3"
-#namefile="flood.RCF4"
+namefile="flood.RCF4"
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
@@ -1974,6 +1974,8 @@ plot_riverchange<-function(plot_inputs,main,dates){
          cex=1, lty=c(1,2,3,4), bg=alpha("white",.6))
 } 
 
+
+#who is the Arno here
 pix=4103620
 pix=5300097
 pix=5302991
@@ -2225,8 +2227,6 @@ IRmap=ggplot(basemap) +
 
 #mato=match(RLGPDflSCF[,71],RLGPDflH[,71])
 
-Totaltrend=RLGPDflH[,c(1:70)]-(RLGPDflH[,1])
-
 
 ### change from climate--------------------
 Climtrend=RLGPDflSCF[,c(1:70)]-(RLGPDflSCF[,1])
@@ -2263,14 +2263,14 @@ RLGPDflSt[6786,]
 RLGPDflRtpx=RLGPDflRtp-(RLGPDflRtp-RLGPDflRWtp)
 RLGPDflHtpx=RLGPDflHtp-(RLGPDflRtp-RLGPDflRWtp)
 WUtrend=(RLGPDflRtp-RLGPDflRWtp)
+# 
+# plot(as.numeric(RLGPDflRCF[6786,-71]),type="l",col=3)
+# lines(as.numeric(RLGPDflH[6786,-71]),col=1)
+# lines(as.numeric(RLGPDflRWCF[6786,-71]),col=2)
+# lines(as.numeric(RLGPDflSCF[6786,-71]),col=4)
 
-plot(as.numeric(RLGPDflRCF[6786,-71]),type="l",col=3)
-lines(as.numeric(RLGPDflH[6786,-71]),col=1)
-lines(as.numeric(RLGPDflRWCF[6786,-71]),col=2)
-lines(as.numeric(RLGPDflSCF[6786,-71]),col=4)
 
-
-plot(as.numeric(RLGPDflRCF[6786,-71])-as.numeric(RLGPDflRWCF[6786,-71]))
+#plot(as.numeric(RLGPDflRCF[6786,-71])-as.numeric(RLGPDflRWCF[6786,-71]))
                                    
 WUtrend=(RLGPDflRCF[,-71]-RLGPDflRWCF[,-71])
 
@@ -2281,7 +2281,12 @@ Restrend=(RLGPDflHtpx-RLGPDflRtpx)
 
 Restrend=RLGPDflH[,-71]-RLGPDflRCF[,-71]
 
-plot(as.numeric(Restrend[6786,]))
+#2 ways to buid total trend
+
+Totaltrend=Climtrend+Soctrend+WUtrend+Restrend
+#Totaltrend=RLGPDflH[,c(1:70)]-(RLGPDflH[,1])
+
+#plot(as.numeric(Restrend[6786,]))
 
 #Restrend[-rmat,]<-0
 ### Upstream area vector --------
@@ -2590,8 +2595,8 @@ new_reservoirs=ReservoirOpen(r_path,outletname,outf)
 
 new_reservoirs=new_reservoirs[which(new_reservoirs$upa>0),]
 rmat=match(new_reservoirs$outl2,DataW$outl2)
-
-
+Rcrap=DataR[-rmat,]
+Rcrap=Rcrap[which(abs(Rcrap$Y2020)>1e-1),]
 #Look at rivers with reservoir influence
 LUtrendX=DataL[rmat,]
 LUtrendY=DataL[-rmat,]
@@ -2600,11 +2605,11 @@ length(LUtrendX$Y2020[which(LUtrendX$Y2020<0)])
 #extract and identify these locations
 LUtrend_o=LUtrendX[which(LUtrendX$Y2020<0),]
 #can I relate this to the reservoirs?
-pwu <- st_as_sf(LUtrend_o, coords = c("Var1", "Var2"), crs = 4326)
+pwu <- st_as_sf(Rcrap, coords = c("Var1", "Var2"), crs = 4326)
 pwu <- st_transform(pwu, crs = 3035)
 blss=ggplot(basemap) +
   geom_sf(fill="gray95",color="gray10",size=0.5)+
-  geom_sf(data=pwu,aes(geometry=geometry,size=upa),col="red",alpha=.9,stroke=0,shape=15)+
+  geom_sf(data=pwu,aes(geometry=geometry,size=upa,col=Y2020),alpha=.9,stroke=0,shape=15)+
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   # scale_colour_manual(values = colorz, name="Largest change driver", labels=lab1) +
   # scale_fill_manual(values = colorz, name="Largest change driver",labels=lab1) +
@@ -2628,7 +2633,7 @@ blss=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Blss_LUneg.jpg"), blss,width=20, height=20, units=c("cm"),dpi=1000) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Blss_Rcrap.jpg"), blss,width=20, height=20, units=c("cm"),dpi=1000) 
 
 
 
@@ -2741,8 +2746,8 @@ ggplot() +
 
 
 
-PointAI=data.frame(clim=abs(pointClim$Rchange.mean),lu=abs(pointSoc$Rchange.mean),
-                   res=abs(pointRes$Rchange.mean),wu=abs(pointWu$Rchange.mean))
+PointAI=data.frame(clim=abs(pointClim$Rchange_qsp.mean),lu=abs(pointSoc$Rchange_qsp.mean),
+                   res=abs(pointRes$Rchange_qsp.mean),wu=abs(pointWu$Rchange_qsp.mean))
 
 max_col_numbers <- apply(PointAI, 1, function(x) which.max(x))
 max_col_numbers<-as.numeric(max_col_numbers)
@@ -3488,7 +3493,7 @@ colorn = c("WU" ='limegreen',"Res" ='tomato4',"LUC" ='orange',"Clim" ='royalblue
 
 trtF=trtF[-which(trtF$yr==2020),]
 #use pointap for bars
-
+library(ggnewscale)
 fac=1
 
 xlabs=seq(1950,2010,10)
@@ -3497,8 +3502,8 @@ clabels=c("Climate","Land use","Reservoirs", "Water demand")
 nplot="Mean change (% of 1951 10Y RL)"
 br=seq(-50,100,10)
 nplot="Mean change (l/s/km2)"
-br=seq(-.5,1,.1)
-#br=seq(-50,100,10)
+#br=seq(-.5,1,.1)
+br=seq(-50,100,10)
 ggplot() +
   # IQR represented as rectangles
   geom_linerange(data=trtF,aes(x=year, ymin=fac*(w1),ymax=fac*w2,color = factor(driver),group=factor(driver)),
@@ -3898,9 +3903,11 @@ trendOutlets=rbind(ClimAgg$ChangeOut,LuAgg$ChangeOut,ResAgg$ChangeOut,WuAgg$Chan
 
 
 
-Output_dr_nonfrost=list(TrendPix=Alltrend,TrendRegio=trendRegio,TrendOutlets=trendOutlets,Out2020=pointsAD,DataI=DataI)
+Output_fl_year=list(TrendPix=Alltrend,TrendRegio=trendRegio,TrendOutlets=trendOutlets,Out2020=pointsAD,DataI=DataI)
+save(Output_fl_year,file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_qsp3.Rdata"))
 
-save(Output_dr_nonfrost,file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_qsp2.Rdata"))
+#Output_dr_nonfrost=list(TrendPix=Alltrend,TrendRegio=trendRegio,TrendOutlets=trendOutlets,Out2020=pointsAD,DataI=DataI)
+#save(Output_dr_nonfrost,file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_qsp3.Rdata"))
 # I need to compare this with the change in reservoir influence
 
 #Ok keep going and clean the script

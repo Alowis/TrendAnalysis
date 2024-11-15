@@ -1415,9 +1415,9 @@ if (!exists("outf")){
 #load results from previous script 
 
 #floods
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_qsp2.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_qsp3.Rdata"))
 #droughts
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_qsp2.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_qsp3.Rdata"))
 #I extract the trend at MUTS3 level fist
 
 FloodTrends=Output_fl_year$TrendRegio
@@ -1476,178 +1476,31 @@ basemap=w2
 library(ggplot2)
 
 
-a=sd(Flplot$f2020,na.rm=T)
-b=sd(Flplot$d2020,na.rm=T)
-ab=a/b
-lfval=2
-mfval=5
-hfval=10
-ldval=lfval/ab
-mdval=mfval/ab
-hdval=hfval/ab
+#1. TOTAL Trend ------------
 
-# Create data frame for the grid
-data <- expand.grid(y = seq(-12, 12, by = .1), x = seq(-0.5, 0.5, by = .01))
-
-
-# Assign categories based on conditions for drought (x) and flood (y) changes
-data$category <- with(data,
-                      ifelse(x >= 0 & y >= 0, "Wetting",
-                             ifelse(x >= 0 & y < 0, "Decelerating",
-                                    ifelse(x < 0 & y < 0, "Drying", "Accelerating"))))
-
-# Further subdivide into subcategories based on specific thresholds
-data$subcategory <- with(data, 
-ifelse(category == "Drying" & x < -hdval & y <= 0, "High Drying",
-ifelse(category == "Drying" & x <= 0 &  y < -hfval, "High Drying",
-ifelse(category == "Drying" & x <= 0 &  y < -mfval, "Medium Drying",
-ifelse(category == "Drying" & x < -mdval &  y <= 0, "Medium Drying",
-ifelse(category == "Drying" & x <= 0 &  y <= 0, "Low Drying",
-
-# Wetting subcategories
-ifelse(category == "Wetting" & x > hdval & y >= 0, "High Wetting",
-ifelse(category == "Wetting" & x >= 0 & y > hfval, "High Wetting",
-ifelse(category == "Wetting" & x > mdval & y >= 0, "Medium Wetting",
-ifelse(category == "Wetting" & x >= 0 & y > mfval, "Medium Wetting",
-ifelse(category == "Wetting" & x >= 0 & y >= 0, "Low Wetting",
-
-# Decelerating subcategories
-ifelse(category == "Decelerating" & x > hdval & y <= 0, "High Decelerating",
-ifelse(category == "Decelerating" & x >= 0 & y < -hfval, "High Decelerating",
-ifelse(category == "Decelerating" & x > mdval & y <= 0, "Medium Decelerating",
-ifelse(category == "Decelerating" & x >= 0 & y < -mfval, "Medium Decelerating",
-ifelse(category == "Decelerating" & x >= 0 & y <= 0, "Low Decelerating",
-
-# Accelerating subcategories
-ifelse(category == "Accelerating" & x < -hdval & y >= 0, "High Accelerating",
-ifelse(category == "Accelerating" & x <= 0 & y > hfval, "High Accelerating",
-ifelse(category == "Accelerating" & x < -mdval & y >= 0, "Medium Accelerating",
-ifelse(category == "Accelerating" & x <= 0 & y > mfval, "Medium Accelerating",
-ifelse(category == "Accelerating" & x <= 0 & y >= 0, "Low Accelerating", "Other")))))))))))))))))))))
-
-# Set the color scale for each subcategory
-colors <- c("High Drying" = "#b10026",       # Dark Red
-            "Medium Drying" = "#fd8d3c",     # Medium Red
-            "Low Drying" = "#feb24c",        # Light Red
-            "High Wetting" = "#2c7fb8",      # Dark Blue
-            "Medium Wetting" = "deepskyblue",    # Medium Blue
-            "Low Wetting" = "lightblue",       # Light Blue
-            "High Decelerating" = "#006d2c", # Dark Green
-            "Medium Decelerating" = "#74c476",# Medium Green
-            "Low Decelerating" = "#c7e9c0",  # Light Green
-            "High Accelerating" = "#762a83", # Dark Purple
-            "Medium Accelerating" = "#af8dc3",# Medium Purple
-            "Low Accelerating" = "#d7b5d8")  # Light Purple
-
-# Create the plot with subcategories
-ggplot(data, aes(x = x, y = y, fill = subcategory)) +
-  geom_tile() + 
-  scale_fill_manual(values = colors) +
-  #coord_fixed() +
-  
-  # Add main quadrant labels
-  annotate("text", x = .2, y = 4, label = "Wetting", color = "white", size = 5, fontface = "bold") +
-  annotate("text", x = -.2, y = 4, label = "Accelerating", color = "white", size = 5, fontface = "bold") +
-  annotate("text", x = -.2, y = -4, label = "Drying", color = "white", size = 5, fontface = "bold") +
-  annotate("text", x = .2, y = -4, label = "Decelerating", color = "white", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (% per decade)", 
-       y = "Change in flood flows (% per decade)") +
-  
-  # Customize the theme
-  theme_minimal() +
-  theme(legend.position = "none",
-        axis.title = element_text(size = 12, face = "bold"),
-        axis.text = element_text(size = 10),
-        panel.grid = element_blank())
-
-
-
-
-
-# Create data frame for the grid
-data <- expand.grid(x = seq(-8, 8, by = .1), y = seq(-8, 8, by = .1))
-
-# Calculate the distance (radius) from the center (0,0) using Euclidean distance
-data$radius <- sqrt(data$x^2 + data$y^2)
-
-# Assign categories based on quadrants (same as before)
-data$category <- with(data,
-                      ifelse(x >= 0 & y >= 0, "Wetting",
-                             ifelse(x >= 0 & y < 0, "Decelerating",
-                                    ifelse(x < 0 & y < 0, "Drying", "Accelerating"))))
-
-# Further subdivide into subcategories based on distance (radius)
-data$subcategory <- with(data, 
-                         ifelse(radius < 6, "High",
-                                ifelse(radius > 3, "Medium", "Low")))
-
-# Combine the main category and subcategory to make a label
-data$combined_category <- paste(data$subcategory, data$category)
-
-# Set the color scale for each subcategory
-colors <- c("High Drying" = "#b10026",       # Dark Red
-            "Medium Drying" = "#fd8d3c",     # Medium Red
-            "Low Drying" = "#feb24c",        # Light Red
-            "High Wetting" = "#2c7fb8",      # Dark Blue
-            "Medium Wetting" = "#7fcdbb",    # Medium Blue
-            "Low Wetting" = "#a6bddb",       # Light Blue
-            "High Decelerating" = "#006d2c", # Dark Green
-            "Medium Decelerating" = "#74c476",# Medium Green
-            "Low Decelerating" = "#c7e9c0",  # Light Green
-            "High Accelerating" = "#762a83", # Dark Purple
-            "Medium Accelerating" = "#af8dc3",# Medium Purple
-            "Low Accelerating" = "#d7b5d8")  # Light Purple
-
-
-
-
-
-
-
-
-
-
-
-
-############# TOTAL Trend ###############
-
-
-# Set up the totaltrend
+## catchment level ---------------
 TotalFloodTrend=FloodTrends[which(FloodTrends$driver==driver[5]),c(2:71)]
 TotalDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[5]),c(2:71)]
 TotalFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 TotalDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-#pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
 FlPoint=inner_join(hybas07,TotalFloodTrend,by=c("HYBAS_ID"="HydroR"))
 st_geometry(FlPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
 Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
-
-
-
 DrPoint=inner_join(hybas07,TotalDroughtTrend,by=c("HYBAS_ID"="HydroR"))
-st_geometry(DrPoint)<-NULL
-#match pointagg with hybasf
 
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
+st_geometry(DrPoint)<-NULL
 Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
 
-
 Flplot$d2020=Drplot$Rchange.Y2020
 Flplot$f2020=Flplot$Rchange.Y2020
-
 FlplotTot=Flplot
 
 #Univariate plot for verification
@@ -1658,18 +1511,12 @@ osize=12
 legend="Change in Qsp \n(l/s/km2)"
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 
-
-# wop=match(Flplot$NUTS_ID,NUTSRLi$HydroR)
-# Flplot$f2020.rel=Flplot$f2020/NUTSRLi$RL10.mean[wop]*100
-
-
-
 br=seq(-100,100,.1)
 labels=br
-limi=c(-.5,.5)
+limi=c(-50,50)
 ggplot(basemap) +
   geom_sf(fill="white")+
-  geom_sf(data = Flplot, mapping = aes(fill = d2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
+  geom_sf(data = Flplot, mapping = aes(fill = f2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
   geom_sf(fill=NA, color="gray42") +
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   scale_fill_gradientn(
@@ -1689,49 +1536,7 @@ ggplot(basemap) +
         legend.key.size = unit(.8, "cm"))
 
 
-
-#ok here I have to do my calssification
-
-# databi$category <- with(databi,
-# ifelse(d2020 >= 0 & f2020 >= 0, "Wetting",
-# ifelse(d2020 >= 0 & f2020 < 0, "Decelerating",
-# ifelse(d2020 < 0 & f2020 < 0, "Drying", "Accelerating"))))
-# 
-# 
-# databi$bi_class <- with(databi, 
-# ifelse(category == "Drying" & d2020 < -hdval & f2020 <= 0, "High Drying",
-# ifelse(category == "Drying" & d2020 <= 0 &  f2020 < -hfval, "High Drying",
-# ifelse(category == "Drying" & d2020 <= 0 &  f2020 < -mfval, "Medium Drying",
-# ifelse(category == "Drying" & d2020 < -mdval &  f2020 <= 0, "Medium Drying",
-# ifelse(category == "Drying" & d2020 <= 0 &  f2020 <= 0, "Low Drying",
-# 
-# # Wetting subcategories
-# ifelse(category == "Wetting" & d2020 > hdval & f2020 >= 0, "High Wetting",
-# ifelse(category == "Wetting" & d2020 >= 0 & f2020 > hfval, "High Wetting",
-# ifelse(category == "Wetting" & d2020 > mdval & f2020 >= 0, "Medium Wetting",
-# ifelse(category == "Wetting" & d2020 >= 0 & f2020 > mfval, "Medium Wetting",
-# # ifelse(category == "Wetting" & d2020 >= 0 & f2020 >= 0, "Low Wetting",
-# 
-# # Decelerating subcategories
-# ifelse(category == "Decelerating" & d2020 > hdval & f2020 <= 0, "High Decelerating",
-# ifelse(category == "Decelerating" & d2020 >= 0 & f2020 < -hfval, "High Decelerating",
-# ifelse(category == "Decelerating" & d2020 > mdval & f2020 <= 0, "Medium Decelerating",
-# ifelse(category == "Decelerating" & d2020 >= 0 & f2020 < -mfval, "Medium Decelerating",
-# ifelse(category == "Decelerating" & d2020 >= 0 & f2020 <= 0, "Low Decelerating",
-# 
-# # Accelerating subcategories
-# ifelse(category == "Accelerating" & d2020 < -hdval & f2020 >= 0, "High Accelerating",
-# ifelse(category == "Accelerating" & d2020 <= 0 & f2020 > hfval, "High Accelerating",
-# ifelse(category == "Accelerating" & d2020 < -mdval & f2020 >= 0, "Medium Accelerating",
-# ifelse(category == "Accelerating" & d2020 <= 0 & f2020 > mfval, "Medium Accelerating",
-# ifelse(category == "Accelerating" & d2020 <= 0 & f2020 >= 0, "Low Accelerating", "Other")))))))))))))))))))))
-# 
-
-
-#better classification
-
 #create a new variable which make flood and drought on the same scale
-
 #normalize flood change
 a=sd(FlplotTot$f2020,na.rm=T)
 b=sd(FlplotTot$d2020,na.rm=T)
@@ -1740,16 +1545,10 @@ databitot=FlplotTot
 databitot$x=databitot$f2020/a
 databitot$y=databitot$d2020/b
 
-hist(databitot$x,breaks=100,xlim=c(-5,5))
-hist(databitot$y,breaks=100,xlim=c(-5,5))
-sd(databitot$x)
-
-# databitot <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
 breaker1=0
 breaker2=0.25
 
-
+### flood -----------------
 alterclass=data.frame(databitot$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -1758,10 +1557,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 c1=alterclass$class
 
-
-
-
-
+### drought ----------------
 alterclass=data.frame(databitot$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -1771,42 +1567,67 @@ alterclass$class[which(alterclass[,1]>=breaker2)]=4
 c2=alterclass$class
 
 cx=paste(c2,c1,sep="-")
-
 databitot$bi_class=cx
-
-
-
-# Combine the main category and subcategory to make a label
 databitot$combined_category <-databitot$bi_class
 
+## Pixel level ------------------------
 
-# #databitot=databitot[-which(is.na(databitot$d2020)),]
-# # Set the color scale for each subcategory
-# colors <- c("High Drying" = "darkorange4",       # Dark Red
-#             "Medium Drying" = "#fd8d3c",     # Medium Red
-#             "Low Drying" = "#feb24c",        # Light Red
-#             "High Wetting" = "dodgerblue4",      # Dark Blue
-#             "Medium Wetting" = "deepskyblue",    # Medium Blue
-#             "Low Wetting" = "lightblue",       # Light Blue
-#             "High Decelerating" = "#006d2c", # Dark Green
-#             "Medium Decelerating" = "#74c476",# Medium Green
-#             "Low Decelerating" = "#c7e9c0",  # Light Green
-#             "High Accelerating" = "#762a83", # Dark Purple
-#             "Medium Accelerating" = "#af8dc3",# Medium Purple
-#             "Low Accelerating" = "#d7b5d8")  # Light Purple
-# 
-# colors <- c("3-3" = "#174f28",       # Dark Red
-#             "3-2" = "#167984",     # Medium Red
-#             "3-1" = "#169dd0",        # Light Red
-#             "2-3" = "#845e29",      # Dark Blue
-#             "2-2" = "#819185",    # Medium Blue
-#             "2-1" = "#7ebbd2",       # Light Blue
-#             "1-1" = "#d3d3d3", # Dark Green
-#             "1-2" = "#d8a386",# Medium Green
-#             "1-3" = "#dd6a29"  # Light Green
-# )
+FloodTrendsP=Output_fl_year$TrendPix
+DroughtTrendsP=Output_dr_nonfrost$TrendPix
+
+TotalFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[5]),]
+TotalDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[5]),]
+
+ClimFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[1]),]
+ClimDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[1]),]
+
+LuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[3]),]
+LuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[3]),]
+
+ResFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[2]),]
+ResDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[2]),]
+
+WuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[4]),]
+WuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[4]),]
+
+points <- st_as_sf(TotalFloodTrendPix, coords = c("Var1", "Var2"), crs = 4326)
+points <- st_transform(points, crs = 3035)
+Flpixplot=points
+Flpixplot$d2020=TotalDroughtTrendPix$Y2020
+
+#normalize changes
+a=sd(Flpixplot$Y2020,na.rm=T)
+b=sd(Flpixplot$d2020,na.rm=T)
+databipi=Flpixplot
+databipi$x=databipi$Y2020/a
+databipi$y=databipi$d2020/b
 
 
+breaker1=0
+breaker2=0.25
+
+### floods --------------------
+alterclass=data.frame(databipi$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+### droughts --------------------
+alterclass=data.frame(databipi$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databipi$bi_class=cx
+
+## plot section --------------
 
 colors <- c(
   "1-1" = "#dd6a29",  # high x, low y
@@ -1832,7 +1653,7 @@ colors <- c(
 )
 
 
-colors <- c(
+colors2 <- c(
   "1-1" = "#dd6a29",  # high x, low y
   "2-1" = "#dd6a29",  # medium-high x, low y
   "3-1" = "#ffe1ff",  # medium-low x, low y
@@ -1890,20 +1711,20 @@ ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
         legend.key.size = unit(.8, "cm"))
 
 
-
-
-
-
-
-
-colNA="grey"
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
-  geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
   geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
- # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_fill_manual(values = colors) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_color_manual(values = colors) +
   labs()+
   theme(axis.title=element_text(size=tsize),
         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
@@ -1916,11 +1737,6 @@ map <- ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 
-map
-
-
-
-
 
 
 legend <- bi_legend(pal = colors,
@@ -1930,62 +1746,43 @@ legend <- bi_legend(pal = colors,
                     size = 16,
                     arrows = FALSE)
 
-legend
-
-# combine map with legend
-finalPlot <- ggdraw() +
-  draw_plot(map, 0, 0, 1, 1) +
-  draw_plot(legend, 0.7, .65, 0.2, 0.2)
-
-finalPlot
-
 pl=ggarrange(map, legend, 
              labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(2,1), vjust=-1)
-pl
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Bivar_plot_Allchange.jpg"), pl, width=20, height=20, units=c("cm"),dpi=600) 
+             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
 
 
 
-################# CLIMATE TREND #################
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_ad2.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500) 
 
-#Redo this plot only for climate change
 
-ClimateFloodTrend=FloodTrends[which(FloodTrends$driver==driver[1]),c(2:71)]
-ClimateDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[1]),c(2:71)]
+
+#2. CLIMATE TREND ------------------
+
+
+ClimateFloodTrend=FloodTrends[which(FloodTrends$driver==driver[1]),]
+ClimateDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[1]),]
 ClimateFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 ClimateDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
 
-#pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
 FlPoint=inner_join(hybas07,ClimateFloodTrend,by=c("HYBAS_ID"="HydroR"))
 st_geometry(FlPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
 Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
 
-
-
 DrPoint=inner_join(hybas07,ClimateDroughtTrend,by=c("HYBAS_ID"="HydroR"))
-st_geometry(DrPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+#st_geometry(DrPoint)<-NULL
 period=c(1951,2020)
 haz="flood"
-Drplot <- st_transform(Drplot, crs = 3035)
+Drplot <- st_transform(DrPoint, crs = 3035)
 
-
+mv=match(Drplot$HYBAS_ID,Flplot$HYBAS_ID)
+plot(diff(mv))
 Flplot$d2020=Drplot$Rchange.Y2020
 Flplot$f2020=Flplot$Rchange.Y2020
-
 
 #Univariate plot for verification
 colNA="transparent"
@@ -1995,39 +1792,35 @@ osize=12
 legend="Change in Qsp \n(l/s/km2)"
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 
+uplot=F
 
-# wop=match(Flplot$NUTS_ID,NUTSRLi$HydroR)
-# Flplot$f2020.rel=Flplot$f2020/NUTSRLi$RL10.mean[wop]*100
+if (uplot==T){
+  br=seq(-100,100,.1)
+  labels=br
+  limi=c(-.5,.5)
+  ggplot(basemap) +
+    geom_sf(fill="white")+
+    geom_sf(data = Flplot, mapping = aes(fill = d2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
+    geom_sf(fill=NA, color="gray42") +
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    scale_fill_gradientn(
+      colors=palet,
+      breaks=br,limits=limi,
+      oob = scales::squish,na.value=colNA, name=legend)  +
+    labs()+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+}
 
-
-
-br=seq(-100,100,.1)
-labels=br
-limi=c(-.5,.5)
-ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = Flplot, mapping = aes(fill = d2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
-  geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_fill_gradientn(
-    colors=palet,
-    breaks=br,limits=limi,
-    oob = scales::squish,na.value=colNA, name=legend)  +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-#normalize flood change
+#normalize change
 FlplotClim=Flplot
 a=sd(FlplotClim$f2020,na.rm=T)
 b=sd(FlplotClim$d2020,na.rm=T)
@@ -2040,12 +1833,48 @@ hist(databiclim$x,breaks=100,xlim=c(-5,5))
 hist(databiclim$y,breaks=100,xlim=c(-5,5))
 sd(databiclim$x)
 
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
 breaker1=0
 breaker2=0.25
 
+### floods --------------------
 alterclass=data.frame(databiclim$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+### droughts --------------------
+alterclass=data.frame(databiclim$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databiclim$bi_class=cx
+# Combine the main category and subcategory to make a label
+databiclim$combined_category <-databiclim$bi_class
+
+merdas=ClimateDroughtTrend$Rchange.Y2020[which(ClimateDroughtTrend$HydroR==2070016940)]
+merdav=databiclim$d2020[which(databiclim$HYBAS_ID==2070016940)]
+## Pixel level --------------
+
+a=sd(ClimFloodTrendPix$Y2020,na.rm=T)
+b=sd(ClimDroughtTrendPix$Y2020,na.rm=T)
+databipic=Flpixplot
+databipic$x=ClimFloodTrendPix$Y2020/a
+databipic$y=ClimDroughtTrendPix$Y2020/b
+
+
+sd(databipic$x,na.rm=T)
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databipic$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2053,7 +1882,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 
 c1=alterclass$class
-alterclass=data.frame(databiclim$y)
+alterclass=data.frame(databipic$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2064,25 +1893,7 @@ c2=alterclass$class
 
 cx=paste(c2,c1,sep="-")
 
-databiclim$bi_class=cx
-
-
-
-# Combine the main category and subcategory to make a label
-databiclim$combined_category <-databiclim$bi_class
-#databiclim=databiclim[-which(is.na(databiclim$d2020)),]
-# Set the color scale for each subcategory
-
-# colors <- c("3-3" = "#174f28",       # Dark Red
-#             "3-2" = "#167984",     # Medium Red
-#             "3-1" = "#169dd0",        # Light Red
-#             "2-3" = "#845e29",      # Dark Blue
-#             "2-2" = "#819185",    # Medium Blue
-#             "2-1" = "#7ebbd2",       # Light Blue
-#             "1-1" = "#d3d3d3", # Dark Green
-#             "1-2" = "#d8a386",# Medium Green
-#             "1-3" = "#dd6a29"  # Light Green
-# )
+databipic$bi_class=cx
 
 
 ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
@@ -2116,18 +1927,20 @@ ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
 
 
 
-
-
-
-
-colNA="grey"
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
-  geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
   geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_fill_manual(values = colors) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_color_manual(values = colors) +
   labs()+
   theme(axis.title=element_text(size=tsize),
         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
@@ -2140,12 +1953,7 @@ map <- ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 
-map
 
-
-
-
-bi_pal(pal = colors, dim = 4)
 
 legend <- bi_legend(pal = colors,
                     dim = 4,
@@ -2154,240 +1962,94 @@ legend <- bi_legend(pal = colors,
                     size = 16,
                     arrows = FALSE)
 
-
-# combine map with legend
-# finalPlot <- ggdraw() +
-#   draw_plot(map, 0, 0, 1, 1) +
-#   draw_plot(legend, 0.7, .65, 0.2, 0.2)
-# 
-# finalPlot
-
 pl=ggarrange(map, legend, 
              labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(2,1), vjust=-1)
+             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+
 pl
 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_bvPIX.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
 
-############## LAND USE TREND ##################
-driver
-# Set up the landuse
-LanduseFloodTrend=FloodTrends[which(FloodTrends$driver==driver[2]),c(2:71)]
-LanduseDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[2]),c(2:71)]
+
+#3. LAND USE TREND --------------
+
+LanduseFloodTrend=FloodTrends[which(FloodTrends$driver==driver[2]),]
+LanduseDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[2]),]
 LanduseFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 LanduseDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-#pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
+LanduseFloodTrend$f2020=LanduseFloodTrend$Rchange.Y2020
+LanduseDroughtTrend$f2020=LanduseDroughtTrend$Rchange.Y2020
+
 FlPoint=inner_join(hybas07,LanduseFloodTrend,by=c("HYBAS_ID"="HydroR"))
 st_geometry(FlPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
 Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
-
-
-
 DrPoint=inner_join(hybas07,LanduseDroughtTrend,by=c("HYBAS_ID"="HydroR"))
 st_geometry(DrPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
 Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
-
-
 Flplot$d2020=Drplot$Rchange.Y2020
 Flplot$f2020=Flplot$Rchange.Y2020
 
 FlplotLu=Flplot
+a=sd(FlplotLu$f2020,na.rm=T)
+b=sd(FlplotLu$d2020,na.rm=T)
+
 databilu=FlplotLu
-
-############# RESERVOIR trend ####################
-driver
-# Set up the Reservoir
-ReservoirFloodTrend=FloodTrends[which(FloodTrends$driver==driver[3]),c(2:71)]
-ReservoirDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:71)]
-ReservoirFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
-ReservoirDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
-
-#pointap=full_join(GHshpp,pointClim,by=c("CODEB"="HydroR"))
-FlPoint=inner_join(hybas07,ReservoirFloodTrend,by=c("HYBAS_ID"="HydroR"))
-st_geometry(FlPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
-period=c(1951,2020)
-haz="flood"
-
-Flplot <- st_transform(Flplot, crs = 3035)
-
-
-
-DrPoint=inner_join(hybas07,ReservoirDroughtTrend,by=c("HYBAS_ID"="HydroR"))
-st_geometry(DrPoint)<-NULL
-#match pointagg with hybasf
-
-#pointplot=inner_join(HydroRsf,pointap,by= c("Id"="Id"))
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
-period=c(1951,2020)
-haz="flood"
-Drplot <- st_transform(Drplot, crs = 3035)
-
-
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
-
-FlplotRes=Flplot
-databire=FlplotRes
-
-
-
-# databilu$f2020=databitot$f2020 - databiclim$f2020
-# databilu$d2020=databitot$d2020 -databiclim$d2020
-
-a=sd(databilu$f2020,na.rm=T)
-b=sd(databilu$d2020,na.rm=T)
-
 databilu$x=databilu$f2020/a
 databilu$y=databilu$d2020/b
-
-hist(databilu$x,breaks=100,xlim=c(-5,5))
-hist(databilu$y,breaks=100,xlim=c(-5,5))
-sd(databiclim$x)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
 
 breaker1=0
 breaker2=0.25
 
+### floods --------------------
 alterclass=data.frame(databilu$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
 alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
 c1=alterclass$class
+
+### droughts --------------------
 alterclass=data.frame(databilu$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
 alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
 c2=alterclass$class
 
 cx=paste(c2,c1,sep="-")
-
 databilu$bi_class=cx
-
-
 # Combine the main category and subcategory to make a label
 databilu$combined_category <-databilu$bi_class
-#databiclim=databiclim[-which(is.na(databiclim$d2020)),]
 
-ggplot(databilu, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
+## Pixel level
+
+luflood=LuFloodTrendPix$Y2020
+ludrought=LuDroughtTrendPix$Y2020
+a=sd(luflood,na.rm=T)
+b=sd(ludrought,na.rm=T)
+databipilu=Flpixplot
+databipilu$x=luflood/a
+databipilu$y=ludrought/b
 
 
-
-
-
-
-
-
-colNA="grey"
-map <- ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = databilu, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
-  geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_fill_manual(values = colors) +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-map
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-databicpr=Flplot
-databicpr$f2020= databire$f2020 + databiclim$f2020
-databicpr$d2020= databire$d2020 + databiclim$d2020
-
-a=sd(databicpr$f2020,na.rm=T)
-b=sd(databicpr$d2020,na.rm=T)
-
-databicpr$x=databicpr$f2020/a
-databicpr$y=databicpr$d2020/b
-
-hist(databicpr$x,breaks=100,xlim=c(-5,5))
-hist(databicpr$y,breaks=100,xlim=c(-5,5))
-sd(databiclim$x)
+sd(databipilu$x,na.rm=T)
 
 # databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
 
 breaker1=0
 breaker2=0.25
 
-alterclass=data.frame(databicpr$x)
+alterclass=data.frame(databipilu$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2395,7 +2057,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 
 c1=alterclass$class
-alterclass=data.frame(databicpr$y)
+alterclass=data.frame(databipilu$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2406,81 +2068,45 @@ c2=alterclass$class
 
 cx=paste(c2,c1,sep="-")
 
-databicpr$bi_class=cx
+databipilu$bi_class=cx
 
+#4. RESERVOIR trend --------------
 
+# Set up the Reservoir
+ReservoirFloodTrend=FloodTrends[which(FloodTrends$driver==driver[3]),c(2:71)]
+ReservoirDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:71)]
+ReservoirFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
+ReservoirDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-# Combine the main category and subcategory to make a label
-databicpr$combined_category <-databicpr$bi_class
+FlPoint=inner_join(hybas07,ReservoirFloodTrend,by=c("HYBAS_ID"="HydroR"))
+st_geometry(FlPoint)<-NULL
+Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+period=c(1951,2020)
+haz="flood"
 
+Flplot <- st_transform(Flplot, crs = 3035)
 
+DrPoint=inner_join(hybas07,ReservoirDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+st_geometry(DrPoint)<-NULL
+Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+period=c(1951,2020)
+haz="flood"
+Drplot <- st_transform(Drplot, crs = 3035)
 
+Flplot$d2020=Drplot$Rchange.Y2020
+Flplot$f2020=Flplot$Rchange.Y2020
 
-
-
-ggplot(databicpr, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-databirest=FlplotTot
-
-databirest$f2020=databilu$f2020 + databire$f2020 + databiclim$f2020
-databirest$d2020=databilu$d2020 + databire$d2020 + databiclim$d2020
-
-a=sd(databirest$f2020,na.rm=T)
-b=sd(databirest$d2020,na.rm=T)
-
-databirest$x=databirest$f2020/a
-databirest$y=databirest$d2020/b
-
-hist(databirest$x,breaks=100,xlim=c(-5,5))
-hist(databirest$y,breaks=100,xlim=c(-5,5))
-sd(databiclim$x)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
+FlplotRes=Flplot
+a=sd(FlplotRes$f2020,na.rm=T)
+b=sd(FlplotRes$d2020,na.rm=T)
+databire=FlplotRes
+databire$x=databire$f2020/a
+databire$y=databire$d2020/b
 
 breaker1=0
 breaker2=0.25
 
-alterclass=data.frame(databirest$x)
+alterclass=data.frame(databire$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2488,7 +2114,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 
 c1=alterclass$class
-alterclass=data.frame(databirest$y)
+alterclass=data.frame(databire$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
 alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
@@ -2499,28 +2125,314 @@ c2=alterclass$class
 
 cx=paste(c2,c1,sep="-")
 
-databirest$bi_class=cx
-
-
-
+databire$bi_class=cx
 # Combine the main category and subcategory to make a label
-databirest$combined_category <-databirest$bi_class
-#databiclim=databiclim[-which(is.na(databiclim$d2020)),]
-# Set the color scale for each subcategory
-
-# colors <- c("3-3" = "#174f28",       # Dark Red
-#             "3-2" = "#167984",     # Medium Red
-#             "3-1" = "#169dd0",        # Light Red
-#             "2-3" = "#845e29",      # Dark Blue
-#             "2-2" = "#819185",    # Medium Blue
-#             "2-1" = "#7ebbd2",       # Light Blue
-#             "1-1" = "#d3d3d3", # Dark Green
-#             "1-2" = "#d8a386",# Medium Green
-#             "1-3" = "#dd6a29"  # Light Green
-# )
+databire$combined_category <-databire$bi_class
 
 
-ggplot(databirest, aes(x = d2020, y = f2020, fill = combined_category)) +
+#Reservoir signal
+crsiflood=ResFloodTrendPix$Y2020
+crsidrought=ResDroughtTrendPix$Y2020
+a=sd(crsiflood,na.rm=T)
+b=sd(crsidrought,na.rm=T)
+databipire=Flpixplot
+databipire$x=crsiflood/a
+databipire$y=crsidrought/b
+
+
+sd(databipire$x,na.rm=T)
+
+# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databipire$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c1=alterclass$class
+alterclass=data.frame(databipire$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+
+databipire$bi_class=cx
+
+
+#5. Water Demand signal ------------------
+
+
+# Set up the Reservoir
+WaterDemandFloodTrend=FloodTrends[which(FloodTrends$driver==driver[4]),c(2:71)]
+WaterDemandDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2:71)]
+WaterDemandFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[4]),1]
+WaterDemandDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[4]),1]
+
+FlPoint=inner_join(hybas07,WaterDemandFloodTrend,by=c("HYBAS_ID"="HydroR"))
+st_geometry(FlPoint)<-NULL
+Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+period=c(1951,2020)
+haz="flood"
+
+Flplot <- st_transform(Flplot, crs = 3035)
+
+DrPoint=inner_join(hybas07,WaterDemandDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+st_geometry(DrPoint)<-NULL
+Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+period=c(1951,2020)
+haz="flood"
+Drplot <- st_transform(Drplot, crs = 3035)
+
+Flplot$d2020=Drplot$Rchange.Y2020
+Flplot$f2020=Flplot$Rchange.Y2020
+
+FlplotWD=Flplot
+a=sd(FlplotWD$f2020,na.rm=T)
+b=sd(FlplotWD$d2020,na.rm=T)
+
+databiwd=FlplotWD
+databiwd$x=databiwd$f2020/a
+databiwd$y=databiwd$d2020/b
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databiwd$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c1=alterclass$class
+alterclass=data.frame(databiwd$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+
+databiwd$bi_class=cx
+# Combine the main category and subcategory to make a label
+databiwd$combined_category <-databiwd$bi_class
+
+
+## Pixel level ---------------
+crsiflood=WuFloodTrendPix$Y2020
+crsidrought=WuDroughtTrendPix$Y2020
+a=sd(crsiflood,na.rm=T)
+b=sd(crsidrought,na.rm=T)
+databipiwd=Flpixplot
+databipiwd$x=crsiflood/a
+databipiwd$y=crsidrought/b
+
+
+sd(databipiwd$x,na.rm=T)
+
+# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databipiwd$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c1=alterclass$class
+alterclass=data.frame(databipiwd$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+
+databipiwd$bi_class=cx
+
+
+# Combination of drivers ------------------------
+databicr=databiclim
+databicr$x= databire$x + databiclim$x
+databicr$y= databire$y + databiclim$y
+
+
+hist(databicr$x,breaks=100,xlim=c(-5,5))
+hist(databicr$y,breaks=100,xlim=c(-5,5))
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databicr$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databicr$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databicr$bi_class=cx
+# Combine the main category and subcategory to make a label
+databicr$combined_category <-databicr$bi_class
+
+
+ggplot(databicr, aes(x = d2020, y = f2020, fill = combined_category)) +
+  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+  scale_fill_manual(values = colors) +
+  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
+  
+  # Add main quadrant labels
+  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+  
+  # Set axis labels
+  labs(x = "Change in drought flows (l/s/km2)", 
+       y = "Change in flood flows (l/s/km2)") +
+  
+  # Customize the theme
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "transparent", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+
+databicrl=databiclim
+
+databicrl$x=databilu$x + databire$x + databiclim$x
+databicrl$y=databilu$y + databire$y + databiclim$y
+
+
+hist(databicrl$x,breaks=100,xlim=c(-5,5))
+hist(databicrl$y,breaks=100,xlim=c(-5,5))
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databicrl$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databicrl$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+cx=paste(c2,c1,sep="-")
+databicrl$bi_class=cx
+# Combine the main category and subcategory to make a label
+databicrl$combined_category <-databicrl$bi_class
+
+
+## Pixel level -----------
+databipicr=databipic
+databipicr$x= databipire$x + databipic$x
+databipicr$y= databipire$y + databipic$y
+
+
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databipicr$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databipicr$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databipicr$bi_class=cx
+# Combine the main category and subcategory to make a label
+databipicr$combined_category <-databipicr$bi_class
+
+
+databipicrl=databipic
+
+databipicrl$x=databipilu$x + databipire$x + databipic$x
+databipicrl$y=databipilu$y + databipire$y + databipic$y
+
+breaker1=0
+breaker2=0.25
+
+alterclass=data.frame(databipicrl$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databipicrl$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+cx=paste(c2,c1,sep="-")
+databipicrl$bi_class=cx
+# Combine the main category and subcategory to make a label
+databipicrl$combined_category <-databipicrl$bi_class
+
+
+# Some plots here --------------
+
+
+ggplot(databicrl, aes(x = d2020, y = f2020, fill = combined_category)) +
   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   scale_fill_manual(values = colors) +
@@ -2552,13 +2464,10 @@ ggplot(databirest, aes(x = d2020, y = f2020, fill = combined_category)) +
 
 
 
-
-
-
 colNA="grey"
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
-  geom_sf(data = databirest, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databicrl, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
   geom_sf(fill=NA, color="gray42") +
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
@@ -2605,12 +2514,12 @@ pl
 
 
 
-
+# SANKEY AT CATCHMENT LEVEL ------------
 
 #Sankey diagram of transers between classes
 databiclim=databiclim[-which(is.na(databiclim$d2020)),]
-databirest=databirest[-which(is.na(databirest$d2020)),]
-databicpr=databicpr[-which(is.na(databicpr$d2020)),]
+databicrl=databicrl[-which(is.na(databicrl$d2020)),]
+databicr=databicr[-which(is.na(databicr$d2020)),]
 databitot=databitot[-which(is.na(databitot$d2020)),]
 
 
@@ -2632,41 +2541,41 @@ databiclim$maxicat[which(databiclim$combined_category == "3-3" |
                           databiclim$combined_category == "2-3" |
                           databiclim$combined_category == "2-2" )]="Stable"
 
-databicpr$maxicat="Wetting"
-databicpr$maxicat[which(databicpr$combined_category == "1-1" |
-                           databicpr$combined_category == "1-2" |
-                           databicpr$combined_category == "2-1")]="Drying"
+databicr$maxicat="Wetting"
+databicr$maxicat[which(databicr$combined_category == "1-1" |
+                           databicr$combined_category == "1-2" |
+                           databicr$combined_category == "2-1")]="Drying"
 
-databicpr$maxicat[which(databicpr$combined_category == "3-1" |
-                           databicpr$combined_category == "4-2" |
-                           databicpr$combined_category == "4-1" )]="Decelerating"
+databicr$maxicat[which(databicr$combined_category == "3-1" |
+                           databicr$combined_category == "4-2" |
+                           databicr$combined_category == "4-1" )]="Decelerating"
 
-databicpr$maxicat[which(databicpr$combined_category == "1-3" |
-                           databicpr$combined_category == "1-4" |
-                           databicpr$combined_category == "2-4" )]="Accelerating"
+databicr$maxicat[which(databicr$combined_category == "1-3" |
+                           databicr$combined_category == "1-4" |
+                           databicr$combined_category == "2-4" )]="Accelerating"
 
-databicpr$maxicat[which(databicpr$combined_category == "3-3" |
-                           databicpr$combined_category == "3-2" |
-                           databicpr$combined_category == "2-3" |
-                           databicpr$combined_category == "2-2" )]="Stable"
+databicr$maxicat[which(databicr$combined_category == "3-3" |
+                           databicr$combined_category == "3-2" |
+                           databicr$combined_category == "2-3" |
+                           databicr$combined_category == "2-2" )]="Stable"
 
-databirest$maxicat="Wetting"
-databirest$maxicat[which(databirest$combined_category == "1-1" |
-                           databirest$combined_category == "1-2" |
-                           databirest$combined_category == "2-1" )]="Drying"
+databicrl$maxicat="Wetting"
+databicrl$maxicat[which(databicrl$combined_category == "1-1" |
+                           databicrl$combined_category == "1-2" |
+                           databicrl$combined_category == "2-1" )]="Drying"
 
-databirest$maxicat[which(databirest$combined_category == "3-1" |
-                           databirest$combined_category == "4-2" |
-                           databirest$combined_category == "4-1" )]="Decelerating"
+databicrl$maxicat[which(databicrl$combined_category == "3-1" |
+                           databicrl$combined_category == "4-2" |
+                           databicrl$combined_category == "4-1" )]="Decelerating"
 
-databirest$maxicat[which(databirest$combined_category == "1-3" |
-                           databirest$combined_category == "1-4" |
-                           databirest$combined_category == "2-4" )]="Accelerating"
+databicrl$maxicat[which(databicrl$combined_category == "1-3" |
+                           databicrl$combined_category == "1-4" |
+                           databicrl$combined_category == "2-4" )]="Accelerating"
 
-databirest$maxicat[which(databirest$combined_category == "3-3" |
-                           databirest$combined_category == "3-2" |
-                           databirest$combined_category == "2-3" |
-                           databirest$combined_category == "2-2" )]="Stable"
+databicrl$maxicat[which(databicrl$combined_category == "3-3" |
+                           databicrl$combined_category == "3-2" |
+                           databicrl$combined_category == "2-3" |
+                           databicrl$combined_category == "2-2" )]="Stable"
 
 
 databitot$maxicat="Wetting"
@@ -2688,12 +2597,12 @@ databitot$maxicat[which(databitot$combined_category == "3-3" |
                            databitot$combined_category == "2-2" )]="Stable"
 
 class1=databiclim$maxicat
-class2=databicpr$maxicat
-class3=databirest$maxicat
+class2=databicr$maxicat
+class3=databicrl$maxicat
 class4=databitot$maxicat
 # class1=databiclim$combined_category
-# class2=databirest$combined_category
-
+# class2=databicrl$combined_category
+ltot=length(databiclim$bi_class)
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 #8 categories 
 # Define the nodes
@@ -2728,13 +2637,13 @@ df2 <- merge(df,
              by.y = 'node', 
              all.x = FALSE)
 df2=df2[which(df2$x.x==df2$x.y),]
-
+df2$np=round(df2$n/ltot*100)
 pl <- ggplot(df2, aes(x = x.x,                        
                       next_x = next_x,                                     
                       node = node,
                       next_node = next_node,        
                       fill = factor(node),
-                      label= paste0(node,"\n", n)))
+                      label= paste0(node,"\n", np,"%")))
 
 
 
@@ -2761,9 +2670,9 @@ pl=pl + scale_fill_manual(values = loscolors) +
 pl
 
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changesADWD.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_cat.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
 
-mean_lf=c(mean(databitot$d2020,na.rm=T),mean(databiclim$d2020,na.rm=T),mean(databicpr$d2020,na.rm=T),mean(databirest$d2020,na.rm=T))
+mean_lf=c(mean(databitot$d2020,na.rm=T),mean(databiclim$d2020,na.rm=T),mean(databicr$d2020,na.rm=T),mean(databicrl$d2020,na.rm=T))
 mean_scen=data.frame()
 
 ggplot() +
@@ -2771,11 +2680,11 @@ ggplot() +
              shape = 21, color = "transparent", fill="blue",size = 3,alpha=0.1,show.legend = FALSE) +
   geom_point(data=databiclim, aes(x = d2020, y = f2020, fill = combined_category),
              shape = 21, color = "transparent", fill= "red",alpha=0.1, size = 3,show.legend = FALSE) +
-  geom_point(data=databicpr, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databicr, aes(x = d2020, y = f2020, fill = combined_category),
              shape = 21, color = "transparent", fill= "darkgreen",alpha=0.1,size = 3,show.legend = FALSE) +
-  geom_point(data=databirest, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databicrl, aes(x = d2020, y = f2020, fill = combined_category),
              shape = 21, color = "transparent", fill= "purple",alpha=0.1,size = 3,show.legend = FALSE) +
-  #gg_bagplot(data=databirest, d2020, f2020, color = "#00659e", scatterplot = FALSE)
+  #gg_bagplot(data=databicrl, d2020, f2020, color = "#00659e", scatterplot = FALSE)
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   #scale_fill_manual(values = colors) +
   coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
@@ -2801,77 +2710,6 @@ ggplot() +
         panel.grid.minor = element_line(colour = "grey90"),
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
-
-library(asbio)
-Y1<-rnorm(100, 17, 3)
-Y2<-rnorm(100, 13, 2)
-bv.boxplot(databiclim$d2020, databiclim$f2020)
-
-
-library(ggplot2)
-library(dplyr)
-
-# Sample data (replace with actual X and Y)
-set.seed(123)
-ellipse_nd=c()
-df_nd=c()
-for (dt in 1:4){
-  if (dt==1){
-    databip=databiclim
-  }
-  if (dt==2){
-    databip=databicpr
-  }
-  if (dt==3){
-    databip=databirest
-  }
-  if (dt==4){
-    databip=databitot
-  }
-X <- databip$d2020
-Y <- databip$f2020
-
-# Calculate summary statistics
-R <- cor(X, Y)
-S.X <- sd(X)
-S.Y <- sd(Y)
-X.loc <- mean(X)
-Y.loc <- mean(Y)
-
-# Standardized coordinates
-X.stan <- (X - X.loc) / S.X
-Y.stan <- (Y - Y.loc) / S.Y
-
-# Ellipse distances
-E.i <- sqrt((X.stan^2 + Y.stan^2 - 2 * R * X.stan * Y.stan) / (1 - R^2))
-E.m <- median(E.i)
-D <- 2  # You can set this threshold if needed
-E.max <- max(E.i[E.i^2 < D * E.m^2])
-
-# Ellipse angles for plotting
-theta <- seq(0, 2 * pi, length.out = 180)
-Theta1_hinge <- E.m * sqrt((1 + R) / 2) * cos(theta)
-Theta2_hinge <- E.m * sqrt((1 - R) / 2) * sin(theta)
-
-# Hinge ellipse coordinates
-X.p <- X.loc + (Theta1_hinge + Theta2_hinge) * S.X
-Y.p <- Y.loc + (Theta1_hinge - Theta2_hinge) * S.Y
-
-# Data frame for ggplot2
-df <- data.frame(X = X.loc, Y = Y.loc,dt=dt)
-ellipse_hinge <- data.frame(X = X.p, Y = Y.p,dt=dt)
-
-df_nd<- rbind(df_nd,df)
-ellipse_nd=rbind(ellipse_nd,ellipse_hinge)
-}
-# Plot with ggplot2
-ggplot() +
-  #geom_point(alpha = 0.5) +  # Scatter plot of data points
-  geom_polygon(data = ellipse_nd, aes(x = X, y = Y, fill = dt, group=dt), alpha = 0.3)+
-  geom_point(data=df_nd, aes(x = X, y = Y, color=dt), size = 3) +  # Median point
-  labs(x = "X", y = "Y", title = "Bivariate Boxplot with Hinge and Fence Ellipses") +
-  theme_minimal()
-
 
 
 
@@ -2959,341 +2797,6 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bvHydro_tot
 
 
 ############### PIXEL LEVEL TREND ######################
-
-
-#yrange=c(15:84)
-FloodTrends=Output_fl_year$TrendPix
-
-DroughtTrends=Output_dr_nonfrost$TrendPix
-
-driver=unique(FloodTrends$driver)
-mato=match(FloodTrends$outl2[which(FloodTrends$driver==driver[2])],FloodTrends$outl2[which(FloodTrends$driver==driver[1])])
-which(is.na(mato))
-#FloodTrends[which(FloodTrends$driver==driver[1]),]=FloodTrends[mato,]
-#I need to aggregate all the changes
-# TotalFloodTrend=FloodTrends[mato,yrange]+
-#   FloodTrends[which(FloodTrends$driver==driver[2]),yrange]+
-#   FloodTrends[which(FloodTrends$driver==driver[3]),yrange]+
-#   FloodTrends[which(FloodTrends$driver==driver[4]),yrange]
-# 
-# TotalDroughtTrend=DroughtTrends[mato,yrange-1]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[2]),yrange-1]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[3]),yrange-1]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[4]),yrange-1]
-
-TotalFloodTrendPix=FloodTrends[which(FloodTrends$driver==driver[5]),]
-TotalDroughtTrendPix=DroughtTrends[which(DroughtTrends$driver==driver[5]),]
-
-ClimFloodTrendPix=FloodTrends[which(FloodTrends$driver==driver[1]),]
-ClimDroughtTrendPix=DroughtTrends[which(DroughtTrends$driver==driver[1]),]
-
-LuFloodTrendPix=FloodTrends[which(FloodTrends$driver==driver[3]),]
-LuDroughtTrendPix=DroughtTrends[which(DroughtTrends$driver==driver[3]),]
-
-ResFloodTrendPix=FloodTrends[which(FloodTrends$driver==driver[2]),]
-ResDroughtTrendPix=DroughtTrends[which(DroughtTrends$driver==driver[2]),]
-
-WuFloodTrendPix=FloodTrends[which(FloodTrends$driver==driver[4]),]
-WuDroughtTrendPix=DroughtTrends[which(DroughtTrends$driver==driver[4]),]
-
-
-#TotalFloodTrend=data.frame(TotalFloodTrend, FloodTrends[which(FloodTrends$driver==driver[2]),c(13,5,6,85)])
-
-
-#TotalFloodTrendPix=TotalFloodTrendPix[-which(is.na(TotalFloodTrendPix$x.y)),]
-#continue here by using monovariate results...
-
-points <- st_as_sf(TotalFloodTrendPix, coords = c("Var1", "Var2"), crs = 4326)
-points <- st_transform(points, crs = 3035)
-
-limi=c(-50,50)
-ocrap<-ggplot(basemap) +
-  geom_sf(fill="gray95",color="darkgrey",size=0.5)+
-  #geom_sf(data=pag,aes(fill=sign,geometry=geometry),alpha=0.2,color="transparent")+
-  geom_sf(data=points,aes(col=Y2020,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
-  
-  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                       sep = " ")),
-             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-             guide = "none")+
- # scale_fill_manual(values=c("tomato4","steelblue4"), name="Significant trends")+
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_color_gradientn(
-    colors=palet,
-    breaks=br,limits=limi,
-    oob = scales::squish,na.value=colNA, name=legend)   +
-  labs(x="Longitude", y = "Latitude")+
-  guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14),
-         fill = guide_legend(override.aes = list(size = 10)))+
-  theme(axis.title=element_text(size=tsize),
-        title = element_text(size=osize),
-        axis.text=element_text(size=osize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "right",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(1, "cm"))
-
-#remember the very high dispersion in NUTS3 changes
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_flood_test.jpg"), ocrap, width=20, height=20, units=c("cm"),dpi=1000) 
-
-
-
-
-Flpixplot=points
-Flpixplot$d2020=TotalDroughtTrendPix$Y2020
-
-
-
-ocrap<-ggplot(basemap) +
-  geom_sf(fill="gray95",color="darkgrey",size=0.5)+
-  #geom_sf(data=pag,aes(fill=sign,geometry=geometry),alpha=0.2,color="transparent")+
-  geom_sf(data=Flpixplot,aes(col=d2020,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
-  
-  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                       sep = " ")),
-             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-             guide = "none")+
-  # scale_fill_manual(values=c("tomato4","steelblue4"), name="Significant trends")+
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_color_gradientn(
-    colors=palet,
-    breaks=br,limits=limi,
-    oob = scales::squish,na.value=colNA, name=legend)   +
-  labs(x="Longitude", y = "Latitude")+
-  guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14),
-         fill = guide_legend(override.aes = list(size = 10)))+
-  theme(axis.title=element_text(size=tsize),
-        title = element_text(size=osize),
-        axis.text=element_text(size=osize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "right",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(1, "cm"))
-
-#remember the very high dispersion in NUTS3 changes
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_drought.jpg"), ocrap, width=20, height=20, units=c("cm"),dpi=1000) 
-
-
-a=sd(Flpixplot$Y2020,na.rm=T)
-b=sd(Flpixplot$d2020,na.rm=T)
-databipit=Flpixplot
-databipit$x=databipi$Y2020/a
-databipit$y=databipi$d2020/b
-
-tflood=ClimFloodTrendPix$Y2020+ResFloodTrendPix$Y2020+LuFloodTrendPix$Y2020+WuFloodTrendPix$Y2020
-tdrought=ClimDroughtTrendPix$Y2020+ResDroughtTrendPix$Y2020+LuDroughtTrendPix$Y2020+WuDroughtTrendPix$Y2020
-a=sd(tflood,na.rm=T)
-b=sd(tdrought,na.rm=T)
-databipi=Flpixplot
-databipi$x=tflood/a
-databipi$y=tdrought/b
-
-sd(databipi$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-breaker1=0
-breaker2=0.25
-
-alterclass=data.frame(databipi$x)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c1=alterclass$class
-alterclass=data.frame(databipi$y)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c2=alterclass$class
-
-cx=paste(c2,c1,sep="-")
-
-databipi$bi_class=cx
-
-
-
-map <- ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-  geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-  geom_sf(fill=NA, color="gray42") +
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_fill_manual(values = colors) +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                       sep = " ")),
-             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-             guide = "none")+
-  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_color_manual(values = colors) +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-legend <- bi_legend(pal = colors,
-                    dim = 4,
-                    xlab = "  +  Drought changes  -  ",
-                    ylab = "  -  Flood changes  +  ",
-                    size = 16,
-                    arrows = FALSE)
-
-pl=ggarrange(map, legend, 
-             labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-
-
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_ad.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500) 
-
-
-
-#Climate signal
-a=sd(ClimFloodTrendPix$Y2020,na.rm=T)
-b=sd(ClimDroughtTrendPix$Y2020,na.rm=T)
-databipic=Flpixplot
-databipic$x=ClimFloodTrendPix$Y2020/a
-databipic$y=ClimDroughtTrendPix$Y2020/b
-
-
-sd(databipic$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-breaker1=0
-breaker2=0.25
-
-alterclass=data.frame(databipic$x)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c1=alterclass$class
-alterclass=data.frame(databipic$y)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c2=alterclass$class
-
-cx=paste(c2,c1,sep="-")
-
-databipic$bi_class=cx
-
-
-#Reservoir signal
-crsiflood=ClimFloodTrendPix$Y2020+ResFloodTrendPix$Y2020
-crsidrought=ClimDroughtTrendPix$Y2020+ResDroughtTrendPix$Y2020
-a=sd(crsiflood,na.rm=T)
-b=sd(crsidrought,na.rm=T)
-databipicr=Flpixplot
-databipicr$x=crsiflood/a
-databipicr$y=crsidrought/b
-
-
-sd(databipicr$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-breaker1=0
-breaker2=0.25
-
-alterclass=data.frame(databipicr$x)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c1=alterclass$class
-alterclass=data.frame(databipicr$y)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c2=alterclass$class
-
-cx=paste(c2,c1,sep="-")
-
-databipicr$bi_class=cx
-
-
-
-#Reservoir+LUC signal
-crsiflood=ClimFloodTrendPix$Y2020+ResFloodTrendPix$Y2020+LuFloodTrendPix$Y2020+Wu
-crsidrought=ClimDroughtTrendPix$Y2020+ResDroughtTrendPix$Y2020+LuDroughtTrendPix$Y2020
-a=sd(crsiflood,na.rm=T)
-b=sd(crsidrought,na.rm=T)
-databipicrl=Flpixplot
-databipicrl$x=crsiflood/a
-databipicrl$y=crsidrought/b
-
-
-sd(databipicrl$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-breaker1=0
-breaker2=0.25
-
-alterclass=data.frame(databipicrl$x)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c1=alterclass$class
-alterclass=data.frame(databipicrl$y)
-alterclass$class=NA
-alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-alterclass$class[which(alterclass[,1]>=breaker2)]=4
-
-c2=alterclass$class
-
-cx=paste(c2,c1,sep="-")
-
-databipicrl$bi_class=cx
-
-
-#readd the scatter plot
-
-
-
-
 
 
 ####### SANKEY for pixels #################
@@ -3387,7 +2890,7 @@ class4=databipi$maxicat
 
 ltot=length(databipi$bi_class)
 # class1=databiclim$combined_category
-# class2=databirest$combined_category
+# class2=databicrl$combined_category
 
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 #8 categories 
@@ -3460,6 +2963,7 @@ pl
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixels.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
 
 
+# part with barplots ------------------
 #barplot of contribution by driver for each category
 ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2020,LuFloodTrendPix$Y2020,WuFloodTrendPix$Y2020)
 ptnnn=FloodTrends
