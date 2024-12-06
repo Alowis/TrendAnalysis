@@ -22,6 +22,119 @@ library(data.table)
 
 
 # THIS SCRIPT WILL BE A CLEAN AND SHORT VERSION OF THE INITIAL SCRIPT
+ComputeReturnLevels<-function(nonStationaryEvaParams, RPgoal, timeIndex){
+  
+  #GEV
+  epsilonGEV <- nonStationaryEvaParams[[1]]$parameters$epsilon
+  sigmaGEV <- mean(nonStationaryEvaParams[[1]]$parameters$sigma[timeIndex])
+  muGEV <- mean(nonStationaryEvaParams[[1]]$parameters$mu[timeIndex])
+  dtSampleYears <- nonStationaryEvaParams[[1]]$parameters$timeDeltaYears
+  
+  #GPD
+  epsilonGPD <- nonStationaryEvaParams[[2]]$parameters$epsilon
+  sigmaGPD <- mean(nonStationaryEvaParams[[2]]$parameters$sigma[timeIndex])
+  thresholdGPD <- mean(nonStationaryEvaParams[[2]]$parameters$threshold[timeIndex])
+  nPeaks <- nonStationaryEvaParams[[2]]$parameters$nPeaks
+  thStart <- nonStationaryEvaParams[[2]]$parameters$timeHorizonStart
+  thEnd <- nonStationaryEvaParams[[2]]$parameters$timeHorizonEnd
+  sampleTimeHorizon <- as.numeric((thEnd - thStart)/365.2425)
+  
+  if (nonStationaryEvaParams[[1]]$method=="No fit"){
+    print("could not fit EVD to this pixel")
+    ParamGEV=c(epsilonGEV,sigmaGEV,muGEV,NA, NA, NA)
+    names(ParamGEV)=c("epsilonGEV","sigmaGEV","muGEV","epsilonStdErrGEV","sigmaStdErrGEV","muStdErrGEV")
+    
+    ParamGPD=c(epsilonGPD,sigmaGPD,thresholdGPD,NA,NA, NA,nPeaks,sampleTimeHorizon)
+    names(ParamGPD)=c("epsilonGPD","sigmaGPD","thresholdGPD","epsilonStdErrGPD","sigmaStdErrGPD","thresholdStdErrGPD","nPeaks","SampleTimeHorizon")
+    return(list(Fit="No fit",Params=c(ParamGEV,ParamGPD)))
+  }else{
+    #GEV
+    # epsilonGEV <- nonStationaryEvaParams[[1]]$parameters$epsilon
+    # sigmaGEV <- mean(nonStationaryEvaParams[[1]]$parameters$sigma[timeIndex])
+    # muGEV <- mean(nonStationaryEvaParams[[1]]$parameters$mu[timeIndex])
+    # dtSampleYears <- nonStationaryEvaParams[[1]]$parameters$timeDeltaYears
+    epsilonStdErrGEV <- nonStationaryEvaParams[[1]]$paramErr$epsilonErr
+    sigmaStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$sigmaErr[timeIndex])
+    muStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$muErr[timeIndex])
+    
+    #GPD
+    # epsilonGPD <- nonStationaryEvaParams[[2]]$parameters$epsilon
+    # sigmaGPD <- mean(nonStationaryEvaParams[[2]]$parameters$sigma[timeIndex])
+    # thresholdGPD <- mean(nonStationaryEvaParams[[2]]$parameters$threshold[timeIndex])
+    # nPeaks <- nonStationaryEvaParams[[2]]$parameters$nPeaks
+    epsilonStdErrGPD <- nonStationaryEvaParams[[2]]$paramErr$epsilonErr
+    sigmaStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$sigmaErr[timeIndex])
+    thresholdStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$thresholdErr[timeIndex])
+    # thStart <- nonStationaryEvaParams[[2]]$parameters$timeHorizonStart
+    # thEnd <- nonStationaryEvaParams[[2]]$parameters$timeHorizonEnd
+    # sampleTimeHorizon <- as.numeric((thEnd - thStart)/365.2425)
+    
+    returnLevelsGEV <- tsEvaComputeReturnLevelsGEV(epsilonGEV, sigmaGEV, muGEV, epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV, RPgoal)
+    
+    returnLevelsGPD <- tsEvaComputeReturnLevelsGPD(epsilonGPD, sigmaGPD, thresholdGPD, epsilonStdErrGPD, sigmaStdErrGPD, thresholdStdErrGPD,
+                                                   nPeaks, sampleTimeHorizon, RPgoal)
+    rlevGEV=returnLevelsGEV$returnLevels
+    rlevGPD=returnLevelsGPD$returnLevels
+    
+    errGEV=returnLevelsGEV$returnLevelsErr
+    errGPD=returnLevelsGPD$returnLevelsErr
+    
+    ParamGEV=c(epsilonGEV,sigmaGEV,muGEV,epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV)
+    names(ParamGEV)=c("epsilonGEV","sigmaGEV","muGEV","epsilonStdErrGEV","sigmaStdErrGEV","muStdErrGEV")
+    
+    ParamGPD=c(epsilonGPD,sigmaGPD,thresholdGPD,epsilonStdErrGPD,sigmaStdErrGPD, thresholdStdErrGPD,nPeaks,sampleTimeHorizon)
+    names(ParamGPD)=c("epsilonGPD","sigmaGPD","thresholdGPD","epsilonStdErrGPD","sigmaStdErrGPD","thresholdStdErrGPD","nPeaks","SampleTimeHorizon")
+    return(list(Fit="Fitted",ReturnLevels=c(ReturnPeriod=RPgoal, GEV=as.numeric(rlevGEV),GPD=as.numeric(rlevGPD),errGEV=as.numeric(errGEV),errGPD=as.numeric(errGPD)),Params=c(ParamGEV,ParamGPD)))
+  }  
+  
+  
+}
+RPcalc<- function(params,RPiGEV,RPiGPD){
+  paramx=data.frame(t(params))
+  qxV=1-exp(-(1+paramx$epsilonGEV*(RPiGEV-paramx$muGEV)/paramx$sigmaGEV)^(-1/paramx$epsilonGEV))
+  if (is.na(qxV)){
+    returnPeriodGEV=9999
+  }else{
+    returnPeriodGEV=1/qxV
+  }
+  X0 <- paramx$nPeaks/paramx$SampleTimeHorizon
+  qxD=(((1+paramx$epsilonGPD*(RPiGPD-paramx$thresholdGPD)/paramx$sigmaGPD)^(-1/paramx$epsilonGPD)))
+  if (is.na(qxD)){
+    returnPeriodGPD=9999
+  }else{
+    returnPeriodGPD=1/(X0*qxD)
+  }
+  return(c(GEV=returnPeriodGEV,GPD=returnPeriodGPD))
+}
+
+RPchangeCal=function(parlist, yi, yf, RetLev,law,valuenames){
+  #Use TSEVA function for return level computation
+  #1 selection of the year I want
+  #check if the computation can be done on all the points at the same time
+  #ay ay ay
+  cname=names(RetLev)
+  cna=match(valuenames,cname)
+  parlistinit=parlist[which(parlist$Year==yi),]
+  parlistf=parlist[which(parlist$Year==yf),]
+  cref=paste0("Y",yi)
+  crefloc=match(cref,cname)
+  RLi=RetLev[,crefloc]
+  
+  
+  if (law=="GEV"){
+    paramx=data.frame((parlistf))
+    qxV=1-exp(-(1+paramx$epsilonGEV*(RLi-paramx$muGEV)/paramx$sigmaGEV)^(-1/paramx$epsilonGEV))
+    returnPeriods=1/qxV
+  } else if (law=="GPD"){
+    paramx=data.frame((parlistf))
+    X0 <- paramx$nPeaks/paramx$SampleTimeHorizon
+    qxD=(((1+paramx$epsilonGPD*(RLi-paramx$thresholdGPD)/paramx$sigmaGPD)^(-1/paramx$epsilonGPD)))
+    returnPeriods=1/(X0*qxD)
+  }
+  min(returnPeriods)
+  
+  return(data.frame(catchment=paramx$catchment,newRP=returnPeriods))
+}
 
 
 
@@ -1901,6 +2014,7 @@ unikout=unique(outhloc$outl2)
 
 pc=c()
 
+
 RetLevGPD=Results$RetLevGPD
 RetPerGPD=Results$RetPerGPD
 RetLevGEV=Results$RetLevGEV
@@ -1916,12 +2030,7 @@ if (length(rm50)>0){
   RetPerGEV=RetPerGEV[,-rm50]
 }
 
-if (cal==F){
-  RetLevGPD=Results$RetLevGPD[which(!is.na(Results$RetLevGPD[,1])),]
-  RetPerGPD=Results$RetPerGPD[which(!is.na(Results$RetLevGPD[,1])),]
-  RetLevGEV=Results$RetLevGEV[which(!is.na(Results$RetLevGPD[,1])),]
-  RetPerGEV=Results$RetPerGEV[which(!is.na(Results$RetLevGPD[,1])),]
-}
+
 
 Impdates=names(RetLevGPD)
 
@@ -1949,13 +2058,21 @@ Peaks$year=year(Peaks$time)
 Peaksave=rbind(Peaksave,Peaks)
 
 
-save(RLGPDfl,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/RL100.drought.nonfrost.Arno.NGWR.Rdata"))
-save(Paramsfl,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/params.drought.nonfrost.Arno.NGWR.Rdata"))
-save(Peaksave,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/Peaks.drought.nonfrost.Arno.NGWR.Rdata"))
+# save(RLGPDfl,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/RL100.drought.nonfrost.Arno.NGWR.Rdata"))
+# save(Paramsfl,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/params.drought.nonfrost.Arno.NGWR.Rdata"))
+# save(Peaksave,file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/Peaks.drought.nonfrost.Arno.NGWR.Rdata"))
 
 RLGPDArno=RLGPDfl
 ParamsArno=Paramsfl
 PeakArno=Peaksave
+
+load(file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/RL100.drought.nonfrost.Arno.NGWR.Rdata"))
+load(file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/params.drought.nonfrost.Arno.NGWR.Rdata"))
+load(file=paste0("D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/TSEVA/out/Peaks.drought.nonfrost.Arno.NGWR.Rdata"))
+
+RLGPDArnold=RLGPDfl
+ParamsArnold=Paramsfl
+PeakArnold=Peaksave
 
 #create a time vector with years
 dates <- seq.Date(ymd("1951-06-01"), ymd("2020-06-01"), by = "year")
@@ -2048,6 +2165,9 @@ pix=5300097
 #Arno
 pix=5302991
 
+#Arno gauge
+pix=5303259
+
 haz="Drought"
 
 ylplot=seq(as.POSIXct("1950-06-01"),as.POSIXct("2020-06-01"),by="year")
@@ -2127,13 +2247,13 @@ dpi <- 300
 width_px <- width_cm * (dpi / 2.54)
 height_px <- height_cm * (dpi / 2.54)
 # Open a JPEG device
-jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/",pix, "_drought_scenarii_Arno.jpg", sep = ""),
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/",pix, "_drought_scenarii_ArnoVico.jpg", sep = ""),
      width = width_px, height = height_px, quality = 100, res=dpi)
 
 # create a function from this  
 main="Reno @ Bologna"
 main="Arno @ Firenze"
-
+main="Arno @ Vicopisano"
 
 
 plot_inputs=list(Climtrend=Climtrend,Soctrend=Soctrend,Restrend=Restrend,Wutrend=Wutrend,
@@ -2145,11 +2265,1467 @@ test=plot_riverchange(plot_inputs,main,dates)
 dev.off()
 
 
+
+#play with different scenarii
+
+cor_st=RL1-RL5
+
+cor_hist=RL5 - (RL4-cor_st[1])
+cor_res= - (RL3-RL4)
+plot(cor_res)
+plot(RL4-cor_st[1]+cor_hist)
+dc=RL4[1]-RL3[1]
+
+plot(RL5,ylim=c(0,5))
+points(RL3-cor_st[1]+cor_hist+cor_res[1],col=2)
+points(RL1-cor_st[1],col=3)
+points(RL2-cor_st[1],col=4)
+points(RL4-cor_st[1]+cor_hist,col=5)
+
+
+RLt1=RL1-cor_st[1]
+RLt2=RL2-cor_st[1]
+RLt3=RL3-cor_st[1]+cor_hist+cor_res[1]
+
+
+
+# Define the size in centimeters
+width_cm <- 20
+height_cm <- 15
+
+# Define the resolution in DPI (300 for high quality)
+dpi <- 300
+
+# Convert centimeters to pixels
+width_px <- width_cm * (dpi / 2.54)
+height_px <- height_cm * (dpi / 2.54)
+# Open a JPEG device
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/",pix, "_drought_correction_ArnoVico.jpg", sep = ""),
+     width = width_px, height = height_px, quality = 100, res=dpi)
+
+# create a function from this  
+main="Reno @ Bologna"
+main="Arno @ Firenze"
+main="Arno @ Vicopisano"
+
+plot(Peak5$time2, Peak5$value, col=alpha("darkred",.8) ,pch=16,axes=FALSE,xaxs="i",yaxs="i",ylim=c(0,8),
+     xlab = NA, ylab="")
+
+lines(dates,RL5,col="darkred",lwd=2,lty=1)
+lines(dates,RLt1,col="royalblue",lwd=2,lty=2)
+lines(dates,RLt3,col="darkgreen",lwd=2,lty=3)
+lines(dates,RLt2,col="orange",lwd=2,lty=4)
+mtext(main,3,font = 2,line = 0.5,cex = 1.5)
+abline(v = yr.deb, col="lightgrey", lty=2)
+abline(h = 0, col=1)
+axis(2,cex.axis=1)
+title(ylab = expression(paste("Q (",m^3/s,")")),cex.lab=1.5,line=2, xlab="years")
+axis(1, yr.deb, label=format(yr.deb,"%Y"),cex.axis=1)
+box()
+## Trace des erreurs absolues
+# polygon(c(dates[1],dates,dates[length(dates)]),c(0,abs(Climtrend),0),
+#         col=alpha("royalblue",.5),border="royalblue")
+# polygon(pdates,abs(lutrend),
+#         col=alpha("orange",.5),border="orange")
+# polygon(pdates,abs(wutrend),
+#         col=alpha("grey",.5),border="darkgreen")
+# polygon(pdates,abs(retrend),
+#         col=alpha("grey",.5),border="darkred")
+## Trace de la grille mensuelle
+
+## Definition de la legende
+legend("bottomleft", leg=c("Historical","Res+WU static (cor)","Res static (cor)","Socio static (cor)"),
+       lwd=c(2,2,2,2), col=c("darkred","orange","darkgreen","royalblue"),
+       cex=1, lty=c(1,2,3,4,5), bg=alpha("white",.6))
+
+
+dev.off()
+
+
+
+#impact of LZ on low flows
+pix=5303259
+PeakAo=PeakArno[which(PeakArno$catch==pix),]
+PeakAod=PeakArnold[which(PeakArnold$catch==pix),]
+
+PeakAo$time2=timeStamps[PeakAo$timeID]
+PeakAod$time2=timeStamps[PeakAod$timeID]
+
+PeakAo$value=PeakAo$value
+PeakAod$value=PeakAod$value
+
+
+RLArno=as.numeric(-RLGPDArno[which(RLGPDArno$unikout==pix),-71])
+RLArnold=as.numeric(-RLGPDArnold[which(RLGPDArnold$unikout==pix),-71])
+
+
+plot(PeakAo$time2,PeakAo$value,pch=16,col="blue")
+points(PeakAod$time2,PeakAod$value,pch=16,col="orange")
+
+
+RLArno[which(RLArno<0)]=0
+RLArnold[which(RLArnold<0)]=0
+
+yr.deb <-  seq(as.Date("1950-01-15"), by="5 years", length=14)
+
+
+# Open a JPEG device
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/",pix, "_LZImpact.jpg", sep = ""),
+     width = width_px, height = height_px, quality = 100, res=dpi)
+
+# create a function from this  
+main="LZ impact Arno @ Vicopisano"
+
+plot(PeakAo$time2, PeakAo$value, col=alpha("darkred",.8) ,pch=16,axes=FALSE,xaxs="i",yaxs="i",ylim=c(0,8),
+     xlab = NA, ylab="")
+points(PeakAod$time2, PeakAod$value, col=alpha("royalblue",.8) ,pch=10)
+lines(dates,RLArno,col="darkred",lwd=2,lty=1)
+lines(dates,RLArnold,col="royalblue",lwd=2,lty=2)
+abline(v = yr.deb, col="lightgrey", lty=2)
+abline(h = 0, col=1)
+axis(2,cex.axis=1)
+title(ylab = expression(paste("Q (",m^3/s,")")),cex.lab=1.5,line=2, xlab="years")
+axis(1, yr.deb, label=format(yr.deb,"%Y"),cex.axis=1)
+box()
+## Trace des erreurs absolues
+# polygon(c(dates[1],dates,dates[length(dates)]),c(0,abs(Climtrend),0),
+#         col=alpha("royalblue",.5),border="royalblue")
+# polygon(pdates,abs(lutrend),
+#         col=alpha("orange",.5),border="orange")
+# polygon(pdates,abs(wutrend),
+#         col=alpha("grey",.5),border="darkgreen")
+# polygon(pdates,abs(retrend),
+#         col=alpha("grey",.5),border="darkred")
+## Trace de la grille mensuelle
+
+## Definition de la legende
+legend("bottomleft", leg=c("LZ_calibrated","LZ_default"),
+       lwd=c(2,2), col=c("darkred","royalblue"),
+       cex=1, lty=c(1,2), bg=alpha("white",.6))
+
+dev.off()
 #compare with observations:
 
 #Load my observations
 
+dis_obs=read.csv(file="D:/tilloal/Documents/06_Floodrivers/WD_runs_Arno/observations/port_TOS01005191.csv",sep=",",header = F)
+
+dis_meta= dis_obs[c(1:16),]
+dis_data= dis_obs[-c(1:16),-c(4,5)]
+colnames(dis_data)=c("date","Q","data_type")
+dis_data=dis_data[-c(1,2,3),]
+dis_data$Q=as.numeric(dis_data$Q)
+dis_data$time=as.Date(dis_data$date,format = "%d/%m/%Y")
+plot(dis_data$time,dis_data$Q)
+dis_data$time[which.max(dis_data$Q)]
+
+
+#extract location of the river gauge
+meta_coord=data.frame(lon=dis_meta$V5[6],lat=dis_meta$V3[6])
+
 #Load the netcdf file
+#' Extract Discharge Data from NetCDF File at Specific Location
+#'
+#' @description
+#' The `disNcopenloc` function opens a NetCDF file and extracts discharge data
+#' for a specified location based on its identifier. It retrieves a time series
+#' for the given location and constructs a data frame with discharge values along
+#' with corresponding longitude, latitude, and time.
+#'
+#' @param fname A character string specifying the file name (without the extension)
+#'   of the NetCDF file containing the discharge data.
+#' @param dir A character string specifying the directory path where the NetCDF
+#'   file is located.
+#' @param outloc A data frame containing location information, including IDs and
+#'   corresponding grid indices for latitude ('idla') and longitude ('idlo').
+#' @param idc An integer representing the location identifier index for which the
+#'   discharge data will be extracted.
+#'
+#' @return A data frame with columns for discharge values ('outlets'), location
+#'   identifier ('outid'), longitude ('lon'), latitude ('lat'), and time ('time').
+#'
+#' @examples
+#' # Assuming the NetCDF file 'discharge_data.nc' is in the directory 'data/',
+#' # 'locations' is a data frame with grid indices, and 'location_id' is the
+#' # identifier index:
+#' discharge_series <- disNcopenloc("discharge_data", "data/", locations, location_id)
+#' # The result is a data frame with the discharge time series for the specified location.
+#'
+#' @export
+#' @importFrom ncdf4 nc_open ncvar_get
+#'
+#' @seealso
+#' `ncdf4::nc_open` and `ncdf4::ncvar_get` for functions used to access and
+#' extract data from NetCDF files.
+#'
+disNcopenloc=function(fname,dir,outloc,idc){
+  ncdis=paste0(dir,"/",fname,".nc")
+  ncd=nc_open(ncdis)
+  name.vb=names(ncd[['var']])
+  namev="dis"
+  time <- ncvar_get(ncd,"time")
+  lt=length(time)
+  
+  #timestamp corretion
+  name.lon="lon"
+  name.lat="lat"
+  londat = ncvar_get(ncd,name.lon) 
+  llo=length(londat)
+  latdat = ncvar_get(ncd,name.lat) 
+  lla=length(latdat)
+  
+  idm=1+(idc-1)*lt
+  start=c(outloc$idlo[idc],outloc$idla[idc],1)
+  count=c(1,1,lt)
+  outlets = ncvar_get(ncd,namev,start = start, count= count)
+  outlets=as.vector(outlets)
+  outid=rep(outloc[idc,1],length(time))
+  #lonlatloop=expand.grid(c(1:lla),c(1:lt))
+  lon=rep(londat[start[1]],length(time))
+  lat=rep(latdat[start[2]],length(time))
+  outll=data.frame(outlets,outid,lon,lat,time)
+  
+  return (outll)
+}
+
+
+#match pixel 
+
+
+### Distance between "official gauges" and EFAS points -----------------------
+points=outf[,c(1,2,3)]
+Vsfloc=st_as_sf(points, coords = c("Var1", "Var2"), crs = 4326)
+Statloc=meta_coord
+Stati=st_as_sf(Statloc, coords = c("lon", "lat"), crs = 4326)
+dist=c()
+for (r in Vsfloc$outlets){
+  cat(paste0(r,"\n"))
+  v1=Vsfloc[which(Vsfloc$outlets==r),]
+  v2=Stati
+  oula=st_distance(v1,v2)
+  oula=oula/1000
+  dist=c(dist,oula)
+}
+
+plot(as.numeric(dist[which(dist<10)]))
+
+
+#match with upstream area
+upR=inner_join(outf,UpArea,by="outl2")
+upR$distance=dist
+
+#take the one with smallest distance.... validated
+matchpix=upR[which.min(upR$distance),]
 
 #Plots of discharge from NGWRF and classic run (timeseries/validation)
+fname="dis_53_1950_2020_cf"
+dir="D:/tilloal/Documents/LFRuns_utils/data/timeseries/Validations"
+  
+dis_mod=disNcopenloc(fname,dir,matchpix,1)
+txx=as.POSIXct((dis_mod$time*3600*24 -3600), origin="1979-01-01 00:00:00")
+
+#remove 1950
+rmv=which(year(txx)==1950)
+#remove 1950 which is not reliable
+if (length(rmv)>0){
+  dis_mod=dis_mod[-rmv,]
+}
+plot(dis_mod$outlets[1:3000])
+
+data=data.frame(time=txx[-rmv],Q=dis_mod$outlets)
+names(data)=c("date","Qs")
+
+data$date2=data$date-(3600)
+data$day=as.Date(data$date2)
+
+dth1=data
+daily_data<-aggregate(list(Q=data$Qs),
+ by = list(days=data$day),
+ FUN = function(x) mean = mean(x,na.rm=T))
+
+
+plot(daily_data)
+
+
+#load default HERA
+valid_path = paste0(main_path,'DataPaper/')
+fname="dis_1951_2020_arno"
+dir="D:/tilloal/Documents/06_Floodrivers/WD_Runs_Arno/out"
+
+dis_mod2=disNcopenloc(fname,dir,matchpix,1)
+txx=as.POSIXct((dis_mod2$time*3600*24 -3600), origin="1979-01-01 00:00:00")
+
+data=data.frame(time=txx,Q=dis_mod2$outlets)
+names(data)=c("date","Qs")
+
+data$date2=data$date-(3600)
+data$day=as.Date(data$date2)
+
+data[which(yday(data$day)<6),]=dth1[which(yday(data$day)<6),]
+data[which(yday(data$day)>=365),]=dth1[which(yday(data$day)>=365),]
+
+daily_data2<-aggregate(list(Q=data$Qs),
+                      by = list(days=data$day),
+                      FUN = function(x) mean = mean(x,na.rm=T))
+
+#load LZ cal 
+valid_path = paste0(main_path,'DataPaper/')
+fname="dis_1951_2020_arnoZ"
+dir="D:/tilloal/Documents/06_Floodrivers/WD_Runs_Arno/out"
+
+dis_mod3=disNcopenloc(fname,dir,matchpix,1)
+txx=as.POSIXct((dis_mod2$time*3600*24 -3600), origin="1979-01-01 00:00:00")
+
+data=data.frame(time=txx,Q=dis_mod3$outlets)
+names(data)=c("date","Qs")
+
+data$date2=data$date-(3600)
+data$day=as.Date(data$date2)
+
+data[which(yday(data$day)<6),]=dth1[which(yday(data$day)<6),]
+data[which(yday(data$day)>=365),]=dth1[which(yday(data$day)>=365),]
+
+daily_data3<-aggregate(list(Q=data$Qs),
+                       by = list(days=data$day),
+                       FUN = function(x) mean = mean(x,na.rm=T))
+
+#daily_data2[which(yday(daily_data2$days)==1),]=daily_data2[which(yday(daily_data2$days)==1)-1,]+rnorm(1,0,10)
+plot(daily_data2)
+plot(daily_data3)
+plot(dis_mod$outlets[1000:1600])
+points(data$Qs[1000:1600],col=2)
+library(hydroGOF)
+kge_2runs=KGE(daily_data2$Q,daily_data3$Q, na.rm=TRUE, method="2012",out.type="full")
+
+
+
+#Now KGE against observations
+
+md=which(dis_data$time>=daily_data$days[1])
+dis_datac=dis_data[md,]
+
+dis_data_kge=left_join(daily_data,dis_datac,by=c("days"="time"))
+
+kge_h1=KGE(dis_data_kge$Q.x,dis_data_kge$Q.y, na.rm=TRUE, method="2012",out.type="full")
+
+dis_data_kge2=left_join(daily_data2,dis_datac,by=c("days"="time"))
+
+kge_h2=KGE(dis_data_kge2$Q.x,dis_data_kge2$Q.y, na.rm=TRUE, method="2012",out.type="full")
+
+dis_data_kge3=left_join(daily_data3,dis_datac,by=c("days"="time"))
+
+kge_h3=KGE(dis_data_kge3$Q.x,dis_data_kge3$Q.y, na.rm=TRUE, method="2012",out.type="full")
+
+dis_data_kge4=left_join(daily_data3,daily_data2,by=c("days"="days"))
+#Now regime plots
+
+source("~/06_Floodrivers/DataPaper/Code/HERA/functions.R")
+
+#put data into right format
+
+
+  
+plotQj <- function(data,catch,UpAloc,run,labels){
+  #~ data <- as.simu(data)
+  names(data)=c("date1","Q1","date2","Q2")
+  ## Suppression des lignes sans couples Qobs/Qsim
+  data <- subset( data, !is.na(Q1) & !is.na(Q2))
+  ## Preparation de la sequence de mois
+  mois.deb <-  seq(as.Date("1950-01-15"), by="month", length=12)
+  ## Vecteur de catÃ©gories
+  period1=paste0(format(range(data$date1)[1],"%Y"),"-",format(range(data$date1)[2],"%Y"))
+  period2=paste0(format(range(data$date2)[1],"%Y"),"-",format(range(data$date2)[2],"%Y"))
+  print(period2)
+  n.area=UpAloc
+  name.riv=catch
+  #main = bquote(.(name.riv)~ " Regime (Area="~.(n.area)~ km^2~") | Periods: "~ .(period1) ~" vs" ~ .(period2))
+  main = bquote(.(name.riv)~ "Regime ( UpArea="~.(n.area)~ km^2~") | Period: "~ .(period2))
+  ## Suppression des lignes sans couples Qobs/Qsim
+  ## Preparation de la sequence de mois
+  jours <- as.numeric(format(data$date1,"%j"))
+  ## Iddinces des lignes de mÃ©me catÃ©gorie
+  ind.j <- tapply(seq(length(jours)), jours, c)
+  ind.j <- ind.j[-366]
+  
+  Qc <- data.frame(date=as.numeric(names(ind.j)),
+                   obs=sapply(ind.j, function(x) mean(data$Q1[x], na.rm=TRUE)),
+                   sim=sapply(ind.j, function(x) mean(data$Q2[x], na.rm=TRUE)),
+                   q25o=sapply(ind.j, function(x) quantile(data$Q1[x],0.25, na.rm=TRUE)),
+                   q75o=sapply(ind.j, function(x) quantile(data$Q1[x],.75, na.rm=TRUE)),
+                   q25s=sapply(ind.j, function(x) quantile(data$Q2[x],0.25, na.rm=TRUE)),
+                   q75s=sapply(ind.j, function(x) quantile(data$Q2[x],.75, na.rm=TRUE)))
+  
+  md=mean(data$Q1)
+  qlim=c(0, max(unlist(Qc[,c(5,7)]),2*md))
+  
+  
+  ## ParamÃ©tres graphiques
+  plot(Qc$date, Qc$obs, type="n", axes=FALSE, ylim=qlim,xaxs="i",yaxs="i",
+       xlab = NA, ylab="")
+  mtext(main,3,font = 2,line = 0.5,cex = 1.2)
+  abline(v = format(mois.deb,"%j"), col="lightgrey", lty=2)
+  lines(Qc$date, Qc$obs, col="blue",lwd=2)
+  lines(Qc$date, Qc$sim, col="red",lwd=2)
+  axis(2,cex.axis=1)
+  title(ylab = expression(paste("Q (",m^3/s,")")),cex.lab=1.5,line=2)
+  axis(1, format(mois.deb,"%j"), label=format(mois.deb,"%b"),cex.axis=1)
+  box()
+  polygon(c(Qc$date,rev(Qc$date)),c(Qc$q25o,rev(Qc$q75o)),
+          col=alpha("lightblue",.3),border="transparent")
+  
+  polygon(c(Qc$date,rev(Qc$date)),c(Qc$q25s,rev(Qc$q75s)),
+          col=alpha("indianred",.3),border="transparent")
+  ## Trace des erreurs absolues
+  polygon(c(0,Qc$date,365),c(0,abs(Qc$sim-Qc$obs),0),
+          col=alpha("lightgrey",.4),border="grey")
+  ## Trace de la grille mensuelle
+  
+  text(x = max(Qc$date)-90, y = max(qlim) * 0.85, labels = labels, pos = 4, cex = .9, col = "black")
+  
+  
+  ## Trace des courbes de dÃ©bits journaliers simules et observes
+  
+  ## Definition de la legende
+  legend("topleft", leg=c(run,"observed","deviation"),
+         lwd=c(2,2,1,2), col=c("red","blue","grey"),
+         cex=1, lty=c(1,1,2,1), bg=alpha("white",.6))
+  #return(Qc)
+} 
+
+
+#Define the size in centimeters
+width_cm <- 20
+height_cm <- 15
+
+# Define the resolution in DPI (300 for high quality)
+dpi <- 300
+
+# Convert centimeters to pixels
+width_px <- width_cm * (dpi / 2.54)
+height_px <- height_cm * (dpi / 2.54)
+
+
+dataR1=data.frame(date1=dis_data_kge$days,Q1=dis_data_kge$Q.y,date2=dis_data_kge$days,Q2=dis_data_kge$Q.x)
+dataR2=data.frame(date1=dis_data_kge2$days,Q1=dis_data_kge2$Q.y,date2=dis_data_kge2$days,Q2=dis_data_kge2$Q.x)
+dataR3=data.frame(date1=dis_data_kge3$days,Q1=dis_data_kge3$Q.y,date2=dis_data_kge3$days,Q2=dis_data_kge3$Q.x)
+
+dataRX=data.frame(date1=dis_data_kge4$days,Q1=dis_data_kge4$Q.y,date2=dis_data_kge4$days,Q2=dis_data_kge4$Q.x)
+
+
+statX=c(round(kge_2runs$KGE.value,2),round(kge_2runs$KGE.elements,2))
+
+labels <- paste(
+  "KGE':", statX[1], "\n",
+  "r:", statX[2], "\n",
+  "Beta:", statX[3], "\n",
+  "Gamma:", statX[4]
+)
+plotQj(dataRX,"Arno @ Vicopisano",8900,"HERA_ori",labels)
+
+
+stat1=c(round(kge_h3$KGE.value,2),round(kge_h3$KGE.elements,2))
+
+labels <- paste(
+  "KGE':", stat1[1], "\n",
+  "r:", stat1[2], "\n",
+  "Beta:", stat1[3], "\n",
+  "Gamma:", stat1[4]
+)
+
+catch="Arno @ Vicopisano"
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Arno_vico_Hera_LZcal.jpg", sep = ""),
+     width = width_px, height = height_px, quality = 100, res=dpi)
+
+plotQj(dataR3,"Arno @ Vicopisano",8900,"HERA_ori",labels)
+dev.off()
+
+
+stat2=c(round(kge_h2$KGE.value,2),round(kge_h2$KGE.elements,2))
+labels <- paste(
+  "KGE':", stat2[1], "\n",
+  "r:", stat2[2], "\n",
+  "Beta:", stat2[3], "\n",
+  "Gamma:", stat2[4]
+)
+
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Arno_vico_Hera_modified.jpg", sep = ""),
+     width = width_px, height = height_px, quality = 100, res=dpi)
+
+plotQj(dataR2,"Arno @ Vicopisano",8900,"HERA_mod",labels)
+dev.off()
+
+#Specialized performance indicators for low flow
+
+dis_data_kge=left_join(daily_data,dis_datac,by=c("days"="time"))
+
+kge1sq_h1=KGE(1/dis_data_kge$Q.x,1/dis_data_kge$Q.y, na.rm=TRUE, method="2012",out.type="full")
+
+dis_data_kge2=left_join(daily_data2,dis_datac,by=c("days"="time"))
+
+kge1sq_h2=KGE(1/dis_data_kge2$Q.x,1/dis_data_kge2$Q.y, na.rm=TRUE, method="2012",out.type="full")
+
+
+
+
+#################################################################################################
+#TSEVA on observed data, for comparisaon with modelled values
+#################################################################################################
+
+#Experimental TSEVA function
+
+library(RtsEva)
+
+TsEvaNs<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDistanceInDays=10,
+                   seasonalityVar=NA,minEventsPerYear=-1, gevMaxima='annual',
+                   ciPercentile=90, gevType = 'GEV', evdType = c('GEV', 'GPD'),
+                   tail="high", epy=-1, lowdt=7, trans=NULL, TrendTh=NA){
+  
+  
+  timeStamps=as.POSIXct(timeAndSeries[,1])
+  dt1=min(diff(timeStamps),na.rm=T)
+  dt=as.numeric(dt1)
+  tdim=attributes(dt1)$units
+  if (tdim=="hours") dt=dt/24
+  if (tdim=="seconds") dt=dt/3600
+  series=timeAndSeries[,2]
+  
+  if (epy==-1){
+    if (tail=="high") epy=3
+    if (tail=="low") epy=2
+  }
+  
+  #If the biggest event is more than 100 times greater than the second biggest event
+  sanitycheck = computeAnnualMaxima(timeAndSeries);
+  anmax=sanitycheck$annualMax[order(sanitycheck$annualMax,decreasing = T)]
+  aloc=sanitycheck$annualMaxIndx[order(sanitycheck$annualMax,decreasing = T)][1]
+  yrs=year(sanitycheck$annualMaxDate[order(sanitycheck$annualMax,decreasing = T)][1])
+  x = anmax[1]/anmax[2]
+  if (x > 100)
+  {
+    message(paste0("biggest event ", x, " times bigger than second biggest"))
+    message ("removing this event from timeserie, reruning first steps")
+    series[(aloc[1]-50):(aloc[1]+50)]=mean(series)
+  }
+  
+  if ( transfType != 'trend' & transfType != 'seasonal' & transfType != 'trendCIPercentile'
+       & transfType != 'seasonalCIPercentile' & transfType != 'trendPeaks'){
+    stop('\nnonStationaryEvaJRCApproach: transfType can be in (trend, seasonal, trendCIPercentile, trendPeaks)')}
+  
+  if (minPeakDistanceInDays == -1) stop('label parameter minPeakDistanceInDays must be set')
+  
+  nonStationaryEvaParams = c()
+  stationaryTransformData = c()
+  
+  # default shape parameter bounds
+  shape_bnd=c(-0.5,1)
+  
+  if (tail=="low"){
+    #default 7-day flow for low flow, can be modified by user
+    start_index=1
+    indices_to_extract <- seq(from = start_index, to = length(series), by = lowdt/dt)
+    series=series[indices_to_extract]
+    timeStamps=timeStamps[indices_to_extract]
+    shape_bnd=c(-1,0)
+    if (trans=="rev"){
+      series=-1*series
+    }else if(trans=="inv"){
+      series=1/series
+    }else if (trans=="lninv"){
+      series=-log(series)
+    }
+  }
+  if (transfType == 'trend'){
+    message('\nevaluating long term variations of extremes')
+    trasfData = tsEvaTransformSeriesToStationaryTrendOnly(timeStamps, series, timeWindow)
+    gevMaxima = 'annual';
+    potEventsPerYear = epy;
+    minEventsPerYear = 1
+    
+    
+  }else  if (transfType == 'trendChange'){
+    message('\nevaluating long term variations of extremes and change point detection')
+    trasfData = tsEvaTransformSeriesToStationaryTrendAndChangepts(timeStamps, series, timeWindow)
+    gevMaxima = 'annual';
+    potEventsPerYear = epy;
+    minEventsPerYear = 1
+    
+  }else if (transfType == 'seasonal'){
+    message('\nevaluating long term an seasonal variations of extremes')
+    trasfData = tsEvaTransformSeriesToStationaryMultiplicativeSeasonality(timeStamps, series, timeWindow, seasonalityVar=seasonalityVar)
+    gevMaxima = 'monthly'
+    potEventsPerYear = 12
+    minEventsPerYear = 12
+    
+  } else if (transfType == 'trendCIPercentile') {
+    if (is.na(ciPercentile)){
+      stop('For trendCIPercentile transformation the label parameter cipercentile is mandatory')
+    }
+    message(paste0('\nevaluating long term variations of extremes using the ', ciPercentile, 'th percentile'))
+    trasfData = tsEvaTransformSeriesToStationaryTrendOnly_ciPercentile( timeStamps, series, timeWindow, ciPercentile);
+    gevMaxima = 'annual'
+    potEventsPerYear = epy
+    minEventsPerYear = 1
+    
+  }else if (transfType == 'trendPeaks') {
+    print(TrendTh)
+    message(paste0('\nevaluating long term variations of the peaks'))
+    if (is.na(TrendTh)){
+      TrendTh=try(tsEvaFindTrendThreshold(series, timeStamps, timeWindow),T)
+      if(length(TrendTh)==0){
+        TrendTh=0.1
+      }
+      trasfData = tsEvaTransformSeriesToStationaryPeakTrend( timeStamps, series, timeWindow, TrendTh);
+    }else{
+      if (TrendTh=="MMX"){
+        trasfData = tsEvaTransformSeriesToStationaryMMXTrend( timeStamps, series, timeWindow);
+        print("using MMX trend")
+      }else{
+        trasfData = tsEvaTransformSeriesToStationaryPeakTrend( timeStamps, series, timeWindow, TrendTh);
+      }
+    }
+    gevMaxima = 'annual'
+    potEventsPerYear = epy
+    minEventsPerYear = 1
+    
+  } else  if (transfType == 'trendChangeCIPercentile'){
+    if (is.na(ciPercentile)){
+      stop('For trendCIPercentile transformation the label parameter cipercentile is mandatory')
+    }
+    message('\n evaluating long term variations of extremes using the ', ciPercentile, 'th percentile and change point detection')
+    trasfData = tsEvaTransformSeriesToStationaryTrendAndChangepts_ciPercentile(timeStamps, series, timeWindow,ciPercentile)
+    gevMaxima = 'annual';
+    potEventsPerYear = epy;
+    minEventsPerYear = 0
+    
+  } else if (transfType == 'seasonalCIPercentile') {
+    if (is.na(ciPercentile)) stop('For seasonalCIPercentile transformation the label parameter cipercentile is mandatory')
+    message(paste0('\nevaluating long term variations of extremes using the ', ciPercentile, 'th percentile\n'))
+    trasfData = tsEvaTransformSeriesToStatSeasonal_ciPercentile( timeStamps, series, timeWindow, ciPercentile)
+    gevMaxima = 'monthly'
+    potEventsPerYear = 12
+    minEventsPerYear = 6
+  }
+  
+  
+  dtn=min(diff(trasfData$timeStamps),na.rm=T)
+  dtn=as.numeric(dtn)
+  tdim=attributes(dtn)$units
+  if (dtn<1) {
+    pace=1/dtn
+    tsDaily=seq(1,length(trasfData$timeStamps),by=pace)
+    trasfData$stdDevSeriesOr=trasfData$stdDevSeries
+    trasfData$trendSeriesOr=trasfData$trendSeries
+    trasfData$stdDevErrorOr=trasfData$stdDevError
+    trasfData$stdDevSeries=trasfData$stdDevSeries[tsDaily]
+    trasfData$trendSeries=trasfData$trendSeries[tsDaily]
+    trasfData$stdDevError=trasfData$stdDevError[tsDaily]
+  }
+  
+  ms = data.frame(trasfData$timeStamps, trasfData$stationarySeries)
+  minPeakDistance = minPeakDistanceInDays/dtn;
+  
+  #estimating the non stationary EVA parameters
+  message('\nExecuting stationary eva')
+  pointData = tsEvaSampleData1(ms, potEventsPerYear, minEventsPerYear, minPeakDistanceInDays,tail);
+  evaAlphaCI = .68; # in a gaussian approximation alphaCI~68% corresponds to 1 sigma confidence
+  eva = tsEVstatistics(pointData, evaAlphaCI, gevMaxima, gevType, evdType,shape_bnd);
+  
+  if (eva$isValid==FALSE) {
+    message("problem in the computation of EVA statistics")
+  }
+  
+  eva[[2]]$GPDstat$thresholdError <- pointData$POT$thresholdError
+  
+  # !!! Assuming a Gaussian approximation to compute the standard errors for
+  # the GEV parameters
+  if (eva[[2]][[1]]$method[1]!="No fit") {
+    epsilonGevX <- eva[[2]][[1]]$parameters[3]
+    errEpsilonX <- epsilonGevX - eva[[2]][[1]]$paramCIs[1,3]
+    sigmaGevX <- eva[[2]][[1]]$parameters[2]
+    errSigmaGevX <- sigmaGevX - eva[[2]][[1]]$paramCIs[1, 2]
+    muGevX <- eva[[2]][[1]]$parameters[1]
+    errMuGevX <- muGevX - eva[[2]][[1]]$paramCIs[1, 1]
+    
+    message('\nTransforming to non stationary eva ...\n')
+    epsilonGevNS = epsilonGevX;
+    errEpsilonGevNS = errEpsilonX;
+    sigmaGevNS = trasfData$stdDevSeries*sigmaGevX;
+    
+    #propagating the errors on stdDevSeries and sigmaGevX to sigmaGevNs.
+    # err(sigmaNs) = sqrt{ [sigmaX*err(stdDev)]^2 + [stdDev*err(sigmaX)]^2 }
+    # the error on sigmaGevNs is time dependant.
+    errSigmaGevFit = trasfData$stdDevSeries*errSigmaGevX;
+    errSigmaGevTransf = sigmaGevX*trasfData$stdDevError;
+    errSigmaGevNS = (  errSigmaGevTransf^2   +  errSigmaGevFit^2  )^.5;
+    muGevNS = trasfData$stdDevSeries*muGevX + trasfData$trendSeries;
+    
+    # propagating the errors on stdDevSeries, trendSeries and sigmaGevX to muGevNS.
+    # err(muNs) = sqrt{ [muX*err(stdDev)]^2 + [stdDev*err(muX)]^2 + err(trend)^2 }
+    # the error on muGevNS is time dependant.
+    errMuGevFit = trasfData$stdDevSeries*errMuGevX;
+    errMuGevTransf = (  (muGevX*trasfData$stdDevError)^2 + trasfData$trendError^2  )^.5;
+    errMuGevNS = (  errMuGevTransf^2   +  errMuGevFit^2  )^.5;
+    gevParams=c()
+    gevParams$epsilon = epsilonGevNS;
+    gevParams$sigma = sigmaGevNS;
+    gevParams$mu = muGevNS;
+    gevParams$annualMax=trasfData$nonStatSeries[pointData$annualMaxIndx]
+    gevParams$monthlyMax=trasfData$nonStatSeries[pointData$monthlyMaxIndx]
+    gevParams$annualMaxIndx=pointData$annualMaxIndx
+    gevParams$monthlyMaxIndx=pointData$monthlyMaxIndx
+    
+    
+    if(tolower(gevMaxima) == "annual") {
+      gevParams$timeDelta <- 365.25
+      gevParams$timeDeltaYears <- 1
+    } else if(tolower(gevMaxima) == "monthly") {
+      gevParams$timeDelta <- 365.25/12
+      gevParams$timeDeltaYears <- 1/12
+    }
+    gevParamStdErr=c()
+    gevParamStdErr$epsilonErr <- errEpsilonGevNS
+    
+    gevParamStdErr$sigmaErrFit <- errSigmaGevFit
+    gevParamStdErr$sigmaErrTransf <- errSigmaGevTransf
+    gevParamStdErr$sigmaErr <- errSigmaGevNS
+    
+    gevParamStdErr$muErrFit <- errMuGevFit
+    gevParamStdErr$muErrTransf <- errMuGevTransf
+    gevParamStdErr$muErr <- errMuGevNS
+    
+    gevObj=list()
+    gevObj$method <- eva[[2]][[1]]$method
+    gevObj$parameters <- gevParams
+    gevObj$paramErr <- gevParamStdErr
+    gevObj$stationaryParams <- eva[[2]][[1]]
+    gevObj$objs$monthlyMaxIndexes <- pointData$monthlyMaxIndexes
+  }else{
+    
+    epsilonGevX <- eva[[2]][[1]]$parameters[3]
+    sigmaGevX <- eva[[2]][[1]]$parameters[2]
+    muGevX <- eva[[2]][[1]]$parameters[1]
+    message('\nTransforming to non stationary eva ...\n')
+    epsilonGevNS = epsilonGevX;
+    sigmaGevNS = trasfData$stdDevSeries*sigmaGevX;
+    muGevNS = trasfData$stdDevSeries*muGevX + trasfData$trendSeries;
+    
+    gevParams=c()
+    gevParams$epsilon = epsilonGevNS;
+    gevParams$sigma = sigmaGevNS;
+    gevParams$mu = muGevNS;
+    gevParams$annualMax=trasfData$nonStatSeries[pointData$annualMaxIndx]
+    gevParams$monthlyMax=trasfData$nonStatSeries[pointData$monthlyMaxIndx]
+    gevParams$annualMaxIndx=pointData$annualMaxIndx
+    gevParams$monthlyMaxIndx=pointData$monthlyMaxIndx
+    
+    if(tolower(gevMaxima) == "annual") {
+      gevParams$timeDelta <- 365.25
+      gevParams$timeDeltaYears <- 1
+    } else if(tolower(gevMaxima) == "monthly") {
+      gevParams$timeDelta <- 365.25/12
+      gevParams$timeDeltaYears <- 1/12
+    }
+    
+    gevObj=list()
+    gevObj$method = "No fit";
+    gevObj$parameters = gevParams;
+    gevObj$paramErr = NULL;
+    gevObj$stationaryParams = NULL;
+    gevObj$objs.monthlyMaxIndexes = NULL;
+  }
+  
+  # estimating the non stationary GPD parameters
+  # !!! Assuming a Gaussian approximation to compute the standard errors for
+  # the GPD parameters
+  if (eva[[2]][[2]]$method!="No fit") {
+    epsilonPotX <- eva[[2]][[2]]$parameters[2]
+    errEpsilonPotX <- epsilonPotX - eva[[2]][[2]]$paramCIs[1,1]
+    sigmaPotX <- eva[[2]][[2]]$parameters[1]
+    errSigmaPotX <- sigmaPotX - eva[[2]][[2]]$paramCIs[1, 2]
+    thresholdPotX = eva[[2]][[2]]$parameters[3];
+    errThresholdPotX = eva[[2]][[2]]$thresholdError;
+    nPotPeaks = eva[[2]][[2]]$parameters[5];
+    percentilePotX = eva[[2]][[2]]$parameters[6];
+    
+    dtPeaks = minPeakDistance;
+    timeStamps=as.Date(timeStamps)
+    dtPotX = as.numeric(timeStamps[length(timeStamps)] - timeStamps[1])/length(series)*dtPeaks;
+    epsilonPotNS = epsilonPotX;
+    errEpsilonPotNS = errEpsilonPotX;
+    sigmaPotNS = sigmaPotX*trasfData$stdDevSeries;
+    
+    # propagating the errors on stdDevSeries and sigmaPotX to sigmaPotNs.
+    # err(sigmaNs) = sqrt{ [sigmaX*err(stdDev)]^2 + [stdDev*err(sigmaX)]^2 }
+    # the error on sigmaGevNs is time dependant.
+    errSigmaPotFit = trasfData$stdDevSeries*errSigmaPotX;
+    errSigmaPotTransf = sigmaPotX*trasfData$stdDevError;
+    errSigmaPotNS = (  errSigmaPotTransf^2   +  errSigmaPotFit^2  )^.5;
+    thresholdPotNS = thresholdPotX*trasfData$stdDevSeries + trasfData$trendSeries;
+    # propagating the errors on stdDevSeries and trendSeries to thresholdPotNs.
+    # err(thresholdPotNs) = sqrt{ [thresholdPotX*err(stdDev)]^2 + err(trend)^2 }
+    # the error on thresholdPotNs is constant.
+    thresholdErrFit = 0;
+    
+    thresholdErrTransf = ((trasfData$stdDevSeries*errThresholdPotX)^2 + (thresholdPotX*trasfData$stdDevError)^2  +  trasfData$trendError^2)^.5;
+    thresholdErr = thresholdErrTransf;
+    
+    potParams=c()
+    potParams$epsilon = epsilonPotNS;
+    potParams$sigma = sigmaPotNS;
+    potParams$threshold = thresholdPotNS;
+    potParams$percentile = percentilePotX;
+    potParams$timeDelta = dtPotX;
+    potParams$timeDeltaYears = dtPotX/365.25;
+    potParams$timeHorizonStart = min(trasfData$timeStamps);
+    potParams$timeHorizonEnd = max(trasfData$timeStamps);
+    potParams$peaks=trasfData$nonStatSeries[pointData$POT$ipeaks]
+    potParams$peakID=pointData$POT$ipeaks
+    potParams$peakST=pointData$POT$stpeaks
+    potParams$peakEN=pointData$POT$endpeaks
+    potParams$nPeaks = nPotPeaks;
+    
+    
+    potParamStdErr=c()
+    potParamStdErr$epsilonErr = errEpsilonPotNS;
+    potParamStdErr$sigmaErrFit = errSigmaPotFit;
+    potParamStdErr$sigmaErrTransf = errSigmaPotTransf;
+    potParamStdErr$sigmaErr = errSigmaPotNS;
+    potParamStdErr$thresholdErrFit = thresholdErrFit;
+    potParamStdErr$thresholdErrTransf = thresholdErrTransf;
+    potParamStdErr$thresholdErr = thresholdErr;
+    
+    potObj=list()
+    potObj$method = eva[[2]][[2]]$method;
+    potObj$parameters = potParams;
+    potObj$paramErr = potParamStdErr;
+    potObj$stationaryParams = eva[[2]][[2]];
+    potObj$objs = NULL;
+  }else{
+    
+    dtPeaks = minPeakDistance;
+    timeStamps=as.Date(timeStamps)
+    dtPotX = as.numeric(timeStamps[length(timeStamps)] - timeStamps[1])/length(series)*dtPeaks;
+    thresholdPotX = pointData$POT$threshold
+    thresholdPotNS = thresholdPotX*trasfData$stdDevSeries + trasfData$trendSeries;
+    
+    epsilonPotX <- pointData$POT$pars[2]
+    sigmaPotX <- pointData$POT$pars[1]
+    epsilonPotNS = epsilonPotX;
+    sigmaPotNS = sigmaPotX*trasfData$stdDevSeries;
+    thresholdPotNS = thresholdPotX*trasfData$stdDevSeries + trasfData$trendSeries;
+    
+    potParams=c()
+    potParams$epsilon = epsilonPotNS;
+    potParams$sigma = sigmaPotNS;
+    potParams$threshold = thresholdPotNS;
+    potParams$percentile = pointData$POT$percentile;
+    potParams$timeDelta = dtPotX;
+    potParams$timeDeltaYears = dtPotX/365.2425;
+    potParams$timeHorizonStart = min(trasfData$timeStamps);
+    potParams$timeHorizonEnd = max(trasfData$timeStamps);
+    potParams$peaks=trasfData$nonStatSeries[pointData$POT$ipeaks]
+    potParams$peakID=pointData$POT$ipeaks
+    potParams$peakST=pointData$POT$stpeaks
+    potParams$peakEN=pointData$POT$endpeaks
+    potParams$nPeaks = length(pointData$POT$peaks);
+    
+    potObj=list()
+    potObj$method = "No fit";
+    potObj$parameters = potParams;
+    potObj$paramErr = NULL;
+    potObj$stationaryParams = NULL;
+    potObj$objs = NULL;
+  }
+  
+  # setting output objects
+  nonStationaryEvaParams <- list(gevObj=gevObj, potObj=potObj)
+  stationaryTransformData <- trasfData
+  return(list(nonStationaryEvaParams=nonStationaryEvaParams,stationaryTransformData=stationaryTransformData))
+  
+}
+
+tsEvaSampleData1 <- function(ms, meanEventsPerYear,minEventsPerYear, minPeakDistanceInDays,tail=NA) {
+  
+  pctsDesired = c(90, 95, 99, 99.9)
+  args <- list(meanEventsPerYear = meanEventsPerYear,
+               minEventsPerYear = minEventsPerYear,
+               potPercentiles = c(seq(70,90,by=1), seq(91,99.5,by=0.5)))
+  meanEventsPerYear = args$meanEventsPerYear
+  minEventsPerYear = args$minEventsPerYear
+  potPercentiles = args$potPercentiles
+  if(is.na(tail)) stop("tail for POT selection needs to be 'high' or 'low'")
+  
+  POTData <- tsGetPOT(ms, potPercentiles, meanEventsPerYear,minEventsPerYear,minPeakDistanceInDays, tail)
+  
+  vals <- quantile(ms[,2], pctsDesired/100,na.rm=T)
+  percentiles <- list(precentiles = pctsDesired, values = vals)
+  
+  pointData <- list()
+  pointData$completeSeries <- ms
+  pointData$POT <- POTData
+  pointDataA <- computeAnnualMaxima(ms)
+  pointDataM <- computeMonthlyMaxima(ms)
+  
+  yrs <- unique(as.numeric(format(as.Date(ms[,1]+3600), "%Y")))
+  yrs <- yrs - min(yrs)
+  pointData$years <- seq(min(yrs),max(yrs),1)
+  
+  pointData$Percentiles <- percentiles
+  pointData$annualMax=pointDataA$annualMax
+  pointData$annualMaxDate=pointDataA$annualMaxDate
+  pointData$annualMaxIndx=pointDataA$annualMaxIndx
+  pointData$monthlyMax=pointDataM$monthlyMax
+  pointData$monthlyMaxDate=pointDataM$monthlyMaxDate
+  pointData$monthlyMaxIndx=pointDataM$monthlyMaxIndx
+  
+  return(pointData)
+}
+
+tsGetPOT <- function(ms, pcts, desiredEventsPerYear,minEventsPerYear, minPeakDistanceInDays, tail) {
+  
+  if (minPeakDistanceInDays == -1) {
+    stop("label parameter 'minPeakDistanceInDays' must be set")
+  }
+  dt1=min(diff(ms[,1]),na.rm=T)
+  dt=as.numeric(dt1)
+  tdim=attributes(dt1)$units
+  if (tdim=="hours") dt=dt/24
+  if (tdim=="seconds") dt=dt/3600
+  minPeakDistance <- minPeakDistanceInDays/dt
+  minRunDistance <- minPeakDistance
+  nyears <- round(as.numeric((max(ms[,1]) - min(ms[,1]))/365.25))
+  if (length(pcts) == 1) {
+    pcts = c(pcts - 3, pcts)
+    desiredEventsPerYear = -1
+  }
+  
+  numperyear <- rep(NA, length(pcts))
+  minnumperyear <- rep(NA, length(pcts))
+  thrsdts <- rep(NA, length(pcts))
+  gpp=rep(NA, length(pcts))
+  devpp=rep(NA, length(pcts))
+  dej=0
+  skip=0
+  trip=NA
+  perfpen=0
+  for (ipp in 1:length(pcts)) {
+    #Skip is used to prevent finding peaks for unappropriate thresholds
+    if (skip>0) {
+      skip=skip-1
+    }else{
+      if(dej==0){
+        thrsdt <- quantile(ms[,2],pcts[ipp]/100,na.rm=T)
+        thrsdts[ipp] <- thrsdt
+        ms[,2][which(is.na(ms[,2]))]=-9999
+        minEventsPerYear=1
+        
+        if(tail=="high") {
+          #boundaries of shape parameter
+          shape_bnd=c(-0.5,1)
+          pks <- pracma::findpeaks(ms[,2],minpeakdistance = minPeakDistance, minpeakheight = thrsdt)
+        }
+        if(tail=="low") {
+          pks <- declustpeaks(data = ms[,2] ,minpeakdistance = minPeakDistance ,minrundistance = minRunDistance, qt=thrsdt)
+          shape_bnd=c(-2,0)
+        }
+        numperyear[ipp] <- length(pks[,1])/nyears
+        #print(shape_bnd)
+        #print(numperyear[ipp])
+        if(numperyear[ipp]>=3*desiredEventsPerYear & ipp<(length(pcts)-5)) skip = floor(length(pcts)/12)
+        if(numperyear[ipp]<0.9*minEventsPerYear) {
+          perfpen=(pcts[ipp])*100
+        }
+        if(numperyear[ipp]<(0.7*minEventsPerYear)) {
+          perfpen=(pcts[ipp])*1000
+        }
+        if(numperyear[ipp]<=desiredEventsPerYear+1 & dej==0){
+          fgpd=suppressWarnings(try(POT::fitgpd(pks[,1], threshold = thrsdt, est = "mle",method="BFGS",std.err.type = "expected")))
+          if(inherits(fgpd, "try-error")){
+            gpdpar=9999
+            deviance=9999
+            devpp[ipp]=1e9
+            gpp[ipp]=9999
+          }else {
+            gpdpar=fgpd$fitted.values
+            deviance=fgpd$deviance
+            devpp[ipp]=AIC(fgpd)+perfpen
+            gpp[ipp]=gpdpar[2]
+          }
+          nperYear <- tsGetNumberPerYear(ms, pks[,2])
+          minnumperyear[ipp] <- min(nperYear$Freq, na.rm = TRUE)
+        }
+      }
+    }
+  }
+  
+  #peaks with lowest threshold (retrieving the two largest peaks)
+  pkx <- declustpeaks(data = ms[,2] ,minpeakdistance = minPeakDistance ,minrundistance = minRunDistance, qt=quantile(ms[,2],pcts[1]/100,na.rm=T))
+  md= abs(pkx[1,1]-pkx[2,1])
+  devpp[1]=NA
+  if(is.na(trip)){
+    isok=F
+    devpx=devpp
+    count=1
+    while(isok==F){
+      #safety measure for stability of parameter
+      dshap=c(0,diff(gpp))
+      #Penalizing fits with positive shape parameters for low tail
+      if(tail=="low") {
+        #for very bounded distributions
+        if (md<0.1){
+          devpp[which(gpp>=-0.5)]=devpp[which(gpp>=-0.5)]+9999
+        }else{
+          devpp[which(gpp>=0)]=devpp[which(gpp>=0)]+9999
+        }
+        
+      }
+      devpp[which(abs(dshap)>0.5)]=devpp[which(abs(dshap)>0.5)]+99999
+      trip=which.min(devpp)
+      #message(paste0("shape outside boudaries: ",round(gpp[trip],2)))
+      #isok=T
+      #trip=which.min(devpx)
+      isok=dplyr::between(round(gpp[trip],1), shape_bnd[1], shape_bnd[2])
+      count=count+1
+      if(isok==F)devpx[trip]=devpx[trip]+9999
+      if(count>(length(devpx)-1)){
+        #safety measure for stability of parameter
+        trip=which.min(devpp)
+        message(paste0("shape outside boudaries: ",round(gpp[trip],2)))
+        isok=T
+      }
+    }
+  }
+  # plot(pcts,devpp,ylim=c(0,1e5))
+  # plot(pcts,gpp)
+  # print(devpp)
+  # print(pcts)
+  message(paste0("\nmax threshold is: ", pcts[trip],"%"))
+  message(paste0("\nshape parameter is: ", round(gpp[trip],2)))
+  message(paste0("\naverage number of events per year = ",round(numperyear[trip],1) ))
+  
+  diffNPerYear <- mean(diff(na.omit(rev(numperyear)), na.rm = TRUE))
+  if (diffNPerYear == 0) diffNPerYear <- 1
+  diffNPerYear <- 1
+  thresholdError <- -mean(diff(na.omit(thrsdts))/diffNPerYear)/2
+  indexp <- trip
+  if (!is.na(indexp)) {
+    thrsd <- quantile(ms[,2],pcts[indexp]/100)
+    pct <- pcts[indexp]
+  } else {
+    thrsd <- 0
+    pct
+  }
+  # Find peaks in the second column of the matrix 'ms'
+  if(tail=="high") pks_and_locs <- pracma::findpeaks(ms[,2],minpeakdistance = minPeakDistance, minpeakheight = thrsd)
+  if(tail=="low") pks_and_locs <- declustpeaks(data = ms[,2] ,minpeakdistance = minPeakDistance ,minrundistance = minRunDistance, qt=thrsd)
+  
+  # Assign peaks and peak locations to separate variables
+  pks <- pks_and_locs[,1]
+  locs <- pks_and_locs[,2]
+  st<-pks_and_locs[,3]
+  end=pks_and_locs[,4]
+  # Create a list to store results
+  POTdata <- list()
+  # Assign values to the fields of the list
+  POTdata[['threshold']] <- thrsd
+  POTdata[['thresholdError']] <- thresholdError
+  POTdata[['percentile']] <- pct
+  POTdata[['peaks']] <- pks
+  POTdata[['stpeaks']] <- st
+  POTdata[['endpeaks']] <- end
+  POTdata[['ipeaks']] <- locs
+  POTdata[['time']] <- ms[locs, 1]
+  POTdata[['pars']] <- gpdpar
+  
+  
+  return(POTdata)
+}
+
+interid<- function(data,trans,WindowSize) {
+  
+  dt1=min(diff(data$date),na.rm=T)
+  dt=as.numeric(dt1)
+  tdim=attributes(dt1)$units
+  if (tdim=="hours") dt=dt/24
+  nRunMn = ceiling(WindowSize/dt);
+  colnames(data)
+  data$Q7=rollmean(data$Qs,nRunMn, align = "right", fill=NA)
+  
+  if (trans=="rev"){
+    data$Qtrans=-(data$Q7)
+  }else if(trans=="inv"){
+    data$Qtrans=1/data$Q7
+  }else if(trans=="lninv"){
+    data$Qtrans=-ln(data$Q7)
+  }
+  if (length(which(is.na(data$Q7)))==length(data$Q7)){
+    print("no data in this pixel")
+    list0=NA
+    dis07=data
+    l0=NA
+    fl=NA
+    mindis=NA
+    
+  }else{
+    if (length(which(is.na(data$Qs)))>0){
+      print("Na alert")
+      #seriefill=tsEvaFillSeries(data$date,data$Qs)
+      #data$Qs=seriefill
+    }
+    #tinversing the discharge for EVA
+    #Identification of the intermittent river
+    mindis=min(data$Q7,na.rm=T)
+    m0=length(which(data$Qs7==mindis))
+    l0=length(which(data$Q7<=1e-4))
+    #30y running average on this
+    dayysbelow=tsEvaNanRunnigBlowTh(data$Q7,1e-4,4*365*30)
+    dayysbelow$time=as.Date(data$date[dayysbelow$time])
+    yrtot=length(unique(year(data$date)))
+    list0=NA
+    fl=0 #flag for intermitent river
+    if (l0>=1){
+      print("intermittent river")
+      fl=1
+      data$Qinv=NA
+      data$Qlninv
+      #keep days with 0 discharge
+      list0=data$date[which(data$Qs==0)]
+    }else if(mindis>0 & m0>=yrtot){ 
+      print(paste0("river with floor low flow ",mindis))
+      fl=3
+      list0=data$date[which(data$Q7==mindis)]
+    }
+    dis07=data[,c(2,3,4)]
+  }
+  #The objective here is to return also the dicharge in a better format for next step of the analysis
+  return(list(zerodate=list0,trdis=dis07,DaysBlow=dayysbelow,flags=c(n0d=l0,intertype=fl,mindischarge=mindis)))
+}
+
+#Now fitting TSEVA on observations between 1950 and 2020
+
+
+workDir = "D:/tilloal/Documents/LFRuns_utils/data/"
+haz="drought"
+tail="low"
+ThDir<-paste0(workDir,"TrendAnalysis/trenTH")
+THX=c()
+Nsq=53
+if (file.exists(paste0(ThDir,"/trenTH_Histo_",tail,"_",Nsq,".csv"))){
+  print(Nsq)
+  TH1=read.csv(paste0(ThDir,"/trenTH_Histo_",tail,"_",Nsq,".csv"))
+  TH2=read.csv(paste0(ThDir,"/trenTH_SCF_",tail,"_",Nsq,".csv"))
+  TH3=inner_join(TH1,TH2,by="cid")
+  TH3$cid=TH3$cid-Nsq*10000
+  TH3$cid=TH3$cid+Nsq*100000
+  TH3=inner_join(TH3,matchpix,by=c("cid"="outl2"))
+  THX=rbind(THX,TH3)
+}
+
+#retain thresholds fro historical run unless it is NA
+thresh_vec=data.frame(THX$cid, THX$Th_new.x)
+#print(thresh_vec[c(1:10),])
+if(length(which(is.na(thresh_vec$TH3.Th_new.x)))>0){
+  print("corr")
+  thresh_vec$TH3.Th_new.x[which(is.na(thresh_vec$TH3.Th_new.x))]=THX$Th_new.y[which(is.na(thresh_vec$TH3.Th_new.x))]
+}
+names(thresh_vec)=c("cid","th")
+thresh_vec$cid=as.numeric(thresh_vec$cid)
+
+
+#loading the frost file for drought
+if (haz=="drought"){
+  load(file=paste0(workDir,"Drought/catchment_frost.Rdata"))
+  rmv=which(year(frostcat$time)==1950)
+  frostcat=frostcat[-rmv,]
+  #remove first day
+  frostcat=frostcat[-1,]
+  Catchmentrivers7=read.csv(paste0(workDir,"Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
+  outletname="outletsv8_hybas07_01min"
+  outhyb07=outletopen(workDir,outletname,nrspace)
+  catmatch=match(outhyb07$outlets,Catchmentrivers7$pointid)
+  mycat=Catchmentrivers7[catmatch,]
+  
+  hybas07 <- read_sf(dsn = paste0(workDir,"Catchments/hydrosheds/hybas_eu_lev07_v1c.shp"))
+  hybasf7=fortify(hybas07) 
+  Catamere07=inner_join(hybasf7,Catchmentrivers7,by= "HYBAS_ID")
+  Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ") 
+  Catf7=inner_join(Catamere07,outhybas,by= c("llcoord"="latlong"))
+  st_geometry(Catf7)=NULL	
+  tail="low"
+  
+}
+
+parlist=c()
+
+uparea=matchpix$upa
+timeAndSeries=dis_data_kge[,c(1,4)]
+
+txx=timeAndSeries$days
+start_time <- Sys.time()
+catch=matchpix$outl2
+catch2=matchpix$outlets.x
+timeStamps=txx
+thresh=thresh_vec[which(thresh_vec$cid==catch),]
+thresh=thresh$th
+frosttime=NA
+series=timeAndSeries
+
+names(series)=c("date","Qs")
+rmv=which(as.integer(format(series$date, "%Y"))==1950)
+if (length(rmv)>0){
+  series=series[-rmv,]
+}
+#remove double days
+doubday=which(diff(series$date)==0)+1
+
+if (length(doubday)>0){
+  series=series[-doubday,]
+}
+dt1=min(diff(series$date),na.rm=T)
+if (haz=="drought"){
+  trans="rev"
+  #seasonal split
+  catmat=Catf7[which(Catf7$outlets==catch2),]
+  Tcatmat=mycat[which(mycat$HYBAS_ID==catmat$HYBAS_ID),]
+  Tcatchment=which(colnames(frostcat)==Tcatmat$pointid)
+  
+  intermit=interid(series,trans,WindowSize=7)
+  interflag=intermit$flags[2]
+  series=data.frame(series$date,intermit$trdis$Q7)
+  #remove frost timesteps, this can be modified to do the anlysis only on frost moments
+  if (length(Tcatchment)>0){
+    frostserie=data.frame(frostcat[,1],frostcat[,Tcatchment])
+    frosttime=which(frostserie[,2]<0)
+  }else{
+    frosttime=NA
+  }
+  ciPercentile=80
+  minPeakDistanceInDays=30
+  tail="low"
+}else if (haz=="flood"){
+  #series = df.dis[which(df.dis$outlets==catch),c(6,1)] 
+  # df.disX=disNcopenloc(filename,hydroDir,outhybas,idfix)
+  # series=data.frame(txx,df.disX$outlets)
+  # names(series)=c("date","Qs")
+  ciPercentile=95
+  minPeakDistanceInDays=7
+  interflag=0
+  # series$date=as.POSIXlt(series$date)
+  #series <- max_daily_value(series)
+  tail="high"
+  trans="ori"
+}
+
+names(series)=c("timestamp","dis")
+dt1=min(diff(series$timestamp),na.rm=T)
+dt=as.numeric(dt1)
+tdim=attributes(dt1)$units
+if (tdim=="hours") dt=dt/24
+if (dt==1){
+  timeDays=series$timestamp
+}else{
+  timeDays=unique(as.Date(series$timestamp))
+}
+
+bounds=c(year(timeDays[1]),year(timeDays[length(timeDays)]))
+realbound=bounds
+tbound=c(as.Date(paste0(realbound[1],"-12-31")),as.Date(paste0(realbound[2],"-12-31")))
+Impdates=seq(tbound[1],tbound[2],by="1 year")
+
+nv=length(unique(series$dis))
+
+if (length(which(is.na(series$dis)))>0){
+  print("Na alert")
+  seriefill=tsEvaFillSeries(series$timestamp,series$dis)
+  series$dis=seriefill
+}
+timeAndSeries=series
+names(timeAndSeries)=c("timestamp","data")
+#timeAndSeries$data=jitter(timeAndSeries$data)
+
+if (haz=="drought" & length(!is.na(frosttime))>1){
+  if (season=="nonfrost"){
+    print("nonfrost season")
+    timeAndSeries$data[frosttime]=NA
+  }else if (season=="frost"){
+    print("frost season")
+    timeAndSeries$data[-frosttime]=NA
+  }else if (season=="year"){
+    print("no seasonal divide")
+  }else {print("season must be frost or nonfrost")}
+}else{
+  print("no frost season for this river")
+}
+#I remove the first year (1950)
+# rmv=which(as.integer(format(timeAndSeries$timestamp, "%Y"))==1950)
+# if (length(rmv)>0){
+# timeAndSeries=timeAndSeries[-rmv,]
+# }
+series=timeAndSeries[,2]
+timeWindow = 365.25*30; #time windows in days, the correction is done within the functions
+windowSize=366
+
+timeStamps=timeAndSeries$timestamp
+#cat(paste0("\nsquare: ", Nsq, " pixel: ",idfix,"/",endid))
+Nonstat<-TsEvaNs(timeAndSeries, timeWindow, transfType='trendPeaks',ciPercentile = ciPercentile, minPeakDistanceInDays = minPeakDistanceInDays,lowdt=7,trans=trans,tail = tail,TrendTh = thresh)
+nonStationaryEvaParams=Nonstat[[1]]
+stationaryTransformData=Nonstat[[2]]
+
+stationaryTransformData$timeStampsDay=unique(as.Date(stationaryTransformData$timeStamps))
+pikos=data.frame(nonStationaryEvaParams$potObj$parameters$peaks,nonStationaryEvaParams$potObj$parameters$peakID,nonStationaryEvaParams$potObj$parameters$peakST, nonStationaryEvaParams$potObj$parameters$peakEN)
+names(pikos)=c("value","timeID","tIDstart","tIDend")
+pikos$time=timeStamps[pikos$timeID]
+pikos$catch=rep(catch,length(pikos[,1]))
+#Here I need to convert the timeStamp to a daily one if dt is not 1
+
+dt1=min(diff(timeStamps),na.rm=T)
+dt=as.numeric(dt1)
+tdim=attributes(dt1)$units
+if (tdim=="hours") dt=dt/24
+
+#change this part
+if (dt==1){
+  timeDays=stationaryTransformData$timeStamps
+}else{
+  timeDays=stationaryTransformData$timeStampsDay
+}
+
+bounds=c(year(timeDays[1]),year(timeDays[length(timeDays)]))
+realbound=bounds
+tbound=c(as.Date(paste0(realbound[1],"-12-31")),as.Date(paste0(realbound[2],"-12-31")))
+Impdates=seq(tbound[1],tbound[2],by="1 years")
+datex=yday(timeDays)
+dtect=c(diff(datex),-1)
+last_days <- timeDays[which(dtect<0)]
+tindexes=match(last_days,timeDays)
+# Compute return periods and levels
+RPgoal=10
+timeIndex=tindexes[1]
+RLevs100=ComputeReturnLevels(nonStationaryEvaParams, RPgoal, timeIndex)
+
+if (RLevs100$Fit=="No fit"){
+  
+  RLgpd=nonStationaryEvaParams$gevObj$parameters$annualMax
+  names(RLgpd)=year(Impdates)[-c(1,2)]
+  
+  RLgev=nonStationaryEvaParams$gevObj$parameters$annualMax
+  names(RLgev)=year(Impdates)[-c(1,2)]
+  
+  nRPgev=rep(NA, length(Impdates))
+  names(nRPgev)=year(Impdates)[-c(1,2)]
+  
+  nRPgpd=rep(NA, length(Impdates))
+  names(nRPgpd)=year(Impdates)[-c(1,2)]
+  
+  params=data.frame(matrix(ncol=17,nrow=(length(Impdates)-3)))
+  params[,1]=rep(catch,7)
+  params[,2]=year(Impdates)[-c(1:2)]
+  params[,4]=rep(interflag,7)
+  if (is.null(colnames(parlist))){
+    colnames(params)=rep("nom",17) 
+  }else{
+    colnames(params)=colnames(parlist)
+  }
+}else{
+  #####
+  RLgev=RLevs100$ReturnLevels[2]
+  RLgpd=RLevs100$ReturnLevels[3]
+  ERgev=RLevs100$ReturnLevels[4]
+  ERgpd=RLevs100$ReturnLevels[5]
+  
+  nRPgev=nRPgpd=10
+  params=c()
+  for (t in 4:length(Impdates)){
+    timeIndex=tindexes[t]
+    RLevs100i=ComputeReturnLevels(nonStationaryEvaParams, RPgoal, timeIndex)
+    params=c(catch,year(Impdates[t]),timeIndex,RLevs100i$Params)
+    names(params)[1:3]=c("catchment","Year","timeIndex")
+    
+    Rper=RPcalc(params,RPiGEV=RLevs100$ReturnLevels[2],RPiGPD=RLevs100$ReturnLevels[3])
+    nRPgpd=c(nRPgpd,Rper[2])
+    nRPgev=c(nRPgev,Rper[1])
+    RLgev=cbind(RLgev,RLevs100i$ReturnLevels[2])
+    RLgpd=cbind(RLgpd,RLevs100i$ReturnLevels[3])
+    ERgev=cbind(ERgev,RLevs100i$ReturnLevels[4])
+    ERgpd=cbind(ERgpd,RLevs100i$ReturnLevels[5])
+    if (length(parlist)>1) colnames(parlist)=names(params)
+    parlist=rbind(parlist,params)
+  }
+  
+  RLgev=as.data.frame(RLgev)
+  names(RLgev)=year(Impdates)
+  rownames(RLgev)=RPgoal
+  
+  RLgpd=as.data.frame(RLgpd)
+  names(RLgpd)=year(Impdates)
+  rownames(RLgpd)=RPgoal
+  
+  nRPgev=as.data.frame(t(nRPgev))
+  names(nRPgev)=year(Impdates)
+  
+  nRPgpd=as.data.frame(t(nRPgpd))
+  names(nRPgpd)=year(Impdates)
+  
+  peaklist=rbind(peaklist,pikos)
+}
+
+#Saving main outputs
+catlist=c(catlist,catch)
+IRES=c(IRES,interflag)
+#Reservoir_i=c(Reservoir_i,Reservoir_alteration)
+
+RetLevGEV=rbind(RetLevGEV,RLgev)
+
+RetLevGPD=rbind(RetLevGPD,RLgpd)
+
+RetPerGEV=rbind(RetPerGEV,nRPgev)
+
+RetPerGPD=rbind(RetPerGPD,nRPgpd)
+end_time <- Sys.time()
+cat(paste0("\nloop duration: ",round(end_time-start_time,2)," seconds\n"))
+
+
+catch="Arno @ Vicopisano"
+jpeg(paste("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Arno_vico_Hera_obs.jpg", sep = ""),
+     width = width_px, height = height_px, quality = 100, res=dpi)
+
+
+
+yr.deb <-  seq(as.Date("1950-01-15"), by="5 years", length=14)
+RL6=as.numeric(-RLgpd)[-c(71,72,73)]
+
+pikos$time2=timeStamps[pikos$timeID]
+
+plot(Peak5$time2, Peak5$value, col=alpha("darkred",.8) ,pch=16,axes=FALSE,xaxs="i",yaxs="i",ylim=c(0,20),
+     xlab = NA, ylab="")
+points(Peak1$time2, Peak1$value, col=alpha("black",.8) ,pch=4)
+points(pikos$time2, -pikos$value, col=alpha("violet",.8) ,pch=3)
+lines(dates,RL5,col="darkred",lwd=2,lty=1)
+lines(dates,RL6,col="violet",lwd=2,lty=1)
+lines(dates,RL1,col="royalblue",lwd=2,lty=2)
+lines(dates,RL3,col="darkgreen",lwd=2,lty=3)
+lines(dates,RL2,col="orange",lwd=2,lty=4)
+mtext(main,3,font = 2,line = 0.5,cex = 1.5)
+abline(v = yr.deb, col="lightgrey", lty=2)
+abline(h = 0, col=1)
+axis(2,cex.axis=1)
+title(ylab = expression(paste("Q (",m^3/s,")")),cex.lab=1.5,line=2, xlab="years")
+axis(1, yr.deb, label=format(yr.deb,"%Y"),cex.axis=1)
+box()
+## Trace des erreurs absolues
+# polygon(c(dates[1],dates,dates[length(dates)]),c(0,abs(Climtrend),0),
+#         col=alpha("royalblue",.5),border="royalblue")
+# polygon(pdates,abs(lutrend),
+#         col=alpha("orange",.5),border="orange")
+# polygon(pdates,abs(wutrend),
+#         col=alpha("grey",.5),border="darkgreen")
+# polygon(pdates,abs(retrend),
+#         col=alpha("grey",.5),border="darkred")
+## Trace de la grille mensuelle
+
+## Definition de la legende
+legend("topleft", leg=c("Historical noRF","Res+WU static","Res static","Socio static","Observed"),
+       lwd=c(2,2,2,2), col=c("darkred","orange","darkgreen","royalblue","violet"),
+       cex=1, lty=c(1,2,3,4,1), bg=alpha("white",.6))
+dev.off()
 

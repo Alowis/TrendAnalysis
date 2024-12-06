@@ -231,7 +231,6 @@ peaklist=c()
 catlist=c()
 IRES=c()
 Reservoir_i=c()
-
 #loop over all stations
 for(id in seq_along(station_ids$X1)){
   # id=23

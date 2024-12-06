@@ -1415,14 +1415,14 @@ if (!exists("outf")){
 #load results from previous script 
 
 #floods
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_qsp3.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_rel.Rdata"))
 #droughts
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_qsp3.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_rel.Rdata"))
 #I extract the trend at MUTS3 level fist
 
 FloodTrends=Output_fl_year$TrendRegio
 
-#Output_dr_nfrost=Output_dr_year
+Output_dr_nonfrost=Output_dr_year
 DroughtTrends=Output_dr_nonfrost$TrendRegio
 
 driver=unique(FloodTrends$driver)
@@ -1510,43 +1510,43 @@ tsize=16
 osize=12
 legend="Change in Qsp \n(l/s/km2)"
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
-
-br=seq(-100,100,.1)
-labels=br
-limi=c(-50,50)
-ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = Flplot, mapping = aes(fill = f2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
-  geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_fill_gradientn(
-    colors=palet,
-    breaks=br,limits=limi,
-    oob = scales::squish,na.value=colNA, name=legend)  +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
+# 
+# br=seq(-100,100,.1)
+# labels=br
+# limi=c(-50,50)
+# ggplot(basemap) +
+#   geom_sf(fill="white")+
+#   geom_sf(data = Flplot, mapping = aes(fill = f2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
+#   geom_sf(fill=NA, color="gray42") +
+#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+#   scale_fill_gradientn(
+#     colors=palet,
+#     breaks=br,limits=limi,
+#     oob = scales::squish,na.value=colNA, name=legend)  +
+#   labs()+
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
 
 #create a new variable which make flood and drought on the same scale
 #normalize flood change
 a=sd(FlplotTot$f2020,na.rm=T)
 b=sd(FlplotTot$d2020,na.rm=T)
-
+a=b=1
 databitot=FlplotTot
 databitot$x=databitot$f2020/a
 databitot$y=databitot$d2020/b
 
 breaker1=0
-breaker2=0.25
+breaker2=10
 
 ### flood -----------------
 alterclass=data.frame(databitot$x)
@@ -1581,11 +1581,11 @@ TotalDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[5]),]
 ClimFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[1]),]
 ClimDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[1]),]
 
-LuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[3]),]
-LuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[3]),]
+LuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[2]),]
+LuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[2]),]
 
-ResFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[2]),]
-ResDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[2]),]
+ResFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[3]),]
+ResDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[3]),]
 
 WuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[4]),]
 WuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[4]),]
@@ -1598,13 +1598,14 @@ Flpixplot$d2020=TotalDroughtTrendPix$Y2020
 #normalize changes
 a=sd(Flpixplot$Y2020,na.rm=T)
 b=sd(Flpixplot$d2020,na.rm=T)
+a=b=1
 databipi=Flpixplot
 databipi$x=databipi$Y2020/a
 databipi$y=databipi$d2020/b
 
 
 breaker1=0
-breaker2=0.25
+breaker2=10
 
 ### floods --------------------
 alterclass=data.frame(databipi$x)
@@ -1681,78 +1682,78 @@ loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","W
 bi_pal(pal = colors, dim = 4)
 #colors=(c("#dd6a29","#169dd0","#7ebbd2","#d3d3d3","#167984","#174f28","#845e29","#819185","#d8a386"))
 
-
-ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-map <- ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-  geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-  geom_sf(fill=NA, color="gray42") +
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_fill_manual(values = colors) +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                       sep = " ")),
-             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-             guide = "none")+
-  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_color_manual(values = colors) +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-legend <- bi_legend(pal = colors,
-                    dim = 4,
-                    xlab = "  +  Drought changes  -  ",
-                    ylab = "  -  Flood changes  +  ",
-                    size = 16,
-                    arrows = FALSE)
-
-pl=ggarrange(map, legend, 
-             labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-
-
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_ad2.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500) 
+# 
+# ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
+#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+#   scale_fill_manual(values = colors) +
+#   coord_cartesian(xlim=c(-200,200),ylim=c(-200,200)) +
+#   
+#   # Add main quadrant labels
+#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+#   
+#   # Set axis labels
+#   labs(x = "Change in drought flows (l/s/km2)", 
+#        y = "Change in flood flows (l/s/km2)") +
+#   
+#   # Customize the theme
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# map <- ggplot(basemap) +
+#   geom_sf(fill="white")+
+#   geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+#   geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+#   geom_sf(fill=NA, color="gray42") +
+#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_fill_manual(values = colors) +
+#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+#                                                                        sep = " ")),
+#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+#              guide = "none")+
+#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_color_manual(values = colors) +
+#   labs()+
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# legend <- bi_legend(pal = colors,
+#                     dim = 4,
+#                     xlab = "  +  Drought changes  -  ",
+#                     ylab = "  -  Flood changes  +  ",
+#                     size = 16,
+#                     arrows = FALSE)
+# 
+# pl=ggarrange(map, legend, 
+#              labels = c("Map", "Key"),
+#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+# 
+# 
+# 
+# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_adrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500) 
 
 
 
@@ -1824,7 +1825,7 @@ if (uplot==T){
 FlplotClim=Flplot
 a=sd(FlplotClim$f2020,na.rm=T)
 b=sd(FlplotClim$d2020,na.rm=T)
-
+a=b=1
 databiclim=FlplotClim
 databiclim$x=databiclim$f2020/a
 databiclim$y=databiclim$d2020/b
@@ -1834,7 +1835,7 @@ hist(databiclim$y,breaks=100,xlim=c(-5,5))
 sd(databiclim$x)
 
 breaker1=0
-breaker2=0.25
+breaker2=10
 
 ### floods --------------------
 alterclass=data.frame(databiclim$x)
@@ -1865,6 +1866,7 @@ merdav=databiclim$d2020[which(databiclim$HYBAS_ID==2070016940)]
 
 a=sd(ClimFloodTrendPix$Y2020,na.rm=T)
 b=sd(ClimDroughtTrendPix$Y2020,na.rm=T)
+a=b=1
 databipic=Flpixplot
 databipic$x=ClimFloodTrendPix$Y2020/a
 databipic$y=ClimDroughtTrendPix$Y2020/b
@@ -1872,7 +1874,7 @@ databipic$y=ClimDroughtTrendPix$Y2020/b
 
 sd(databipic$x,na.rm=T)
 breaker1=0
-breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databipic$x)
 alterclass$class=NA
@@ -1895,80 +1897,87 @@ cx=paste(c2,c1,sep="-")
 
 databipic$bi_class=cx
 
+mbicli=data.frame(x=mean(databiclim$d2020,na.rm=T),y=mean(databiclim$f2020,na.rm=T),xsd=sd(databiclim$d2020,na.rm=T),ysd=sd(databiclim$f2020,na.rm=T))
 
-ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
+mbicli=data.frame(x=mean(databiclim$d2020,na.rm=T),y=mean(databiclim$f2020,na.rm=T),
+                 xq1=quantile(databiclim$d2020,0.05,na.rm=T),yq1=quantile(databiclim$f2020,0.05,na.rm=T),
+                 xq2=quantile(databiclim$d2020,0.95,na.rm=T),yq2=quantile(databiclim$f2020,0.95,na.rm=T))
 
 
 
-
-map <- ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-  geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-  geom_sf(fill=NA, color="gray42") +
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_fill_manual(values = colors) +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                       sep = " ")),
-             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-             guide = "none")+
-  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_color_manual(values = colors) +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-legend <- bi_legend(pal = colors,
-                    dim = 4,
-                    xlab = "  +  Drought changes  -  ",
-                    ylab = "  -  Flood changes  +  ",
-                    size = 16,
-                    arrows = FALSE)
-
-pl=ggarrange(map, legend, 
-             labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-
-pl
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_bvPIX.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
+# ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
+#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+#   scale_fill_manual(values = colors) +
+#   coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
+#   
+#   # Add main quadrant labels
+#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+#   
+#   # Set axis labels
+#   labs(x = "Change in drought flows (l/s/km2)", 
+#        y = "Change in flood flows (l/s/km2)") +
+#   
+#   # Customize the theme
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# 
+# map <- ggplot(basemap) +
+#   geom_sf(fill="white")+
+#   geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+#   geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+#   geom_sf(fill=NA, color="gray42") +
+#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_fill_manual(values = colors) +
+#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+#                                                                        sep = " ")),
+#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+#              guide = "none")+
+#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_color_manual(values = colors) +
+#   labs()+
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# legend <- bi_legend(pal = colors,
+#                     dim = 4,
+#                     xlab = "  +  Drought changes  -  ",
+#                     ylab = "  -  Flood changes  +  ",
+#                     size = 16,
+#                     arrows = FALSE)
+# 
+# pl=ggarrange(map, legend, 
+#              labels = c("Map", "Key"),
+#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+# 
+# pl
+# 
+# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_bvrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
 
 
 #3. LAND USE TREND --------------
@@ -2000,13 +2009,14 @@ Flplot$f2020=Flplot$Rchange.Y2020
 FlplotLu=Flplot
 a=sd(FlplotLu$f2020,na.rm=T)
 b=sd(FlplotLu$d2020,na.rm=T)
-
+a=b=1
 databilu=FlplotLu
 databilu$x=databilu$f2020/a
 databilu$y=databilu$d2020/b
 
 breaker1=0
 breaker2=0.25
+breaker2=10
 
 ### floods --------------------
 alterclass=data.frame(databilu$x)
@@ -2037,6 +2047,7 @@ luflood=LuFloodTrendPix$Y2020
 ludrought=LuDroughtTrendPix$Y2020
 a=sd(luflood,na.rm=T)
 b=sd(ludrought,na.rm=T)
+a=b=1
 databipilu=Flpixplot
 databipilu$x=luflood/a
 databipilu$y=ludrought/b
@@ -2048,6 +2059,7 @@ sd(databipilu$x,na.rm=T)
 
 breaker1=0
 breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databipilu$x)
 alterclass$class=NA
@@ -2069,6 +2081,92 @@ c2=alterclass$class
 cx=paste(c2,c1,sep="-")
 
 databipilu$bi_class=cx
+
+mbilu=data.frame(x=mean(databilu$d2020,na.rm=T),y=mean(databilu$f2020,na.rm=T),xsd=sd(databilu$d2020,na.rm=T),ysd=sd(databilu$f2020,na.rm=T))
+
+
+mbilu=data.frame(x=mean(databilu$d2020,na.rm=T),y=mean(databilu$f2020,na.rm=T),
+                  xq1=quantile(databilu$d2020,0.05,na.rm=T),yq1=quantile(databilu$f2020,0.05,na.rm=T),
+                  xq2=quantile(databilu$d2020,0.95,na.rm=T),yq2=quantile(databilu$f2020,0.95,na.rm=T))
+
+# 
+# 
+# ggplot(databilu, aes(x = d2020, y = f2020, fill = combined_category)) +
+#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+#   scale_fill_manual(values = colors) +
+#   coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
+#   geom_point(data=mbilu, aes(x = x,y = y), fill="red",color="red",size=4)+
+#   
+#   # Add main quadrant labels
+#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+#   
+#   # Set axis labels
+#   labs(x = "Change in drought flows (l/s/km2)", 
+#        y = "Change in flood flows (l/s/km2)") +
+#   
+#   # Customize the theme
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# 
+# map <- ggplot(basemap) +
+#   geom_sf(fill="white")+
+#   geom_sf(data = databilu, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+#   geom_sf(data = databipilu, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+#   geom_sf(fill=NA, color="gray42") +
+#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_fill_manual(values = colors) +
+#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+#                                                                        sep = " ")),
+#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+#              guide = "none")+
+#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_color_manual(values = colors) +
+#   labs()+
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# legend <- bi_legend(pal = colors,
+#                     dim = 4,
+#                     xlab = "  +  Drought changes  -  ",
+#                     ylab = "  -  Flood changes  +  ",
+#                     size = 16,
+#                     arrows = FALSE)
+# 
+# pl=ggarrange(map, legend, 
+#              labels = c("Map", "Key"),
+#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+# 
+# pl
+# 
+# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/luchange_bvrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
+# 
+
 
 #4. RESERVOIR trend --------------
 
@@ -2099,12 +2197,14 @@ Flplot$f2020=Flplot$Rchange.Y2020
 FlplotRes=Flplot
 a=sd(FlplotRes$f2020,na.rm=T)
 b=sd(FlplotRes$d2020,na.rm=T)
+a=b=1
 databire=FlplotRes
 databire$x=databire$f2020/a
 databire$y=databire$d2020/b
 
 breaker1=0
 breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databire$x)
 alterclass$class=NA
@@ -2135,6 +2235,7 @@ crsiflood=ResFloodTrendPix$Y2020
 crsidrought=ResDroughtTrendPix$Y2020
 a=sd(crsiflood,na.rm=T)
 b=sd(crsidrought,na.rm=T)
+a=b=1
 databipire=Flpixplot
 databipire$x=crsiflood/a
 databipire$y=crsidrought/b
@@ -2146,6 +2247,7 @@ sd(databipire$x,na.rm=T)
 
 breaker1=0
 breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databipire$x)
 alterclass$class=NA
@@ -2168,11 +2270,14 @@ cx=paste(c2,c1,sep="-")
 
 databipire$bi_class=cx
 
+mbires=data.frame(x=mean(databire$d2020,na.rm=T),y=mean(databire$f2020,na.rm=T),
+                  xq1=quantile(databire$d2020,0.05,na.rm=T),yq1=quantile(databire$f2020,0.05,na.rm=T),
+                  xq2=quantile(databire$d2020,0.95,na.rm=T),yq2=quantile(databire$f2020,0.95,na.rm=T))
+
 
 #5. Water Demand signal ------------------
 
 
-# Set up the Reservoir
 WaterDemandFloodTrend=FloodTrends[which(FloodTrends$driver==driver[4]),c(2:71)]
 WaterDemandDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2:71)]
 WaterDemandFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[4]),1]
@@ -2199,14 +2304,14 @@ Flplot$f2020=Flplot$Rchange.Y2020
 FlplotWD=Flplot
 a=sd(FlplotWD$f2020,na.rm=T)
 b=sd(FlplotWD$d2020,na.rm=T)
-
+a=b=1
 databiwd=FlplotWD
 databiwd$x=databiwd$f2020/a
 databiwd$y=databiwd$d2020/b
 
 breaker1=0
 breaker2=0.25
-
+breaker2=10
 alterclass=data.frame(databiwd$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2236,6 +2341,7 @@ crsiflood=WuFloodTrendPix$Y2020
 crsidrought=WuDroughtTrendPix$Y2020
 a=sd(crsiflood,na.rm=T)
 b=sd(crsidrought,na.rm=T)
+a=b=1
 databipiwd=Flpixplot
 databipiwd$x=crsiflood/a
 databipiwd$y=crsidrought/b
@@ -2247,6 +2353,7 @@ sd(databipiwd$x,na.rm=T)
 
 breaker1=0
 breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databipiwd$x)
 alterclass$class=NA
@@ -2269,6 +2376,217 @@ cx=paste(c2,c1,sep="-")
 
 databipiwd$bi_class=cx
 
+#mbiwd=data.frame(x=mean(databiwd$d2020,na.rm=T),y=mean(databiwd$f2020,na.rm=T),xsd=sd(databiwd$d2020,na.rm=T),ysd=sd(databiwd$f2020,na.rm=T))
+
+
+mbiwd=data.frame(x=mean(databiwd$d2020,na.rm=T),y=mean(databiwd$f2020,na.rm=T),
+                  xq1=quantile(databiwd$d2020,0.05,na.rm=T),yq1=quantile(databiwd$f2020,0.05,na.rm=T),
+                  xq2=quantile(databiwd$d2020,0.95,na.rm=T),yq2=quantile(databiwd$f2020,0.95,na.rm=T))
+
+
+# Bivariate plots of mean contribution ----------------------
+
+
+
+biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
+biogeof=fortify(biogeo)
+st_geometry(biogeof)<-NULL
+biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
+Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
+biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
+biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
+biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
+
+
+#matching biogeoregions and hybas07
+databiwdxBG=inner_join(biogeo_rivers,databipiwd,by=c("outl2"))
+databiluxBG=inner_join(biogeo_rivers,databipilu,by=c("outl2"))
+databiclixBG=inner_join(biogeo_rivers,databipic,by=c("outl2"))
+databiresxBG=inner_join(biogeo_rivers,databipire,by=c("outl2"))
+
+
+
+
+
+mbf=rbind(mbicli,mbires,mbilu,mbiwd)
+mbf$names=c('Climate',
+            'Reservoirs',
+            'Landuse',
+            'WaterDemand')
+# mbf$lbx=mbf$x-mbf$xsd
+# mbf$hbx=mbf$x+mbf$xsd
+# mbf$lby=mbf$y-mbf$ysd
+# mbf$hby=mbf$x+mbf$ysd
+
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
+clabels=c("Climate","Land use","Reservoirs", "Water demand")
+colorn = c("WaterDemand" ='limegreen',"Reservoirs" ='tomato4',"Landuse" ='orange',"Climate" ='royalblue')
+tsize=osize=20
+bpc=ggplot(mbf, aes(x = x, y = y, fill = names)) +
+  geom_linerange(data=mbf,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=1,alpha=0.8) +
+  geom_linerange(data=mbf,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=1,alpha=0.8) +
+  geom_point(shape = 21, color = "black", size = 5, show.legend = TRUE) +
+  scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
+  scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
+  coord_cartesian(xlim=c(-100,100),ylim=c(-50,50)) +
+  annotate("text", x = 50, y = 20, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
+  annotate("text", x = -50, y = 20, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
+  annotate("text", x = -50, y = -20, label = "Drying", color = "#dd6a29", size = 7, fontface = "bold") +
+  annotate("text", x = 50, y = -20, label = "Decelerating", color = "burlywood", size = 7, fontface = "bold") +
+  labs(x = "Change in drought (%)", 
+       y = "Change in flood (%)") +
+  scale_x_continuous(trans=scales::modulus_trans(.5),
+                     breaks=seq(-100,100,50),
+                     minor_breaks = seq(-100,100,10)) +
+  scale_y_continuous(trans=scales::modulus_trans(.5),
+                     breaks=seq(-100,100,25),
+                     minor_breaks = seq(-100,100,10)) +
+  guides( fill = guide_legend(override.aes = list(size = 6)))+
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    #legend.key = element_rect(fill = "lightgray", colour = "lightgray"),
+    legend.position = "right",
+    panel.grid.major = element_line(colour = "grey60"),
+    panel.grid.minor= element_line(colour = "grey70", linetype = "dashed"),
+    #legend.key = element_rect(fill = "white", colour = "white"),
+    #legend.key.size = unit(1, "cm")
+  )
+
+bpc
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_bv.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+
+
+
+mbiwd1=aggregate(list(val=databiwdxBG$y.y),
+                 by = list(bg=databiwdxBG$code),
+                 FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T)))
+mbiwd1 <- do.call(data.frame, mbiwd1)
+
+mbicli1=aggregate(list(val=databiclixBG$y.y),
+                  by = list(bg=databiclixBG$code),
+                  FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T)))
+mbicli1 <- do.call(data.frame, mbicli1)
+
+mbires1=aggregate(list(val=databiresxBG$y.y),
+                  by = list(bg=databiresxBG$code),
+                  FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T)))
+mbires1 <- do.call(data.frame, mbires1)
+
+mbilu1=aggregate(list(val=databiluxBG$y.y),
+                 by = list(bg=databiluxBG$code),
+                 FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T)))
+mbilu1 <- do.call(data.frame, mbilu1)
+
+
+
+mbiwd2=aggregate(list(val=databiwdxBG$x.y),
+                 by = list(bg=databiwdxBG$code),
+                 FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T)))
+mbiwd2 <- do.call(data.frame, mbiwd2)
+
+mbicli2=aggregate(list(val=databiclixBG$x.y),
+                  by = list(bg=databiclixBG$code),
+                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T)))
+mbicli2 <- do.call(data.frame, mbicli2)
+
+mbires2=aggregate(list(val=databiresxBG$x.y),
+                  by = list(bg=databiresxBG$code),
+                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T)))
+mbires2 <- do.call(data.frame, mbires2)
+
+mbilu2=aggregate(list(val=databiluxBG$x.y),
+                 by = list(bg=databiluxBG$code),
+                 FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T)))
+mbilu2 <- do.call(data.frame, mbilu2)
+
+
+mbiwd3=inner_join(mbiwd1,mbiwd2,by="bg")
+mbires3=inner_join(mbires1,mbires2,by="bg")
+mbilu3=inner_join(mbilu1,mbilu2,by="bg")
+mbicli3=inner_join(mbicli1,mbicli2,by="bg")
+
+
+
+
+mbfX=rbind(mbicli3,mbires3,mbilu3,mbiwd3)
+mbfX$names=c(rep('Climate',9),
+            rep('Reservoirs',9),
+            rep('Landuse',9),
+            rep('WaterDemand',9))
+# mbf$lbx=mbf$x-mbf$xsd
+# mbf$hbx=mbf$x+mbf$xsd
+# mbf$lby=mbf$y-mbf$ysd
+# mbf$hby=mbf$x+mbf$ysd
+
+breg=unique(mbfX$bg)
+breg=breg[c(1,3,5,6,7)]
+mbk=which(!is.na(match(mbfX$bg,breg)))
+mbfX=mbfX[mbk,]
+mbfX$xl=((mbfX$xq2-mbfX$xq1)+(mbfX$yq2-mbfX$yq1))/2
+colnames(mbfX)[c(2:7)]=c("x","xq1","xq2","y","yq1","yq2")
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
+clabels=c("Climate","Land use","Reservoirs", "Water demand")
+colorn = c("WaterDemand" ='limegreen',"Reservoirs" ='tomato4',"Landuse" ='orange',"Climate" ='royalblue')
+shapex=c("Alpine"=0,"Atlantic"=1,"Boreal"=2, "Continental"=3,"Mediterranean"=4)
+tsize=osize=20
+bpc=ggplot() +
+  geom_linerange(data=mbf,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
+  geom_linerange(data=mbf,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
+  geom_point(data=mbf, aes(x = x, y = y, fill = names), shape = 21, color = "black", size = 5, show.legend = FALSE) +
+  geom_point(data=mbfX, aes(x = x, y = y, color = names,shape = bg, size=xl), show.legend = TRUE, stroke=2) +
+  scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
+  scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
+  scale_shape_manual(values = shapex, name = "Regions") +
+  scale_size(range = c(.5, 12))+
+  coord_cartesian(xlim=c(-60,100),ylim=c(-60,60)) +
+  annotate("text", x = 50, y = 20, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
+  annotate("text", x = -20, y = 20, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
+  annotate("text", x = -20, y = -20, label = "Drying", color = "#dd6a29", size = 7, fontface = "bold") +
+  annotate("text", x = 50, y = -20, label = "Decelerating", color = "burlywood", size = 7, fontface = "bold") +
+  labs(x = "Change in drought (%)", 
+       y = "Change in flood (%)") +
+  scale_x_continuous(trans=scales::modulus_trans(.5),
+                     breaks=c(-200,-100,-50,-10,0,10,50,100,200),
+                     minor_breaks = seq(-100,100,10)) +
+  scale_y_continuous(trans=scales::modulus_trans(.5),
+                     breaks=c(-200,-100,-50,-10,0,10,50,100,200),
+                     minor_breaks = seq(-100,100,10), expand = c(0,0)) +
+  guides( fill = guide_legend(override.aes = list(size = 6)),size="none")+
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    #legend.key = element_rect(fill = "lightgray", colour = "lightgray"),
+    legend.position = "right",
+    panel.grid.major = element_line(colour = "grey60"),
+    panel.grid.minor= element_line(colour = "grey70", linetype = "dashed"),
+    #legend.key = element_rect(fill = "white", colour = "white"),
+    #legend.key.size = unit(1, "cm")
+  )
+
+bpc
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_bv2.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+
+
+
+
+
+
+
+
+
 
 # Combination of drivers ------------------------
 databicr=databiclim
@@ -2276,11 +2594,11 @@ databicr$x= databire$x + databiclim$x
 databicr$y= databire$y + databiclim$y
 
 
-hist(databicr$x,breaks=100,xlim=c(-5,5))
+hist(databire$x,breaks=100,xlim=c(-50,50))
 hist(databicr$y,breaks=100,xlim=c(-5,5))
 
 breaker1=0
-breaker2=0.25
+breaker2=10
 
 alterclass=data.frame(databicr$x)
 alterclass$class=NA
@@ -2303,36 +2621,36 @@ databicr$bi_class=cx
 # Combine the main category and subcategory to make a label
 databicr$combined_category <-databicr$bi_class
 
-
-ggplot(databicr, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
+# 
+# ggplot(databicr, aes(x = d2020, y = f2020, fill = combined_category)) +
+#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+#   scale_fill_manual(values = colors) +
+#   coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
+#   
+#   # Add main quadrant labels
+#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+#   
+#   # Set axis labels
+#   labs(x = "Change in drought flows (l/s/km2)", 
+#        y = "Change in flood flows (l/s/km2)") +
+#   
+#   # Customize the theme
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
 
 
 databicrl=databiclim
@@ -2344,8 +2662,8 @@ databicrl$y=databilu$y + databire$y + databiclim$y
 hist(databicrl$x,breaks=100,xlim=c(-5,5))
 hist(databicrl$y,breaks=100,xlim=c(-5,5))
 
-breaker1=0
-breaker2=0.25
+# breaker1=0
+# breaker2=10
 
 alterclass=data.frame(databicrl$x)
 alterclass$class=NA
@@ -2374,9 +2692,8 @@ databipicr$x= databipire$x + databipic$x
 databipicr$y= databipire$y + databipic$y
 
 
-
-breaker1=0
-breaker2=0.25
+# breaker1=0
+# breaker2=0.25
 
 alterclass=data.frame(databipicr$x)
 alterclass$class=NA
@@ -2405,8 +2722,8 @@ databipicrl=databipic
 databipicrl$x=databipilu$x + databipire$x + databipic$x
 databipicrl$y=databipilu$y + databipire$y + databipic$y
 
-breaker1=0
-breaker2=0.25
+# breaker1=0
+# breaker2=0.25
 
 alterclass=data.frame(databipicrl$x)
 alterclass$class=NA
@@ -2430,87 +2747,87 @@ databipicrl$combined_category <-databipicrl$bi_class
 
 
 # Some plots here --------------
-
-
-ggplot(databicrl, aes(x = d2020, y = f2020, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
-  
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-  
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)", 
-       y = "Change in flood flows (l/s/km2)") +
-  
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-
-
-colNA="grey"
-map <- ggplot(basemap) +
-  geom_sf(fill="white")+
-  geom_sf(data = databicrl, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
-  geom_sf(fill=NA, color="gray42") +
-  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_fill_manual(values = colors) +
-  labs()+
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-map
-
-
-
-
-bi_pal(pal = colors, dim = 4)
-
-legend <- bi_legend(pal = colors,
-                    dim = 4,
-                    xlab = "  +  Drought changes  -  ",
-                    ylab = "  -  Flood changes  +  ",
-                    size = 16,
-                    arrows = FALSE)
-
-legend
-
-# combine map with legend
-# finalPlot <- ggdraw() +
-#   draw_plot(map, 0, 0, 1, 1) +
-#   draw_plot(legend, 0.7, .65, 0.2, 0.2)
 # 
-# finalPlot
-
-pl=ggarrange(map, legend, 
-             labels = c("Map", "Key"),
-             ncol = 2, nrow = 1,widths = c(2,1), heights=c(2,1), vjust=-1)
-pl
+# 
+# ggplot(databicrl, aes(x = d2020, y = f2020, fill = combined_category)) +
+#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+#   scale_fill_manual(values = colors) +
+#   coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
+#   
+#   # Add main quadrant labels
+#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+#   
+#   # Set axis labels
+#   labs(x = "Change in drought flows (l/s/km2)", 
+#        y = "Change in flood flows (l/s/km2)") +
+#   
+#   # Customize the theme
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# 
+# 
+# 
+# 
+# colNA="grey"
+# map <- ggplot(basemap) +
+#   geom_sf(fill="white")+
+#   geom_sf(data = databicrl, mapping = aes(fill = combined_category), alpha=0.9, color = "transparent", size = 0.01,show.legend = F) +
+#   geom_sf(fill=NA, color="gray42") +
+#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+#   scale_fill_manual(values = colors) +
+#   labs()+
+#   theme(axis.title=element_text(size=tsize),
+#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+#         legend.title = element_text(size=tsize),
+#         legend.text = element_text(size=osize),
+#         legend.position = "bottom",
+#         panel.grid.major = element_line(colour = "grey70"),
+#         panel.grid.minor = element_line(colour = "grey90"),
+#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
+#         legend.key.size = unit(.8, "cm"))
+# 
+# map
+# 
+# 
+# 
+# 
+# bi_pal(pal = colors, dim = 4)
+# 
+# legend <- bi_legend(pal = colors,
+#                     dim = 4,
+#                     xlab = "  +  Drought changes  -  ",
+#                     ylab = "  -  Flood changes  +  ",
+#                     size = 16,
+#                     arrows = FALSE)
+# 
+# legend
+# 
+# # combine map with legend
+# # finalPlot <- ggdraw() +
+# #   draw_plot(map, 0, 0, 1, 1) +
+# #   draw_plot(legend, 0.7, .65, 0.2, 0.2)
+# # 
+# # finalPlot
+# 
+# pl=ggarrange(map, legend, 
+#              labels = c("Map", "Key"),
+#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(2,1), vjust=-1)
+# pl
 
 
 
@@ -2670,7 +2987,7 @@ pl=pl + scale_fill_manual(values = loscolors) +
 pl
 
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_cat.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_catNew.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
 
 mean_lf=c(mean(databitot$d2020,na.rm=T),mean(databiclim$d2020,na.rm=T),mean(databicr$d2020,na.rm=T),mean(databicrl$d2020,na.rm=T))
 mean_scen=data.frame()
@@ -2687,7 +3004,7 @@ ggplot() +
   #gg_bagplot(data=databicrl, d2020, f2020, color = "#00659e", scatterplot = FALSE)
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   #scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-2,2),ylim=c(-50,50)) +
+  coord_cartesian(xlim=c(-100,100),ylim=c(-50,50)) +
   
   # Add main quadrant labels
   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
@@ -2801,8 +3118,10 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bvHydro_tot
 
 ####### SANKEY for pixels #################
 
-
-
+mean(databipi$x,na.rm=T)
+mean(databipic$y,na.rm=T)
+mean(databipire$y,na.rm=T)
+mean(databipicrl$x,na.rm=T)
 #Sankey diagram of transers between classes
 databipi=databipi[-which(is.na(databipicrl$x)),]
 databipic=databipic[-which(is.na(databipicrl$x)),]
@@ -2960,17 +3279,17 @@ pl=pl + scale_fill_manual(values = loscolors) +
 pl
 
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixels.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixelsNew.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
 
 
 # part with barplots ------------------
 #barplot of contribution by driver for each category
 ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2020,LuFloodTrendPix$Y2020,WuFloodTrendPix$Y2020)
 ptnnn=FloodTrends
-mx=(match(FloodTrends$outl2,ptnnn$outl2))
+mx=(match(FloodTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 
-fagg =aggregate(list(val=dt_acc$Y2020),
+fagg = aggregate(list(val=dt_acc$Y2020),
                        by = list(Group=dt_acc$AllDrivers,driver=dt_acc$driver),
                        FUN = function(x) c(mean2=mean(x,na.rm=T),dev2=sd(x,na.rm=T),len2=length(x),median2=quantile(x,0.5,na.rm=T)))
 fagg <- do.call(data.frame, fagg)
@@ -3079,6 +3398,8 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/change_by_c
 
 #redo this plot by Biogeoregions
 
+mean(FloodTrendsP$Y2020[which(driver==driver[3])])
+
 biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
 biogeof=fortify(biogeo)
 st_geometry(biogeof)<-NULL
@@ -3095,22 +3416,26 @@ bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
 
 #barplot of contribution by driver for each category
 ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2020,LuFloodTrendPix$Y2020,WuFloodTrendPix$Y2020)
-ptnnn=FloodTrends
-mx=(match(FloodTrends$outl2,ptnnn$outl2))
+ptnnn=FloodTrendsP
+mx=(match(FloodTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
-
+# bio_acc$Y2020[which(bio_acc$Y2020==0)]=NA
 fagg =aggregate(list(val=bio_acc$Y2020),
                 by = list(Group=bio_acc$code,driver=bio_acc$driver),
                 FUN = function(x) c(mean2=mean(x,na.rm=T),dev2=sd(x,na.rm=T),len2=length(x),median2=quantile(x,0.5,na.rm=T)))
 fagg <- do.call(data.frame, fagg)
 
 
-ptnnn=DroughtTrends
-mx=(match(DroughtTrends$outl2,ptnnn$outl2))
+ptnnn=DroughtTrendsP
+mx=(match(DroughtTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
-
+#put a limit to max change: 1000
+bio_acc$Y2020[which(bio_acc$Y2020>200)]=200
+#or 
+#bio_acc$Y2020[which(bio_acc$Y2020==0)]=NA
+#bio_acc$Y2020[which(bio_acc$Y2020<(-200))]=200
 dagg =aggregate(list(val=bio_acc$Y2020),
                 by = list(Group=bio_acc$code,driver=bio_acc$driver),
                 FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),median=quantile(x,0.5,na.rm=T)))
@@ -3128,6 +3453,8 @@ for (f in 1:6){
   tfchange=sum(abs(sel$val.mean2))
   sel$rvd=(abs(sel$val.mean))/tdchange*100
   sel$rvf=(abs(sel$val.mean2))/tfchange*100
+  # sel$rvd=(abs(sel$val.mean))
+  # sel$rvf=(abs(sel$val.mean2))
   sel_agg=rbind(sel_agg,sel)
   tfsav=c(tfsav,tfchange)
   tdsav=c(tdsav,tdchange)
@@ -3148,9 +3475,9 @@ saveplot=list()
 for (idg in 1:6){
   #idg=6
   sel_aggp=sel_agg[which(sel_agg$Group==grp[idg]),]
-  f_sel=round(fdagg$val.mean2[which(fdagg$Group==grp[idg] & fdagg$driver=="Total")],2)
+  f_sel=round(fdagg$val.mean2[which(fdagg$Group==grp[idg] & fdagg$driver=="Total")],1)
   if (f_sel>0) f_sel=paste0("+",f_sel)
-  d_sel=round(fdagg$val.mean[which(fdagg$Group==grp[idg] & fdagg$driver=="Total")],2)
+  d_sel=round(fdagg$val.mean[which(fdagg$Group==grp[idg] & fdagg$driver=="Total")],1)
   if (d_sel>0) d_sel=paste0("+",d_sel)
   # Customize the barplot
   saveplot[[idg]]<-ggplot() +
@@ -3163,11 +3490,11 @@ for (idg in 1:6){
       colors=paletf,
       breaks=c(-100,100),labels=c(" - "," + "),limits=c(-100,100),trans=scales::modulus_trans(.2),
       oob = scales::squish,na.value=colNA, name="Change \nMagnitude") +
-    annotate("text", x = 3.6, y = 80, label = paste0(f_sel," l/s/km2"), color = "black", size = 5, fontface = "bold") +
-    annotate("text", x = 3.6, y = -80, label = paste0(d_sel," l/s/km2"), color = "black", size = 5, fontface = "bold") +
+    annotate("text", x = 3.6, y = 80, label = paste0(f_sel," %"), color = "black", size = 5, fontface = "bold") +
+    annotate("text", x = 3.6, y = -80, label = paste0(d_sel," %"), color = "black", size = 5, fontface = "bold") +
     scale_y_continuous(
       expand = c(0,0),
-      name = "share of change contribution (%)",
+      name = "change contribution (%)",
       breaks=seq(-100,100,100),
       labels=c(100,0,100),
       minor_breaks = seq(-2000,2000,10),
@@ -3207,7 +3534,7 @@ for (idg in 1:6){
   
 }
 
-saveplot[[2]]
+saveplot[[6]]
 
 plf=ggarrange(saveplot[[1]], saveplot[[2]], saveplot[[3]],
               saveplot[[4]],saveplot[[5]],saveplot[[6]],
@@ -3215,7 +3542,7 @@ plf=ggarrange(saveplot[[1]], saveplot[[2]], saveplot[[3]],
 
 plf
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/change_by_biogeoregion.jpg"), plf, width=30, height=40, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/change_by_biogeoregion_200.jpg"), plf, width=30, height=40, units=c("cm"),dpi=300) 
 
 
 
