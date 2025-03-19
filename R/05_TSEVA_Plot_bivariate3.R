@@ -422,7 +422,7 @@ plotTrendSipix=function(basemap,datar,period=c(1950,2020),hybasf,valuenames,nco)
   #aggregate by hybas07 catchment
   
   pointagg=aggregate(list(Rchange=data[,valcol]),
-                     by = list(HYBAS_ID=data$outlets),
+                     by = list(Id=data$outlets),
                      FUN = function(x) c(mean=mean(x)))
   pointagg <- do.call(data.frame, pointagg)
   
@@ -1415,14 +1415,14 @@ if (!exists("outf")){
 #load results from previous script 
 
 #floods
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_rel.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_new.Rdata"))
 #droughts
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_rel.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_new2.Rdata"))
 #I extract the trend at MUTS3 level fist
 
 FloodTrends=Output_fl_year$TrendRegio
 
-Output_dr_nonfrost=Output_dr_year
+#Output_dr_nonfrost=Output_dr_year
 DroughtTrends=Output_dr_nonfrost$TrendRegio
 
 driver=unique(FloodTrends$driver)
@@ -1459,11 +1459,22 @@ UnHY=unique(GNF$HYBAS_ID)
 GridHR=raster( paste0(hydroDir,"/HydroRegions_raster_WGS84.tif"))
 GHR=as.data.frame(GridHR,xy=T)
 GHR=GHR[which(!is.na(GHR[,3])),]
+a1=(unique(GHR$HydroRegions_raster_WGS84))
 GHR$llcoord=paste(round(GHR$x,4),round(GHR$y,4),sep=" ")
 GHR_riv=inner_join(GHR,outf,by= c("llcoord"="latlong"))
-GHshpp <- read_sf(dsn ="Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted.shp")
-HydroRsf=fortify(GHshpp)
+a2=(unique(GHR_riv$HydroRegions_raster_WGS84))
 
+ups=which(is.na(match(a1,a2)))
+mierda=a1[ups]
+GHshpp <- read_sf(dsn ="Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted_cor.shp")
+HydroRsf=fortify(GHshpp)
+length(unique(GHshpp$IRST_NAMEB))
+
+#correction of the Baltic shield
+# GHshppCor=GHshpp[which(GHshpp$IRST_NAMEB=="BALTIC SHIELD"),]
+# GHshppCor$IRST_NAMEB=c("FINLAND BALTIC COAST SOUTH","FINLAND BALTIC COAST SOUTH","FINLAND NORTH","FINLAND BALTIC COAST NORTH","FINLAND BALTIC COAST CENTRAL","FINLAND CENTRAL")
+# GHshpp$IRST_NAMEB[which(GHshpp$IRST_NAMEB=="BALTIC SHIELD")]=c("FINLAND BALTIC COAST SOUTH","FINLAND BALTIC COAST SOUTH","FINLAND NORTH","FINLAND BALTIC COAST NORTH","FINLAND BALTIC COAST CENTRAL","FINLAND CENTRAL")
+# st_write(GHshpp,"Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted_cor.shp")
 
 ### Plot parameters ----
 palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
@@ -1496,17 +1507,17 @@ TotalDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[5]),c(2:71)]
 TotalFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 TotalDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-FlPoint=inner_join(hybas07,TotalFloodTrend,by=c("HYBAS_ID"="HydroR"))
+FlPoint=inner_join(GHshpp,TotalFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
-DrPoint=inner_join(hybas07,TotalDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+DrPoint=inner_join(GHshpp,TotalDroughtTrend,by=c("CODEB"="HydroR"))
 
 st_geometry(DrPoint)<-NULL
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
@@ -1558,7 +1569,7 @@ databitot$x=databitot$f2020/a
 databitot$y=databitot$d2020/b
 
 breaker1=0
-breaker2=10
+breaker2=5
 
 ### flood -----------------
 alterclass=data.frame(databitot$x)
@@ -1602,6 +1613,23 @@ ResDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[3]),]
 WuFloodTrendPix=FloodTrendsP[which(FloodTrendsP$driver==driver[4]),]
 WuDroughtTrendPix=DroughtTrendsP[which(DroughtTrendsP$driver==driver[4]),]
 
+# Remove NA rows 
+TotalFloodTrendPix = TotalFloodTrendPix[which(!is.na(TotalFloodTrendPix$Var1)),]
+TotalDroughtTrendPix = TotalDroughtTrendPix[which(!is.na(TotalDroughtTrendPix$Var1)),]
+
+ClimFloodTrendPix = ClimFloodTrendPix[which(!is.na(ClimFloodTrendPix$Var1)),]
+ClimDroughtTrendPix = ClimDroughtTrendPix[which(!is.na(ClimDroughtTrendPix$Var1)),]
+
+LuFloodTrendPix = LuFloodTrendPix[which(!is.na(LuFloodTrendPix$Var1)),]
+LuDroughtTrendPix = LuDroughtTrendPix[which(!is.na(LuDroughtTrendPix$Var1)),]
+
+ResFloodTrendPix = ResFloodTrendPix[which(!is.na(ResFloodTrendPix$Var1)),]
+ResDroughtTrendPix = ResDroughtTrendPix[which(!is.na(ResDroughtTrendPix$Var1)),]
+
+WuFloodTrendPix = WuFloodTrendPix[which(!is.na(WuFloodTrendPix$Var1)),]
+WuDroughtTrendPix = WuDroughtTrendPix[which(!is.na(WuDroughtTrendPix$Var1)),]
+
+
 points <- st_as_sf(TotalFloodTrendPix, coords = c("Var1", "Var2"), crs = 4326)
 points <- st_transform(points, crs = 3035)
 Flpixplot=points
@@ -1617,7 +1645,7 @@ databipi$y=databipi$d2020/b
 
 
 breaker1=0
-breaker2=10
+breaker2=5
 
 ### floods --------------------
 alterclass=data.frame(databipi$x)
@@ -1666,6 +1694,29 @@ colors <- c(
 )
 
 
+colorp <- c(
+  "1-1" = "#dd6a40",  # high x, low y
+  "2-1" = "#d9926a",  # medium-high x, low y
+  "3-1" = "#DEB887",  # medium-low x, low y
+  "4-1" = "#FFD39B",  # low x, low y
+  
+  "1-2" = "#a36229",  # high x, medium-low y
+  "2-2" = "#999999",  # medium-high x, medium-low y
+  "3-2" = "#999999",  # medium-low x, medium-low y
+  "4-2" = "#9cc4d2",  # low x, medium-low y
+  
+  "1-3" = "#635929",  # high x, medium-high y
+  "2-3" = "#999999",  # medium-high x, medium-high y
+  "3-3" = "#999999",  # medium-low x, medium-high y
+  "4-3" = "#5fb2d1",  # low x, medium-high y
+  
+  "1-4" = "#174f28",  # high x, high y
+  "2-4" = "#166d68",  # medium-high x, high y
+  "3-4" = "#16869e",  # medium-low x, high y
+  "4-4" = "#169dd0"  # low x, high y
+  
+)
+
 colors2 <- c(
   "1-1" = "#dd6a29",  # high x, low y
   "2-1" = "#dd6a29",  # medium-high x, low y
@@ -1694,78 +1745,78 @@ loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","W
 bi_pal(pal = colors, dim = 4)
 #colors=(c("#dd6a29","#169dd0","#7ebbd2","#d3d3d3","#167984","#174f28","#845e29","#819185","#d8a386"))
 
-# 
-# ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
-#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-#   scale_fill_manual(values = colors) +
-#   coord_cartesian(xlim=c(-200,200),ylim=c(-200,200)) +
-#   
-#   # Add main quadrant labels
-#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-#   
-#   # Set axis labels
-#   labs(x = "Change in drought flows (l/s/km2)", 
-#        y = "Change in flood flows (l/s/km2)") +
-#   
-#   # Customize the theme
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# map <- ggplot(basemap) +
-#   geom_sf(fill="white")+
-#   geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-#   geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-#   geom_sf(fill=NA, color="gray42") +
-#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_fill_manual(values = colors) +
-#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-#                                                                        sep = " ")),
-#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-#              guide = "none")+
-#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_color_manual(values = colors) +
-#   labs()+
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# 
-# legend <- bi_legend(pal = colors,
-#                     dim = 4,
-#                     xlab = "  +  Drought changes  -  ",
-#                     ylab = "  -  Flood changes  +  ",
-#                     size = 16,
-#                     arrows = FALSE)
-# 
-# pl=ggarrange(map, legend, 
-#              labels = c("Map", "Key"),
-#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-# 
-# 
-# 
-# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_adrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500) 
+
+ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
+  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+  scale_fill_manual(values = colorp) +
+  coord_cartesian(xlim=c(-50,50),ylim=c(-50,50)) +
+
+  # Add main quadrant labels
+  annotate("text", x = 18, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -18, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -18, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = 18, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+
+  # Set axis labels
+  labs(x = "Change in drought flows (l/s/km2)",
+       y = "Change in flood flows (l/s/km2)") +
+
+  # Customize the theme
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "transparent", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+  geom_sf(fill=NA, color="gray42") +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_fill_manual(values = colorp) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_color_manual(values = colorp) +
+  labs()+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+legend <- bi_legend(pal = colorp,
+                    dim = 4,
+                    xlab = "  +  Drought intensity  -  ",
+                    ylab = "  -  Flood intensity  +  ",
+                    size = 16,
+                    arrows = FALSE)
+
+pl=ggarrange(map, legend,
+             labels = c("Map", "Key"),
+             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+
+
+pl
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_HR_n3.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500)
 
 
 
@@ -1778,21 +1829,22 @@ ClimateFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 ClimateDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
 
-FlPoint=inner_join(hybas07,ClimateFloodTrend,by=c("HYBAS_ID"="HydroR"))
+FlPoint=full_join(GHshpp,ClimateFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
 
-DrPoint=inner_join(hybas07,ClimateDroughtTrend,by=c("HYBAS_ID"="HydroR"))
-#st_geometry(DrPoint)<-NULL
+DrPoint=full_join(GHshpp,ClimateDroughtTrend,by=c("CODEB"="HydroR"))
+st_geometry(DrPoint)<-NULL
 period=c(1951,2020)
 haz="flood"
-Drplot <- st_transform(DrPoint, crs = 3035)
+#Drplot <- st_transform(DrPoint, crs = 3035)
+Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 
-mv=match(Drplot$HYBAS_ID,Flplot$HYBAS_ID)
+mv=match(Drplot$Id,Flplot$Id)
 plot(diff(mv))
 Flplot$d2020=Drplot$Rchange.Y2020
 Flplot$f2020=Flplot$Rchange.Y2020
@@ -1802,15 +1854,15 @@ colNA="transparent"
 # legend="Relative change (%)"
 tsize=16
 osize=12
-legend="Change in Qsp \n(l/s/km2)"
+legend="Change in Q (%)"
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 
 uplot=F
 
 if (uplot==T){
-  br=seq(-100,100,.1)
+  br=seq(-100,100,2)
   labels=br
-  limi=c(-.5,.5)
+  limi=c(-20,20)
   ggplot(basemap) +
     geom_sf(fill="white")+
     geom_sf(data = Flplot, mapping = aes(fill = d2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
@@ -1847,7 +1899,7 @@ hist(databiclim$y,breaks=100,xlim=c(-5,5))
 sd(databiclim$x)
 
 breaker1=0
-breaker2=10
+breaker2=5
 
 ### floods --------------------
 alterclass=data.frame(databiclim$x)
@@ -1873,7 +1925,7 @@ databiclim$bi_class=cx
 databiclim$combined_category <-databiclim$bi_class
 
 merdas=ClimateDroughtTrend$Rchange.Y2020[which(ClimateDroughtTrend$HydroR==2070016940)]
-merdav=databiclim$d2020[which(databiclim$HYBAS_ID==2070016940)]
+merdav=databiclim$d2020[which(databiclim$Id==2070016940)]
 ## Pixel level --------------
 
 a=sd(ClimFloodTrendPix$Y2020,na.rm=T)
@@ -1886,7 +1938,7 @@ databipic$y=ClimDroughtTrendPix$Y2020/b
 
 sd(databipic$x,na.rm=T)
 breaker1=0
-breaker2=10
+breaker2=5
 
 alterclass=data.frame(databipic$x)
 alterclass$class=NA
@@ -1917,79 +1969,79 @@ mbicli=data.frame(x=mean(databiclim$d2020,na.rm=T),y=mean(databiclim$f2020,na.rm
 
 
 
-# ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
-#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-#   scale_fill_manual(values = colors) +
-#   coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
-#   
-#   # Add main quadrant labels
-#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-#   
-#   # Set axis labels
-#   labs(x = "Change in drought flows (l/s/km2)", 
-#        y = "Change in flood flows (l/s/km2)") +
-#   
-#   # Customize the theme
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# 
-# 
-# map <- ggplot(basemap) +
-#   geom_sf(fill="white")+
-#   geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-#   geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-#   geom_sf(fill=NA, color="gray42") +
-#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_fill_manual(values = colors) +
-#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-#                                                                        sep = " ")),
-#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-#              guide = "none")+
-#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_color_manual(values = colors) +
-#   labs()+
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# 
-# legend <- bi_legend(pal = colors,
-#                     dim = 4,
-#                     xlab = "  +  Drought changes  -  ",
-#                     ylab = "  -  Flood changes  +  ",
-#                     size = 16,
-#                     arrows = FALSE)
-# 
-# pl=ggarrange(map, legend, 
-#              labels = c("Map", "Key"),
-#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-# 
-# pl
-# 
-# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_bvrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
+ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
+  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
+  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
+  scale_fill_manual(values = colors) +
+  coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
+
+  # Add main quadrant labels
+  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
+  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
+
+  # Set axis labels
+  labs(x = "Change in drought flows (l/s/km2)",
+       y = "Change in flood flows (l/s/km2)") +
+
+  # Customize the theme
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "transparent", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+  geom_sf(fill=NA, color="gray42") +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_fill_manual(values = colorp) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_color_manual(values = colorp, na.value=NA) +
+  labs()+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+legend <- bi_legend(pal = colorp,
+                    dim = 4,
+                    xlab = "  -  Drought flows  +  ",
+                    ylab = "  -  Flood flows  +  ",
+                    size = 16,
+                    arrows = FALSE)
+
+pl=ggarrange(map, legend,
+             labels = c("Map", "Key"),
+             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+
+
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_HR_new3.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800)
 
 
 #3. LAND USE TREND --------------
@@ -2002,16 +2054,16 @@ LanduseDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),
 LanduseFloodTrend$f2020=LanduseFloodTrend$Rchange.Y2020
 LanduseDroughtTrend$f2020=LanduseDroughtTrend$Rchange.Y2020
 
-FlPoint=inner_join(hybas07,LanduseFloodTrend,by=c("HYBAS_ID"="HydroR"))
+FlPoint=full_join(GHshpp,LanduseFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
-DrPoint=inner_join(hybas07,LanduseDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+DrPoint=full_join(GHshpp,LanduseDroughtTrend,by=c("CODEB"="HydroR"))
 st_geometry(DrPoint)<-NULL
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
@@ -2027,8 +2079,8 @@ databilu$x=databilu$f2020/a
 databilu$y=databilu$d2020/b
 
 breaker1=0
-breaker2=0.25
-breaker2=10
+breaker2=5
+
 
 ### floods --------------------
 alterclass=data.frame(databilu$x)
@@ -2069,9 +2121,9 @@ sd(databipilu$x,na.rm=T)
 
 # databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
 
-breaker1=0
-breaker2=0.25
-breaker2=10
+# breaker1=0
+# breaker2=0.25
+# breaker2=10
 
 alterclass=data.frame(databipilu$x)
 alterclass$class=NA
@@ -2188,17 +2240,17 @@ ReservoirDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:7
 ReservoirFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 ReservoirDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-FlPoint=inner_join(hybas07,ReservoirFloodTrend,by=c("HYBAS_ID"="HydroR"))
+FlPoint=full_join(GHshpp,ReservoirFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
 
-DrPoint=inner_join(hybas07,ReservoirDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+DrPoint=full_join(GHshpp,ReservoirDroughtTrend,by=c("CODEB"="HydroR"))
 st_geometry(DrPoint)<-NULL
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
@@ -2214,9 +2266,9 @@ databire=FlplotRes
 databire$x=databire$f2020/a
 databire$y=databire$d2020/b
 
-breaker1=0
-breaker2=0.25
-breaker2=10
+# breaker1=0
+# breaker2=0.25
+# breaker2=10
 
 alterclass=data.frame(databire$x)
 alterclass$class=NA
@@ -2257,9 +2309,9 @@ sd(databipire$x,na.rm=T)
 
 # databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
 
-breaker1=0
-breaker2=0.25
-breaker2=10
+# breaker1=0
+# breaker2=0.25
+# breaker2=10
 
 alterclass=data.frame(databipire$x)
 alterclass$class=NA
@@ -2295,17 +2347,17 @@ WaterDemandDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2
 WaterDemandFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[4]),1]
 WaterDemandDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[4]),1]
 
-FlPoint=inner_join(hybas07,WaterDemandFloodTrend,by=c("HYBAS_ID"="HydroR"))
+FlPoint=full_join(GHshpp,WaterDemandFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
-Flplot=inner_join(hybasf7,FlPoint,by= c("HYBAS_ID"))
+Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 
 Flplot <- st_transform(Flplot, crs = 3035)
 
-DrPoint=inner_join(hybas07,WaterDemandDroughtTrend,by=c("HYBAS_ID"="HydroR"))
+DrPoint=full_join(GHshpp,WaterDemandDroughtTrend,by=c("CODEB"="HydroR"))
 st_geometry(DrPoint)<-NULL
-Drplot=inner_join(hybasf7,DrPoint,by= c("HYBAS_ID"))
+Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
@@ -2321,9 +2373,10 @@ databiwd=FlplotWD
 databiwd$x=databiwd$f2020/a
 databiwd$y=databiwd$d2020/b
 
-breaker1=0
-breaker2=0.25
-breaker2=10
+# breaker1=0
+# breaker2=0.25
+# breaker2=10
+
 alterclass=data.frame(databiwd$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2363,9 +2416,9 @@ sd(databipiwd$x,na.rm=T)
 
 # databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
 
-breaker1=0
-breaker2=0.25
-breaker2=10
+# breaker1=0
+# breaker2=0.25
+# breaker2=10
 
 alterclass=data.frame(databipiwd$x)
 alterclass$class=NA
@@ -2410,6 +2463,42 @@ biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
 biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
 
 
+
+#match biogeoregions with HRs
+databitotxHR=databipi
+RegioRLi=aggregate(list(val=databitotxHR$y),
+                   by = list(HydroR=databitotxHR$HydroRegions_raster_WGS84),
+                   FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
+RegioRLi <- do.call(data.frame, RegioRLi)
+
+HRM=na.omit((match(RegioRLi$HydroR,HydroRsf$Id)))
+HydroRsf_dom=HydroRsf[HRM,]
+
+
+layerMatch=match(GHR_riv$outl2,biogeo_rivers$outl2)
+
+GHR_riv$biogeoR=biogeo_rivers$code[layerMatch]
+unique(GHR_riv$HydroRegions_raster_WGS84)
+verif=(match(GHR_riv$HydroRegions_raster_WGS84,HydroRsf_dom$Id))
+unique(verif)
+unique(HydroRsf_dom$Id[verif])
+GHR_riv$HydrRName=HydroRsf_dom$IRST_NAMEB[verif]
+
+
+bhp_m=na.omit(unique(match(HydroRsf_dom$Id,GHR_riv$HydroRegions_raster_WGS84)))
+HydroRsf_dom$biogeoreg=GHR_riv$biogeoR[bhp_m]
+
+
+sample=GHR_riv[bhp_m,]
+
+
+RegioAg = aggregate(list(oc=GHR_riv$HydrRName),
+                    by = list(BR=GHR_riv$biogeoR,HR=GHR_riv$HydroRegions_raster_WGS84),
+                    FUN = function(x) c(len=length(x)))
+RegioAg <- do.call(data.frame, RegioAg)
+
+ur=unique(RegioAg$HR)
+
 #matching biogeoregions and hybas07
 databiwdxBG=inner_join(biogeo_rivers,databipiwd,by=c("outl2"))
 databiluxBG=inner_join(biogeo_rivers,databipilu,by=c("outl2"))
@@ -2424,6 +2513,12 @@ databiluxHR=inner_join(GHR_riv,databipilu,by=c("outl2"))
 databiclixHR=inner_join(GHR_riv,databipic,by=c("outl2"))
 databiresxHR=inner_join(GHR_riv,databipire,by=c("outl2"))
 databitotxHR=inner_join(GHR_riv,databipi,by=c("outl2"))
+# 
+# databiwdxHR=databipiwd
+# databiluxHR=databipilu
+# databiclixHR=databipic
+# databiresxHR=databipire
+# databitotxHR=databipi
 
 mbf=rbind(mbicli,mbires,mbilu,mbiwd)
 mbf$names=c('Climate',
@@ -2482,63 +2577,64 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contributio
 
 length(which(is.na(databiresxHR$x.y)))
 
-databiwdxHR$y.y[which(abs(databiwdxHR$y.y)>100)]=100
+# databiwdxHR$y.y[which(abs(databiwdxHR$y.y)>100)]=100
 mbiwd1=aggregate(list(val=databiwdxHR$y.y),
-                 by = list(HR=databiwdxHR$HydroRegions_raster_WGS84),
-                 FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+                 by = list(HR=databiwdxHR$HydrRName),
+                 FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbiwd1 <- do.call(data.frame, mbiwd1)
 
 mbicli1=aggregate(list(val=databiclixHR$y.y),
-                  by = list(HR=databiclixHR$HydroRegions_raster_WGS84),
-                  FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+                  by = list(HR=databiclixHR$HydrRName),
+                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbicli1 <- do.call(data.frame, mbicli1)
 
-databiresxHR$y.y[which(abs(databiresxHR$y.y)>100)]=100
+#databiresxHR$y[which(abs(databiresxHR$y)==0)]=NA
 mbires1=aggregate(list(val=databiresxHR$y.y),
-                  by = list(HR=databiresxHR$HydroRegions_raster_WGS84),
-                  FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+                  by = list(HR=databiresxHR$HydrRName),
+                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbires1 <- do.call(data.frame, mbires1)
 
-databiluxHR$y.y[which(abs(databiluxHR$y.y)>100)]=100
+# mbires1$se=mbires1$val.sd/sqrt(mbires1$val.l)
+# databiluxHR$y.y[which(abs(databiluxHR$y.y)>100)]=100
 mbilu1=aggregate(list(val=databiluxHR$y.y),
-                 by = list(HR=databiluxHR$HydroRegions_raster_WGS84),
-                 FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+                 by = list(HR=databiluxHR$HydrRName),
+                 FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbilu1 <- do.call(data.frame, mbilu1)
 
 
-databitotxHR$y.y[which(abs(databitotxHR$y.y)>100)] =100
+#databitotxHR$y.y[which(abs(databitotxHR$y.y)>100)] =100
 mball1=aggregate(list(val=databitotxHR$y.y),
-                 by = list(HR=databitotxHR$HydroRegions_raster_WGS84),
-                 FUN = function(x) c(dmean=mean(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+                 by = list(HR=databitotxHR$HydrRName),
+                 FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mball1 <- do.call(data.frame, mball1)
-  
+#mball1$se=mball1$val.sd/sqrt(mball1$val.l)  
 
 
 #databiwdxHR$x.y[which(abs(databiwdxHR$x.y)<=1e-3)]=NA
 mbiwd2=aggregate(list(val=databiwdxHR$x.y),
-                 by = list(HR=databiwdxHR$HydroRegions_raster_WGS84),
+                 by = list(HR=databiwdxHR$HydrRName),
                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbiwd2 <- do.call(data.frame, mbiwd2)
 
 mbicli2=aggregate(list(val=databiclixHR$x.y),
-                  by = list(HR=databiclixHR$HydroRegions_raster_WGS84),
+                  by = list(HR=databiclixHR$HydrRName),
                   FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbicli2 <- do.call(data.frame, mbicli2)
 
 # databiresxHR$x.y[which(abs(databiresxHR$x.y)>1e4)]=1e3
 mbires2=aggregate(list(val=databiresxHR$x.y),
-                  by = list(HR=databiresxHR$HydroRegions_raster_WGS84),
+                  by = list(HR=databiresxHR$HydrRName),
                   FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbires2 <- do.call(data.frame, mbires2)
 
 # databiluxHR$x.y[which(abs(databiluxHR$x.y)<=1e-3)]=NA
 mbilu2=aggregate(list(val=databiluxHR$x.y),
-                 by = list(HR=databiluxHR$HydroRegions_raster_WGS84),
+                 by = list(HR=databiluxHR$HydrRName),
                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbilu2 <- do.call(data.frame, mbilu2)
 
 mball2=aggregate(list(val=databitotxHR$x.y),
-                 by = list(HR=databitotxHR$HydroRegions_raster_WGS84),
+                 by = list(HR=databitotxHR$HydrRName),
                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mball2 <- do.call(data.frame, mball2)
 
@@ -2548,9 +2644,9 @@ mbilu3=inner_join(mbilu1,mbilu2,by="HR")
 mbicli3=inner_join(mbicli1,mbicli2,by="HR")
 mball3=inner_join(mball1,mball2,by="HR")
 
-RegionName=inner_join(mbicli2,HydroRsf,by=c("HR"="Id"))
+RegionName=inner_join(mbicli2,HydroRsf,by=c("HR"="IRST_NAMEB"))
 
-l1=length(RegionName$HR)
+l1=length(mbicli2$HR)
 
 mbfX=rbind(mbicli3,mbires3,mbilu3,mbiwd3,mball3)
 mbfX$names=c(rep('Climate',l1),
@@ -2562,6 +2658,12 @@ mbfX$names=c(rep('Climate',l1),
 zeb=match(mbfX$HR,RegionName$HR)
 mbfX$regioname=RegionName$IRST_NAMEB[zeb]
 
+
+#correlation between change in drought and flood of several drivers
+
+cor.test(mbicli3$val.dmean, mbicli3$val.fmean)
+cor.test(mbires3$val.dmean, mbires3$val.fmean)
+cor.test(mbilu3$val.dmean, mbilu3$val.fmean)
 # mbf$lbx=mbf$x-mbf$xsd
 # mbf$hbx=mbf$x+mbf$xsd
 # mbf$lby=mbf$y-mbf$ysd
@@ -2573,7 +2675,7 @@ mbfX$regioname=RegionName$IRST_NAMEB[zeb]
 # mbfX=mbfX[mbk,]
 
 
-colnames(mbfX)[c(2:4,7:9)]=c("x","xq1","xq2","y","yq1","yq2")
+colnames(mbfX)[c(2,4,5,8,9,10)]=c("x","xq1","xq2","y","yq1","yq2")
 mbfX$xl=((mbfX$xq2-mbfX$xq1)+(mbfX$yq2-mbfX$yq1))/2
 
 mbfH=mbfX[which(mbfX$names=="Historical"),]
@@ -2584,7 +2686,7 @@ clabels=c("Climate","Land use","Reservoirs", "Water demand")
 colorn = c("WaterDemand" ='limegreen',"Reservoirs" ='tomato4',"Landuse" ='orange',"Climate" ='royalblue')
 shapex=c("Alpine"=0,"Atlantic"=1,"Boreal"=2, "Continental"=3,"Mediterranean"=4)
 tsize=osize=20
-lalim=100
+lalim=60
 bpc=ggplot() +
   geom_vline(xintercept = 0, 
   color = "black", size = 1.5) +
@@ -2593,23 +2695,24 @@ bpc=ggplot() +
   #geom_linerange(data=mbfH,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   #geom_linerange(data=mbfH,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   # geom_point(data=mbf, aes(x = x, y = y, fill = names), shape = 21, color = "black", size = 5, show.legend = FALSE) +
-  geom_point(data=mbfX, aes(x = x, y = y, color = names, size=xl), show.legend = TRUE, stroke=1, alpha=.6) +
+  geom_point(data=mbfX, aes(x = x, y = y, color = names, size=val.l.x), show.legend = TRUE, stroke=1, alpha=.5) +
   #scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
   scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
   #scale_shape_manual(values = shapex, name = "Regions") +
-  scale_size(range = c(1, 8))+
+  scale_size(range = c(2, 6))+
   coord_cartesian(xlim=c(-lalim,lalim),ylim=c(-lalim,lalim)) +
-  annotate("text", x = 50, y = 80, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
-  annotate("text", x = -20, y = 80, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
-  annotate("text", x = -20, y = -80, label = "Drying", color = "#dd6a29", size = 7, fontface = "bold") +
-  annotate("text", x = 50, y = -80, label = "Decelerating", color = "burlywood", size = 7, fontface = "bold") +
-  labs(x = "Change in drought flows (%)", 
-       y = "Change in flood flows (%)") +
+  annotate("text", x = 35, y = 45, label = "Wetting", color = "#169dd0", size = 6, fontface = "bold") +
+  annotate("text", x = -35, y = 45, label = "Accelerating", color = "#174f28", size = 6, fontface = "bold") +
+  annotate("text", x = -35, y = -45, label = "Drying", color = "#dd6a29", size = 6, fontface = "bold") +
+  annotate("text", x = 35, y = -45, label = "Decelerating", color = "burlywood", size = 6, fontface = "bold") +
+  labs(x = "Change in drought intensity (%)", 
+       y = "Change in flood intensity (%)") +
   scale_x_continuous(trans=scales::modulus_trans(.5),
-                     breaks=c(-200,-100,-50,-10,-5,0,5,10,50,100,200),
+                     breaks=c(-200,-100,-50,-20,-10,-5,0,5,10,20,50,100,200),
+                     labels=rev(c(-200,-100,-50,-20,-10,-5,0,5,10,20,50,100,200)),
                      minor_breaks = seq(-100,100,10)) +
   scale_y_continuous(trans=scales::modulus_trans(.5),
-                     breaks=c(-200,-100,-50,-10,-5,0,5,10,50,100,200),
+                     breaks=c(-200,-100,-50,-20,-10,-5,0,5,10,20,50,100,200),
                      minor_breaks = seq(-100,100,10), expand = c(0,0)) +
   guides( color = guide_legend(override.aes = list(size = 6)),size="none")+
   theme(
@@ -2630,7 +2733,7 @@ bpc=ggplot() +
   )
 
 bpc
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HR2.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HR_new3.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
 
 
 
@@ -2640,11 +2743,10 @@ mb1=mbfX[which(mbfX$bg=="Mediterranean"),]
 mb1=mbfX[which(mbfX$bg=="Continental"),]
 
 bpc=ggplot(mb1, aes(x = x, y = y, fill = names)) +
-  geom_linerange(data=mb1,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=1,alpha=0.8) +
-  geom_linerange(data=mb1,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=1,alpha=0.8) +
-  geom_point(shape = 2, color = "black", size = 8, show.legend = TRUE) +
-  scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
+  geom_point(data=mb1, aes(x = x, y = y, color = names, size=val.l.x), show.legend = TRUE, stroke=1, alpha=.5) +
+  #scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
   scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
+  #scale_shape_manual(values = shapex, name = "Regions") +
   coord_cartesian(xlim=c(-100,100),ylim=c(-50,50)) +
   annotate("text", x = 50, y = 20, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
   annotate("text", x = -50, y = 20, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
@@ -2679,43 +2781,10 @@ bpc=ggplot(mb1, aes(x = x, y = y, fill = names)) +
 bpc
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_bv.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
 
+length(unique(GHshpp$IRST_NAMEB))
 
 #plot of historical change with colors by biogeoregions
 
-#match biogeoregions with HRs
-
-RegioRLi=aggregate(list(val=databitotxHR$y.x),
-                   by = list(HydroR=databitotxHR$HydroRegions_raster_WGS84),
-                   FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-RegioRLi <- do.call(data.frame, RegioRLi)
-
-HRM=na.omit((match(RegioRLi$HydroR,HydroRsf$Id)))
-HydroRsf_dom=HydroRsf[HRM,]
-
-
-layerMatch=match(GHR_riv$outl2,biogeo_rivers$outl2)
-
-GHR_riv$biogeoR=biogeo_rivers$code[layerMatch]
-unique(GHR_riv$HydroRegions_raster_WGS84)
-verif=(match(GHR_riv$HydroRegions_raster_WGS84,HydroRsf_dom$Id))
-unique(verif)
-unique(HydroRsf_dom$Id[verif])
-GHR_riv$HydrRName=HydroRsf_dom$IRST_NAMEB[verif]
-
-
-bhp_m=na.omit(unique(match(HydroRsf_dom$Id,GHR_riv$HydroRegions_raster_WGS84)))
-HydroRsf_dom$biogeoreg=GHR_riv$biogeoR[bhp_m]
-
-
-sample=GHR_riv[bhp_m,]
-
-
-RegioAg = aggregate(list(oc=GHR_riv$HydrRName),
-                 by = list(BR=GHR_riv$biogeoR,HR=GHR_riv$HydroRegions_raster_WGS84),
-                 FUN = function(x) c(len=length(x)))
-RegioAg <- do.call(data.frame, RegioAg)
-
-ur=unique(RegioAg$HR)
 #fin fix or just use something else as colors
 Hydroplot=c()
 for (id in 1:length(ur)){
@@ -2736,13 +2805,13 @@ bioplot$BR[which(bioplot$BR=="Steppic")]="Continental"
 #nutplot=nutplot[-which(is.na(nutplot$maxcol)),]
 br=c(-50,-20,-10,0,10,20,50)
 labels=br
-limi=c(-50,50)
+limi=c(-60,60)
 colx=c("Alpine"="deeppink","Atlantic"="forestgreen","Boreal"="darkviolet", "Continental"="orange3","Mediterranean"="gold")
 
 ggplot(basemap) +
   geom_sf(fill="gray95")+
   geom_sf(fill=NA, color="grey") +
-  geom_sf(data=bioplot,aes(fill=factor(BR),geometry=geometry),color="transparent",alpha=1,size=0.25,stroke=0,shape=15)+ 
+  geom_sf(data=bioplot,aes(fill=factor(BR),geometry=geometry),color="black",alpha=.7,size=0.0001)+ 
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   scale_fill_manual(values = colx, name="BioGeoRegions") +
   labs(x="Longitude", y = "Latitude")+
@@ -2758,9 +2827,9 @@ ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Map_HRxBG.jpg"), width=25, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Map_HRxBG2.jpg"), width=25, height=20, units=c("cm"),dpi=300) 
 
-h2p=match(mbfH$regioname,bioplot$IRST_NAMEB)
+h2p=match(mbfH$HR,bioplot$IRST_NAMEB)
 mbfH$biogeo=bioplot$BR[h2p]
 colx=c("Alpine"="deeppink","Atlantic"="forestgreen","Boreal"="darkviolet", "Continental"="orange3","Mediterranean"="gold")
 bpc=ggplot() +
@@ -2771,20 +2840,21 @@ bpc=ggplot() +
   #geom_linerange(data=mbfH,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   #geom_linerange(data=mbfH,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   # geom_point(data=mbf, aes(x = x, y = y, fill = names), shape = 21, color = "black", size = 5, show.legend = FALSE) +
-  geom_point(data=mbfH, aes(x = x, y = y, color=biogeo,size=xl), show.legend = TRUE, stroke=1, alpha=.6) +
+  geom_point(data=mbfH, aes(x = x, y = y, color=biogeo,size=val.l.x), show.legend = TRUE, stroke=1, alpha=.6) +
   #scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
   #scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
   scale_color_manual(values = colx, name = "Regions") +
-  scale_size(range = c(1, 8))+
-  coord_cartesian(xlim=c(-lalim,lalim),ylim=c(-lalim,lalim)) +
-  annotate("text", x = 50, y = 80, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
-  annotate("text", x = -20, y = 80, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
-  annotate("text", x = -20, y = -80, label = "Drying", color = "#dd6a29", size = 7, fontface = "bold") +
-  annotate("text", x = 50, y = -80, label = "Decelerating", color = "burlywood", size = 7, fontface = "bold") +
-  labs(x = "Change in drought flows (%)", 
-       y = "Change in flood flows (%)") +
+  scale_size(range = c(3, 8))+
+  coord_cartesian(xlim=c(-lalim,lalim+10),ylim=c(-lalim,lalim)) +
+  annotate("text", x = 40, y = 45, label = "Wetting", color = "#169dd0", size = 6, fontface = "bold") +
+  annotate("text", x = -35, y = 45, label = "Accelerating", color = "#174f28", size = 6, fontface = "bold") +
+  annotate("text", x = -35, y = -45, label = "Drying", color = "#dd6a29", size = 6, fontface = "bold") +
+  annotate("text", x = 40, y = -45, label = "Decelerating", color = "burlywood", size = 6, fontface = "bold") +
+  labs(x = "Change in drought intensity (%)", 
+       y = "Change in flood intensity (%)") +
   scale_x_continuous(trans=scales::modulus_trans(.5),
-                     breaks=c(-200,-100,-50,-10,-5,0,5,10,50,100,200),
+                     breaks=c(-200,-100,-50,-20,-10,-5,0,5,10,20,50,100,200),
+                     labels=rev(c(-200,-100,-50,-20,-10,-5,0,5,10,20,50,100,200)),
                      minor_breaks = seq(-100,100,10)) +
   scale_y_continuous(trans=scales::modulus_trans(.5),
                      breaks=c(-200,-100,-50,-10,-5,0,5,10,50,100,200),
@@ -2808,14 +2878,177 @@ bpc=ggplot() +
   )
 
 bpc
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HRxBG.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HRxBG_new3.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+
+v=0
+
+#wetting
+length(which(mbfH$x>v & mbfH$y>v))/length(mbfH$HR)*100
+#accelerating
+length(which(mbfH$x<(-v) & mbfH$y>v))/length(mbfH$HR)*100
+#decelerating
+length(which(mbfH$x>v & mbfH$y<(-v)))/length(mbfH$HR)*100
+#drying
+length(which(mbfH$x<(-v) & mbfH$y<(-v)))/length(mbfH$HR)*100
+
+
+mbfC=mbfX[which(mbfX$names=="Climate"),]
+
+#wetting
+length(which(mbfC$x>v & mbfC$y>v))/length(mbfC$HR)*100
+#accelerating
+length(which(mbfC$x<(-v) & mbfC$y>v))/length(mbfC$HR)*100
+#decelerating
+length(which(mbfC$x>v & mbfC$y<(-v)))/length(mbfC$HR)*100
+#drying
+length(which(mbfC$x<(-v) & mbfC$y<(-v)))/length(mbfC$HR)*100
+
+mbfL=mbfX[which(mbfX$names=="Landuse"),]
+length(which(mbfL$x>v & mbfL$y>v))/length(mbfL$HR)*100
+
+
+mbfR=mbfX[which(mbfX$names=="Reservoirs"),]
+length(which(mbfL$x>v & mbfL$y>v))/length(mbfL$HR)*100
+
+mbfL$xcl=mbfL$x+mbfC$x
+mbfL$ycl=mbfL$y+mbfC$y
+
+mbfL$xcr=mbfR$x+mbfC$x
+mbfL$ycr=mbfR$y+mbfC$y
+
+mbfL$xcrl=mbfR$x+mbfC$x+mbfL$x
+mbfL$ycrl=mbfR$y+mbfC$y+mbfL$y
+
+mbfL$xrl=mbfR$x+mbfL$x
+mbfL$yrl=mbfR$y+mbfL$y
+
+abline(0,1)
+abline(0,0)
+abline(v=0)
+mbfH$cat="wetting"
+mbfH$cat[(which(mbfH$x>v & mbfH$y<(-v)))]="decelerating"
+mbfH$cat[(which(mbfH$x<(-v) & mbfH$y<(-v)))]="drying"
+mbfH$cat[(which(mbfH$x<(-v) & mbfH$y>v))]="accelerating"
+
+mbfH$cat2="wetting"
+mbfH$cat2[(which(mbfL$xcr>v & mbfL$ycr<(-v)))]="decelerating"
+mbfH$cat2[(which(mbfL$xcr<(-v) & mbfL$ycr<(-v)))]="drying"
+mbfH$cat2[(which(mbfL$xcr<(-v) & mbfL$ycr>v))]="accelerating"
+
+mbfH$cat3="wetting"
+mbfH$cat3[(which(mbfC$x>v & mbfC$y<(-v)))]="decelerating"
+mbfH$cat3[(which(mbfC$x<(-v) & mbfC$y<(-v)))]="drying"
+mbfH$cat3[(which(mbfC$x<(-v) & mbfC$y>v))]="accelerating"
+
+
+mbfMAAX=inner_join(mbfH,mbfL,by="HR")
+mbana=mbfH[which(mbfH$cat2=="decelerating"),]
+
+length(which(mbana$cat3=="decelerating"))
+length(which(mbana$cat3=="accelerating"))
+length(which(mbana$cat3=="drying"))
+length(which(mbana$cat3=="wetting"))
+
+16/(24)
+write.csv(mbfH,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Histo_res_bvHR_new2.csv"))
+
+write.csv(mbfX,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Drivers_res_bvHR_new2.csv"))
 
 
 
 
+#Standard error plot
+st_geometry(databiclim) <- NULL
+databic2=inner_join(mbfH,GHshpp,by=c("HR"="IRST_NAMEB"))
+#databic2=full_join(databic2,mbfH,by=c("IRST_NAMEB.y"="HR"))
+databic2$xdr=2*(databic2$val.sd.x/sqrt(databic2$val.l.x))*1.96
+databic2$xfl=2*(databic2$val.sd.y/sqrt(databic2$val.l.x))*1.96
+plot(databic2$xdr)
+palet=c(hcl.colors(11, palette = "OrRd", alpha = NULL, rev = T, fixup = TRUE))
+
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databic2, mapping = aes(fill = xdr, geometry=geometry), alpha=1) +
+  geom_sf(fill=NA, color="gray42") +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # scale_fill_manual(values = colorp) +
+  scale_fill_gradientn(
+    colors=palet, name="95% CI of the mean", limits=c(0,5), oob = scales::squish)   +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # scale_color_manual(values = colorp) +
+  ggtitle("Changes in drought flows")+
+  labs()+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
 
 
+map
 
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databic2, mapping = aes(fill = xfl,geometry=geometry ), alpha=0.7, color = "transparent", size = 0.01) +
+  geom_sf(fill=NA, color="gray42") +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # scale_fill_manual(values = colorp) +
+  scale_fill_gradientn(
+    colors=palet, name="95% CI of mean", limits=c(0,5), oob = scales::squish)   +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # scale_color_manual(values = colorp) +
+  labs()+
+  ggtitle("Changes in flood flows")+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+map
+
+#\hydroregions plot
+color = grDevices::colors()[grep('gr(a|e)y|white|black', grDevices::colors(), invert = T)]
+coHR=sample(color, length(unique(databic2$HR)))
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databic2, mapping = aes(fill = factor(HR),geometry=geometry), alpha=0.7, color = "black", size = 0.001,show.legend = FALSE) +
+  geom_sf(fill=NA, color="gray42") +
+  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  # scale_fill_gradientn(
+  #   colors=palet, name="95% CI of mean", limits=c(0,10), oob = scales::squish)   +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
+  scale_fill_manual(values = coHR) +
+  labs()+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "right",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+map
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapreg_HR.jpg"), map, width=30, height=20, units=c("cm"),dpi=300) 
 # Combination of drivers ------------------------
 databicr=databiclim
 databicr$x= databire$x + databiclim$x
@@ -3841,11 +4074,11 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/change_by_b
 
 
 
-HRM=na.omit((match(RegioRLi$HydroR,hybasf7$HYBAS_ID)))
-hybasf7_dom=hybasf7[HRM,]
+HRM=na.omit((match(RegioRLi$HydroR,HydroRsf$Id)))
+HydroRsf_dom=HydroRsf[HRM,]
 
-bhp_m=na.omit(unique(match(hybasf7_dom$HYBAS_ID,bio_hybas$HYBAS_ID)))
-hybasf7_dom$biogeoreg=bio_hybas$code[bhp_m]
+bhp_m=na.omit(unique(match(HydroRsf_dom$Id,bio_hybas$Id)))
+HydroRsf_dom$biogeoreg=bio_hybas$code[bhp_m]
 
 
 

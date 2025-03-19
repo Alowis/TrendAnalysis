@@ -112,7 +112,7 @@ Peaksave=c()
 outf=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="RWCF"
+scenario="RWCF2"
 hazard="Drought"
 season="nonfrost"
 mmx=""
@@ -222,10 +222,10 @@ print(paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,".
 # Saving outputs of the loop
 saveout=T
 if (saveout==T){
-
-  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"3.Rdata"))
-  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"3.Rdata"))
-  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"3.Rdata"))
+  
+  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
+  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
+  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
 }
 
 gc()
@@ -236,7 +236,7 @@ gc()
 IRES_save=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="RWCF"
+scenario="WCF"
 hazard="Drought"
 season="nonfrost"
 mmx=""
@@ -282,8 +282,8 @@ for (file in lf){
 
 length(which(IRES_save$IRES==1))
 
-print(paste0(hydroDir,"/",hazard,"/IRES.",season,".",scenario,mmx,".Rdata"))
+print(paste0(hydroDir,"/",hazard,"/IRES.",season,".",scenario,mmx,"_new2.Rdata"))
 
-save(IRES_save,file=paste0(hydroDir,"/",hazard,"/IRES.",season,".",scenario,mmx,".Rdata"))
+save(IRES_save,file=paste0(hydroDir,"/",hazard,"/IRES.",season,".",scenario,mmx,"_new2.Rdata"))
 
 
