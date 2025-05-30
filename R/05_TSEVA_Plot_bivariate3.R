@@ -1412,18 +1412,287 @@ if (!exists("outf")){
   }
 }
 
+
+#### Total change plots -------
 #load results from previous script 
 
 #floods
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_new.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_8.Rdata"))
 #droughts
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_new2.Rdata"))
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_8.Rdata"))
 #I extract the trend at MUTS3 level fist
 
 FloodTrends=Output_fl_year$TrendRegio
+#FloodTrends=Output_fl_year$TrendPix
 
 #Output_dr_nonfrost=Output_dr_year
 DroughtTrends=Output_dr_nonfrost$TrendRegio
+#DroughtTrends=Output_dr_nonfrost$TrendPix
+
+#First barpolt Figure 1:
+Totrend=FloodTrends[which(FloodTrends$driver=="Clim"),]
+#Totrend=Totrend[,-c(1,2,3,5,6,7,8,9,10,11,82,83,84,85)]
+colnames(Totrend)[c(2:71)]=c(1951:2020)
+#trtest <- suppressWarnings(melt(Totrend, id.vars = "llcoord", variable.name = "variable", value.name = "value"))
+trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
+
+# Convert variable to character and extract the year
+trtest$variable <- as.character(trtest$variable)
+#craplife <- data.frame(strsplit(trtest$variable, ".Y"))
+#trtest$yr <- as.numeric(craplife[2,])
+trtest$yr <- as.numeric(trtest$variable)
+trtest$value=as.numeric(trtest$value)
+#trtest$decad=trtest$yr
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$yr),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+FloodTh <- do.call(data.frame, trtime_global)
+
+
+decades=c(1955,1965,1975,1985,1995,2005,2015)
+valcol=which(!is.na(match(trtest$yr,decades)))
+# Calculate the decade
+#trtest$decad <- 10 * round(trtest$yr / 10)
+trtest=trtest[valcol,]
+trtest$value=as.numeric(trtest$value)
+trtest$decad=trtest$yr
+# Aggregate only by decade (without location)
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$decad),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+FloodGlobal <- do.call(data.frame, trtime_global)
+
+
+#First barpolt Figure 1:
+Totrend=DroughtTrends[which(DroughtTrends$driver=="Clim"),]
+#Totrend=Totrend[,-c(1,2,3,5,6,7,8,9,10,11,82,83,84,85)]
+colnames(Totrend)[c(2:71)]=c(1951:2020)
+trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
+# Convert variable to character and extract the year
+trtest$variable <- as.character(trtest$variable)
+#craplife <- data.frame(strsplit(trtest$variable, ".Y"))
+#trtest$yr <- as.numeric(craplife[2,])
+trtest$yr <- as.numeric(trtest$variable)
+trtest$value=as.numeric(trtest$value)
+#trtest$decad=trtest$yr
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$yr),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+DroughtTh <- do.call(data.frame, trtime_global)
+
+
+FloodTh$haz="Flood"
+DroughtTh$haz="Drought"
+
+FDChanges=rbind(FloodTh,DroughtTh)
+
+
+colorz = c("Flood" ='darkblue',"Drought"="darkorange")
+colorn = c("Flood" ='darkblue',"Drought"="orange")
+
+#trtF=trtF[-which(trtF$yr==2020),]
+#use pointap for bars
+library(ggnewscale)
+fac=1
+
+xlabs=seq(1950,2020,5)
+clabels=c("Drought","Flood")
+
+nplot="Change (% 10yRL)"
+br=seq(-50,100,10)
+#nplot="Mean change (l/s/km2)"
+#br=seq(-.5,1,.1)
+br=seq(-50,300,10)
+br=c(seq(-100,-20,20),c(-10,-5,-2,0,2,5,10),seq(20,100,20))
+ggplot() +
+  geom_hline(yintercept = 0, color = "black", size = 1) +
+  # IQR represented as rectangles
+  geom_line(data=FDChanges,aes(x=yr, y=value.mean,color = (haz),group=(haz)),
+                lwd=2) +
+geom_ribbon(data = FDChanges, aes(x = yr, ymin = value.w1.2.5., ymax = value.w2.97.5., fill = haz, group = haz), 
+            alpha = 0.2) +
+  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
+  # Y-axis settings
+  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.4)) +
+  
+  # X-axis settings
+  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Years",limits=c(1955,2020),
+                     minor_breaks = seq(1955,2005,10), expand = c(.001,0.001)) +
+  
+  # Manual fill and color scales
+  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
+  #scale_color_manual(values = colorz, name = "Hazard", labels = clabels) +
+  
+  # Customize legend
+  #guides(color = guide_legend(override.aes = list(color = colorn))) +
+  
+  # Theme customization
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
+    #panel.grid.minor.y = element_line(color = "lightgray"),
+    legend.position = "right",
+    #panel.grid.major = element_line(colour = "grey80"),
+    #panel.grid.minor.x = element_line(colour = "grey23",linetype = "dashed"),
+    legend.key = element_rect(fill = "transparent", colour = "transparent"),
+    legend.key.size = unit(0.8, "cm")
+  ) +
+  
+  # Add title
+  ggtitle("Europe")
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/temporalCh_clim_fldr6.jpg"), width=30, height=10, units=c("cm"),dpi=1000) 
+
+
+
+
+trtF=rbind(FloodGlobal,DroughtGlobal)
+
+
+
+decades=c(1955,1965,1975,1985,1995,2005,2015)
+valcol=which(!is.na(match(trtest$yr,decades)))
+# Calculate the decade
+#trtest$decad <- 10 * round(trtest$yr / 10)
+trtest=trtest[valcol,]
+trtest$value=as.numeric(trtest$value)
+trtest$decad=trtest$yr
+# Aggregate only by decade (without location)
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$decad),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+DroughtGlobal <- do.call(data.frame, trtime_global)
+
+
+
+
+trtF=rbind(FloodGlobal,DroughtGlobal)
+trtF
+trtF$year=rep(seq(1950,2010,10),2)
+trtF$hazard=c(rep("Flood",7),rep("Drought",7))
+
+names(trtF)[c(2,4,5,6,7,8)]=c("changeC","med","cq1","cq2","w1","w2")
+
+colorz = c("Flood" ='darkblue',"Drought"="darkorange")
+colorn = c("Flood" ='darkblue',"Drought"="orange")
+
+#trtF=trtF[-which(trtF$yr==2020),]
+#use pointap for bars
+library(ggnewscale)
+fac=1
+
+xlabs=seq(1950,2010,10)
+clabels=c("Drought","Flood")
+
+nplot="Mean change (% 10yRL)"
+br=seq(-50,100,10)
+#nplot="Mean change (l/s/km2)"
+#br=seq(-.5,1,.1)
+br=seq(-50,300,10)
+br=c(seq(-100,-10,10),seq(-5,5,5),seq(10,100,10))
+ggplot() +
+  # IQR represented as rectangles
+  geom_linerange(data=trtF,aes(x=year, ymin=fac*(w1),ymax=fac*w2,color = (hazard),group=(hazard)),
+                 position = position_dodge2(width = 9),lwd=1,alpha=0.8) +
+  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
+  new_scale_color()+
+  
+  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
+                           ymin = cq1, ymax = cq2, fill = (hazard), group = (hazard)), 
+            alpha = 0.5, position = position_dodge(width = 9)) +
+  
+  # Mean as points over the IQR
+  geom_point(data=trtF, aes(x = year, y = changeC, color = (hazard), group = (hazard)),
+             position = position_dodge(width = 9), size = 3) +
+  
+  # Median as a horizontal line within the IQR rectangle
+  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
+                           ymin = med-1e-1, ymax = med+1e-1, fill = (hazard), group = (hazard)), 
+            alpha = 1, position = position_dodge(width = 9)) +
+  
+  # Y-axis settings
+  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.6)) +
+  
+  # X-axis settings
+  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Decades",
+                     minor_breaks = seq(1955,2005,10), expand = c(.01,0.01)) +
+  
+  # Manual fill and color scales
+  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
+  scale_color_manual(values = colorz, name = "Hazard", labels = clabels) +
+  
+  # Customize legend
+  #guides(color = guide_legend(override.aes = list(color = colorn))) +
+  
+  # Theme customization
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
+    #panel.grid.minor.y = element_line(color = "lightgray"),
+    legend.position = "right",
+    #panel.grid.major = element_line(colour = "grey80"),
+    panel.grid.minor.x = element_line(colour = "grey23",linetype = "dashed"),
+    legend.key = element_rect(fill = "transparent", colour = "transparent"),
+    legend.key.size = unit(0.8, "cm")
+  ) +
+  
+  # Add title
+  ggtitle("Europe")
+
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bxplot_fldr5.jpg"), width=30, height=20, units=c("cm"),dpi=1000) 
+
+
 
 driver=unique(FloodTrends$driver)
 driver=unique(DroughtTrends$driver)
@@ -1438,7 +1707,90 @@ driver=unique(DroughtTrends$driver)
 #   DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:71)]+
 #   DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2:71)]
 
-#I only look at the climate trend
+
+#spatial smoothing with distance ---------
+
+### Hybas09 -------
+# Catchmentrivers9=read.csv(paste0(hydroDir,"/hybas09_attributes.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
+# Catchmentrivers9=Catchmentrivers9[,c(1,2,15,16,17,22)]
+# hybas09 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev09_v1c.shp"))
+# hybasf9=fortify(hybas09) 
+# Gridhybas09=raster( paste0(hydroDir,"/hybas09_raster.tif"))
+# Ghybas=as.data.frame(Gridhybas09,xy=T)
+# Ghybas=Ghybas[which(!is.na(Ghybas[,3])),]
+# Ghybas$llcoord=paste(round(Ghybas$x,4),round(Ghybas$y,4),sep=" ") 
+# Ghybas_riv=inner_join(Ghybas,outf,by= c("llcoord"="latlong"))
+# Catamere09=inner_join(hybasf9,Ghybas_riv,by= c("SORT"="hybas09_raster"))
+# Catf9=inner_join(Catamere09,outf,by= c("llcoord"="latlong"))
+# 
+# unique(DroughtTrends$driver)
+# DrotrendsLU=DroughtTrends[which(DroughtTrends$driver=="Landuse"),]
+# 
+# DrotrendsLU=inner_join(Catf9,DrotrendsLU,by= c("llcoord"))
+# 
+# HYBASlist=unique(DrotrendsLU$SORT)
+# 
+# mycat=Ghybas[which(Ghybas$hybas09_raster==HYBASlist[6]),]
+# 
+# plot(mycat)
+
+
+
+biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
+biogeof=fortify(biogeo)
+st_geometry(biogeof)<-NULL
+biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
+Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
+biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
+biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
+biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
+
+
+#load the netcdf:
+
+outletname="efas_rnet_100km_01min"
+ncbassin=paste0(hydroDir,"/",outletname,".nc")
+ncb=nc_open(ncbassin)
+name.vb=names(ncb[['var']])
+namev=name.vb[1]
+if ("Band1"%in% name.vb)namev="Band1"
+name.lon="lon"
+name.lat="lat"
+londat = ncvar_get(ncb,name.lon) 
+llo=length(londat)
+latdat = ncvar_get(ncb,name.lat)
+lla=length(latdat)
+start=c(1,1)
+count=c(llo,lla)
+
+
+londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
+llo=length(londat)
+latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
+lla=length(latdat)
+outlets = ncvar_get(ncb,namev,start = start, count= count) 
+outlets=as.vector(outlets)
+outll=expand.grid(londat,latdat)
+lonlatloop=expand.grid(c(1:llo),c(1:lla))
+outll$idlo=lonlatloop$Var1
+outll$idla=lonlatloop$Var2
+outll$riv=outlets
+colnames(outll)[c(1,2,5)]=c("x","y","z")
+outll$llcoord=paste(round(outll$x,4),round(outll$y,4),sep=" ")
+
+mout=match(mycat$llcoord,outll$llcoord)
+
+# outll$riv[which(is.na(outll$riv))]=0
+outlx=outll[mout,c(1,2,5)]
+myriv=which(outlx$z==1)
+outlxu=as.matrix(outlx[myriv,c(1,2)])
+# Step 1: Convert to raster
+r <- rasterFromXYZ(outlx)
+# Step 2 (Optional): Set CRS
+crs(r) <- CRS("+init=epsg:4326")  # or another CRS
+plot(r)
+outlx2=outll[mout,]
+rivmask=outlx2[-which(outlx2$z==0),]
 
 
 ### Hybas07 ----
@@ -1488,6 +1840,7 @@ world <- ne_countries(scale = "medium", returnclass = "sf")
 Europe <- world[which(world$continent == "Europe"),]
 e2=st_transform(Europe,  crs=3035)
 w2=st_transform(world,  crs=3035)
+biobase=st_transform(biogeo, crs=3035)
 tsize=12
 osize=12
 Impdates=seq(1950,2020,by=10)
@@ -1499,6 +1852,93 @@ basemap=w2
 library(ggplot2)
 
 
+
+#recomputing trend significance
+
+calculateTrendSig <- function(trendPlot, pointagg) {
+  
+  # Initialize empty lists for storing results
+  mkta <- c()
+  mksa <- c()
+  
+  tmpval <- trendPlot[,-1]
+  
+  for (it in 1:length(pointagg[,1])) {
+    # print(it)
+    #it=76
+    mks <- NA
+    mkt <- NA
+    miniTS <- as.numeric((tmpval[it,]))
+    miniTS=miniTS[-which(is.na(miniTS))]
+    
+    # Perform Mann-Kendall test if data exists and positive trend is detected
+    if (!is.na(miniTS[2]) & max(abs(diff(miniTS[-1])), na.rm = TRUE) > 0) {
+      mk2 <- mmkh(miniTS[-1], ci = 0.95)
+      mk <- data.frame(tau = mk2[7], sl = mk2[2])
+      
+      mkt <- mk$tau
+      mks <- mk$sl
+      #print(mkt)
+    } else {
+      mkt <- NA
+      mks <- NA
+    }
+    
+    mkta <- c(mkta, mkt)
+    mksa <- c(mksa, mks)
+  }
+  
+  # Add Mann-Kendall test results to pointagg
+  pointagg$mkta <- mkta
+  pointagg$sl <- mksa
+  
+  pointagg$siglvl <- 0
+  pointagg$siglvl[which(pointagg$sl <= 0.05)] <- 1
+  
+  # Define change categories
+  pointagg$change <- 0
+  pointagg$change[which(pointagg$Rchange.Y2020> 0)] <- 1
+  pointagg$change[which(pointagg$Rchange.Y2020< 0)] <- -1
+  pointagg$change[which(pointagg$Rchange.Y2020> 0 & pointagg$siglvl > 0)] <- 2
+  pointagg$change[which(pointagg$Rchange.Y2020< 0 & pointagg$siglvl > 0)] <- -2
+  
+  # Assign slope values
+  pointagg$tslop <- pointagg$mkta
+  pointagg$tslop[which(pointagg$siglvl < 1)] <- NA
+  
+  return(pointagg)
+}
+
+
+trendplot=Output_fl_year$TrendRegio[which(Output_fl_year$TrendRegio$driver=="Clim"),]
+median(trendplot$Rchange.Y2015)
+trendpfas=t(trendplot[which(trendplot$HydroR==23),-c(1,72)])
+plot(trendpfas)
+trendpagg=trendplot[,c(1,71,72)]
+trendFlood=calculateTrendSig(trendPlot=trendplot,pointagg=trendpagg)
+
+length(which(trendFlood$Rchange.Y2020>0))
+length(which(trendFlood$change<(-1)))
+
+trendplot=Output_dr_nonfrost$TrendRegio[which(Output_dr_nonfrost$TrendRegio$driver=="Clim"),]
+median(trendplot$Rchange.Y2015)
+trendpagg=trendplot[,c(1,71,72)]
+trendDrought=calculateTrendSig(trendPlot=trendplot,pointagg=trendpagg)
+length(which(trendDrought$Rchange.Y2020<0))
+length(which(trendDrought$change<(0)))
+
+FloodTrends=Output_fl_year$TrendRegio
+DroughtTrends=Output_dr_nonfrost$TrendRegio
+
+
+DroughtTP=Output_dr_nonfrost$TrendPix
+DroughtTP=DroughtTP[which(DroughtTP$driver=="Clim"),]
+length(DroughtTP$Y2015[which(DroughtTP$Y2015>0)])/length(DroughtTP$Y2015[which(!is.na(DroughtTP$Y2015))])
+
+FloodTP=Output_fl_year$TrendPix
+FloodTP=FloodTP[which(FloodTP$driver=="Clim"),]
+length(FloodTP$Y2015[which(FloodTP$Y2015>=15)])/length(FloodTP$Y2015[which(!is.na(FloodTP$Y2015))])
+
 #1. TOTAL Trend ------------
 
 ## catchment level ---------------
@@ -1507,8 +1947,30 @@ TotalDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[5]),c(2:71)]
 TotalFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 TotalDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
+
+
+
 FlPoint=inner_join(GHshpp,TotalFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
+
+
+#First barpolt Figure 1:
+FlpointT=TotalFloodTrend
+colnames(FlpointT)[c(1:70)]=c(1951:2020)
+trtest <- suppressWarnings(melt(FlpointT, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
+# Convert variable to character and extract the year
+trtest$variable <- as.character(trtest$variable)
+trtest$variable<-as.numeric(trtest$variable)
+
+for (idr in FlpointT$HydroR){
+  trp=trtest[which(trtest$HydroR==idr),]
+  plot(trp$variable,trp$value,main=idr)
+}
+ggplot(trtest,aes(x=variable,y=value,color=HydroR,group=HydroR))+
+  geom_line()
+
+
+
 Flplot=inner_join(HydroRsf,FlPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
@@ -1522,8 +1984,8 @@ period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
 
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
+Flplot$d2015=Drplot$Rchange.Y2015
+Flplot$f2015=Flplot$Rchange.Y2015
 FlplotTot=Flplot
 
 #Univariate plot for verification
@@ -1561,12 +2023,12 @@ palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
 
 #create a new variable which make flood and drought on the same scale
 #normalize flood change
-a=sd(FlplotTot$f2020,na.rm=T)
-b=sd(FlplotTot$d2020,na.rm=T)
+a=sd(FlplotTot$f2015,na.rm=T)
+b=sd(FlplotTot$d2015,na.rm=T)
 a=b=1
 databitot=FlplotTot
-databitot$x=databitot$f2020/a
-databitot$y=databitot$d2020/b
+databitot$x=databitot$f2015/a
+databitot$y=databitot$d2015/b
 
 breaker1=0
 breaker2=5
@@ -1592,7 +2054,6 @@ c2=alterclass$class
 cx=paste(c2,c1,sep="-")
 databitot$bi_class=cx
 databitot$combined_category <-databitot$bi_class
-
 ## Pixel level ------------------------
 
 FloodTrendsP=Output_fl_year$TrendPix
@@ -1633,17 +2094,17 @@ WuDroughtTrendPix = WuDroughtTrendPix[which(!is.na(WuDroughtTrendPix$Var1)),]
 points <- st_as_sf(TotalFloodTrendPix, coords = c("Var1", "Var2"), crs = 4326)
 points <- st_transform(points, crs = 3035)
 Flpixplot=points
-Flpixplot$d2020=TotalDroughtTrendPix$Y2020
+Flpixplot$d2015=TotalDroughtTrendPix$Y2015
 
 #normalize changes
-a=sd(Flpixplot$Y2020,na.rm=T)
-b=sd(Flpixplot$d2020,na.rm=T)
+a=sd(Flpixplot$Y2015,na.rm=T)
+b=sd(Flpixplot$d2015,na.rm=T)
 a=b=1
 databipi=Flpixplot
-databipi$x=databipi$Y2020/a
-databipi$y=databipi$d2020/b
+databipi$x=databipi$Y2015/a
+databipi$y=databipi$d2015/b
 
-
+hist(databipi$x)
 breaker1=0
 breaker2=5
 
@@ -1746,7 +2207,7 @@ bi_pal(pal = colors, dim = 4)
 #colors=(c("#dd6a29","#169dd0","#7ebbd2","#d3d3d3","#167984","#174f28","#845e29","#819185","#d8a386"))
 
 
-ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
+ggplot(databitot, aes(x = d2015, y = f2015, fill = combined_category)) +
   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   scale_fill_manual(values = colorp) +
@@ -1774,10 +2235,16 @@ ggplot(databitot, aes(x = d2020, y = f2020, fill = combined_category)) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(.8, "cm"))
 
+databipi$bi_class[which(databipi$bi_class=="NA-NA")]=NA
+databipi$bi_class[which(is.na(databipi$Y2015))]=NA
+databipi$bi_class[which(is.na(databipi$d2015))]=NA
+
+
 
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
   geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  #geom_sf(data = databitotsig, alpha=0.8, color = "black", fill="NA" ,size = 0.01,show.legend = F) +
   geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
   geom_sf(fill=NA, color="gray42") +
   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
@@ -1788,7 +2255,7 @@ map <- ggplot(basemap) +
              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
              guide = "none")+
   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-  scale_color_manual(values = colorp) +
+  scale_color_manual(values = colorp,na.value=NA) +
   labs()+
   theme(axis.title=element_text(size=tsize),
         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
@@ -1816,8 +2283,139 @@ pl=ggarrange(map, legend,
 
 
 pl
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_HR_n3.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500)
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_HR_n9.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500)
 
+
+
+#aggregation
+
+colord <- c(
+  "1-1" = 12,  # high x, low y
+  "2-1" = 11,  # medium-high x, low y
+  "3-1" = 10,  # medium-low x, low y
+  "4-1" = 9,  # low x, low y
+  
+  "1-2" = 13,  # high x, medium-low y
+  "2-2" = 4,  # medium-high x, medium-low y
+  "3-2" = 3,  # medium-low x, medium-low y
+  "4-2" = 8,  # low x, medium-low y
+  
+  "1-3" = 14,  # high x, medium-high y
+  "2-3" = 1,  # medium-high x, medium-high y
+  "3-3" = 2,  # medium-low x, medium-high y
+  "4-3" = 7,  # low x, medium-high y
+  
+  "1-4" = 15,  # high x, high y
+  "2-4" = 16,  # medium-high x, high y
+  "3-4" = 5,  # medium-low x, high y
+  "4-4" = 6  # low x, high y
+  
+)
+
+zob=unique(databipi$bi_class)
+zob=zob[-which(is.na(zob))]
+
+databipi2=databipi
+databipi2$trcat="Wetting"
+databipi2$trcat[which(databipi2$bi_class=="2-2" | databipi2$bi_class=="3-2" |
+                    databipi2$bi_class=="2-3" | databipi2$bi_class=="3-3")]="Stable"
+databipi2$trcat[which(databipi2$bi_class=="1-1" | databipi2$bi_class=="1-2" |
+                    databipi2$bi_class=="2-1")]="Drying"
+databipi2$trcat[which(databipi2$bi_class=="1-4" | databipi2$bi_class=="2-4" |
+                    databipi2$bi_class=="1-3")]="Accelerating"
+databipi2$trcat[which(databipi2$bi_class=="4-1" | databipi2$bi_class=="4-2" |
+                    databipi2$bi_class=="3-1")]="Decelerating"
+
+databipi2$Biogeo_id[which(databipi2$Biogeo_id=="Pannonian")]="Continental"
+databipi3=databipi2[-which(is.na(databipi2$bi_class)),]
+
+EuAgg = aggregate(list(val=databipi2$upa),
+                 by = list(traj=databipi2$bi_class),
+                 FUN = function(x) c(len=length(x)))
+EuAgg$trcat="Wetting"
+EuAgg$trcat[which(EuAgg$traj=="2-2" | EuAgg$traj=="3-2" |
+                   EuAgg$traj=="2-3" | EuAgg$traj=="3-3")]="Stable"
+EuAgg$trcat[which(EuAgg$traj=="1-1" | EuAgg$traj=="1-2" |
+                   EuAgg$traj=="2-1")]="Drying"
+EuAgg$trcat[which(EuAgg$traj=="1-4" | EuAgg$traj=="2-4" |
+                   EuAgg$traj=="1-3")]="Accelerating"
+EuAgg$trcat[which(EuAgg$traj=="4-1" | EuAgg$traj=="4-2" |
+                   EuAgg$traj=="3-1")]="Decelerating"
+
+
+EuAgg2 = aggregate(list(val=EuAgg$val),
+                  by = list(traj=EuAgg$trcat),
+                  FUN = function(x) c(sum=sum(x)))
+SumEuPix=sum(EuAgg2$val)
+EuAgg2$rel.val=EuAgg2$val/SumEuPix*100
+sum(EuAgg2$rel.val)
+magg$order=1
+RegioSize = aggregate(list(val=databipi3$upa),
+                      by = list(region=databipi3$Biogeo_id),
+                      FUN = function(x) c(len=length(x)))
+
+sum(RegioSize$val)
+
+unique(databipi2$Biogeo_id)
+magg = aggregate(list(val=databipi2$upa),
+                 by = list(reg=databipi2$Biogeo_id ,traj=databipi2$bi_class),
+                 FUN = function(x) c(len=length(x)))
+magg <- do.call(data.frame, magg)
+sum(magg$val)
+magg=magg[-which(magg$reg=="Steppic" | magg$reg=="BlackSea" | magg$reg=="Arctic"),]
+magg$trcat="Wetting"
+magg$trcat[which(magg$traj=="2-2" | magg$traj=="3-2" |
+                 magg$traj=="2-3" | magg$traj=="3-3")]="Stable"
+magg$trcat[which(magg$traj=="1-1" | magg$traj=="1-2" |
+                 magg$traj=="2-1")]="Drying"
+magg$trcat[which(magg$traj=="1-4" | magg$traj=="2-4" |
+                   magg$traj=="1-3")]="Accelerating"
+magg$trcat[which(magg$traj=="4-1" | magg$traj=="4-2" |
+                   magg$traj=="3-1")]="Decelerating"
+magg$order=1
+magg$order[which(magg$trcat=="Wetting")]=2
+magg$order[which(magg$trcat=="Decelerating")]=3
+magg$order[which(magg$trcat=="Drying")]=4
+magg$order[which(magg$trcat=="Accelerating")]=5
+
+matshit=match(magg$traj,names(colord))
+magg$ordf=colord[matshit]
+magg <- magg %>% 
+  mutate(traj = reorder(traj, ordf, FUN = mean))
+
+
+magg2 = aggregate(list(val=magg$val),
+                   by = list(traj=magg$trcat,regio=magg$reg),
+                   FUN = function(x) c(sum=sum(x)))
+
+rsize=(match(magg2$reg,RegioSize$region))
+magg2$rsize=NA
+magg2$rsize=RegioSize$val[rsize]
+magg2$ratio=magg2$val/magg2$rsize*100
+sum(magg$val[which(magg$reg=="Mediterranean")])
+
+
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
+
+tsize=15
+osize=18
+ggplot(magg, aes(x = reg, y = val, fill = traj)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = colorp) +
+  scale_x_discrete(name="Biogeoregions")+
+  scale_y_continuous(label=c(0,25,50,75,100),name="River pixels (%)")+
+  theme(axis.title=element_text(size=tsize),
+        axis.text=element_text(size=tsize),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Regional_trajectories4.jpg"), width=20, height=40, units=c("cm"),dpi=800)
 
 
 #2. CLIMATE TREND ------------------
@@ -1846,8 +2444,8 @@ Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 
 mv=match(Drplot$Id,Flplot$Id)
 plot(diff(mv))
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
+Flplot$d2015=Drplot$Rchange.Y2015
+Flplot$f2015=Flplot$Rchange.Y2015
 
 #Univariate plot for verification
 colNA="transparent"
@@ -1887,12 +2485,12 @@ if (uplot==T){
 
 #normalize change
 FlplotClim=Flplot
-a=sd(FlplotClim$f2020,na.rm=T)
-b=sd(FlplotClim$d2020,na.rm=T)
+a=sd(FlplotClim$f2015,na.rm=T)
+b=sd(FlplotClim$d2015,na.rm=T)
 a=b=1
 databiclim=FlplotClim
-databiclim$x=databiclim$f2020/a
-databiclim$y=databiclim$d2020/b
+databiclim$x=databiclim$f2015/a
+databiclim$y=databiclim$d2015/b
 
 hist(databiclim$x,breaks=100,xlim=c(-5,5))
 hist(databiclim$y,breaks=100,xlim=c(-5,5))
@@ -1924,16 +2522,16 @@ databiclim$bi_class=cx
 # Combine the main category and subcategory to make a label
 databiclim$combined_category <-databiclim$bi_class
 
-merdas=ClimateDroughtTrend$Rchange.Y2020[which(ClimateDroughtTrend$HydroR==2070016940)]
-merdav=databiclim$d2020[which(databiclim$Id==2070016940)]
+merdas=ClimateDroughtTrend$Rchange.Y2015[which(ClimateDroughtTrend$HydroR==2070016940)]
+merdav=databiclim$d2015[which(databiclim$Id==2070016940)]
 ## Pixel level --------------
 
-a=sd(ClimFloodTrendPix$Y2020,na.rm=T)
-b=sd(ClimDroughtTrendPix$Y2020,na.rm=T)
+a=sd(ClimFloodTrendPix$Y2015,na.rm=T)
+b=sd(ClimDroughtTrendPix$Y2015,na.rm=T)
 a=b=1
 databipic=Flpixplot
-databipic$x=ClimFloodTrendPix$Y2020/a
-databipic$y=ClimDroughtTrendPix$Y2020/b
+databipic$x=ClimFloodTrendPix$Y2015/a
+databipic$y=ClimDroughtTrendPix$Y2015/b
 
 
 sd(databipic$x,na.rm=T)
@@ -1961,15 +2559,15 @@ cx=paste(c2,c1,sep="-")
 
 databipic$bi_class=cx
 
-mbicli=data.frame(x=mean(databiclim$d2020,na.rm=T),y=mean(databiclim$f2020,na.rm=T),xsd=sd(databiclim$d2020,na.rm=T),ysd=sd(databiclim$f2020,na.rm=T))
+mbicli=data.frame(x=mean(databiclim$d2015,na.rm=T),y=mean(databiclim$f2015,na.rm=T),xsd=sd(databiclim$d2015,na.rm=T),ysd=sd(databiclim$f2015,na.rm=T))
 
-mbicli=data.frame(x=mean(databiclim$d2020,na.rm=T),y=mean(databiclim$f2020,na.rm=T),
-                 xq1=quantile(databiclim$d2020,0.05,na.rm=T),yq1=quantile(databiclim$f2020,0.05,na.rm=T),
-                 xq2=quantile(databiclim$d2020,0.95,na.rm=T),yq2=quantile(databiclim$f2020,0.95,na.rm=T))
+mbicli=data.frame(x=mean(databiclim$d2015,na.rm=T),y=mean(databiclim$f2015,na.rm=T),
+                 xq1=quantile(databiclim$d2015,0.05,na.rm=T),yq1=quantile(databiclim$f2015,0.05,na.rm=T),
+                 xq2=quantile(databiclim$d2015,0.95,na.rm=T),yq2=quantile(databiclim$f2015,0.95,na.rm=T))
 
 
 
-ggplot(databiclim, aes(x = d2020, y = f2020, fill = combined_category)) +
+ggplot(databiclim, aes(x = d2015, y = f2015, fill = combined_category)) +
   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   scale_fill_manual(values = colors) +
@@ -2041,8 +2639,41 @@ pl=ggarrange(map, legend,
 
 
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_HR_new3.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800)
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_HR_9.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800)
 
+
+#extra analysis
+
+databipic2=databipic
+databipic2$trcat="Wetting"
+databipic2$trcat[which(databipic2$bi_class=="2-2" | databipic2$bi_class=="3-2" |
+                        databipic2$bi_class=="2-3" | databipic2$bi_class=="3-3")]="Stable"
+databipic2$trcat[which(databipic2$bi_class=="1-1" | databipic2$bi_class=="1-2" |
+                        databipic2$bi_class=="2-1")]="Drying"
+databipic2$trcat[which(databipic2$bi_class=="1-4" | databipic2$bi_class=="2-4" |
+                        databipic2$bi_class=="1-3")]="Accelerating"
+databipic2$trcat[which(databipic2$bi_class=="4-1" | databipic2$bi_class=="4-2" |
+                        databipic2$bi_class=="3-1")]="Decelerating"
+
+databipiD=databipi2[which(databipi2$trcat=="Decelerating"),]
+databipicD=databipic2[which(databipi2$trcat=="Decelerating"),]
+
+math=match(databipiD$HydroRegions_raster_WGS84,GHshpp$Id)
+databipiD$HERName=GHshpp$IRST_NAMEB[math]
+databipiD$HERcheck=databipiD$HydroRegions_raster_WGS84
+
+locD1=aggregate(list(val=databipi$upa),
+                by = list(regio=databipi$Biogeo_id),
+                FUN = function(x) c(len=length(x)))
+
+locDt=aggregate(list(val=databipiD$upa),
+                by = list(regio=databipiD$Biogeo_id),
+                FUN = function(x) c(len=length(x)))
+
+locDt$rat=locDt$val/locD1$val  
+ClimDT = aggregate(list(val=databipicD$upa),
+                      by = list(traj=databipicD$trcat),
+                      FUN = function(x) c(len=length(x)))
 
 #3. LAND USE TREND --------------
 
@@ -2051,8 +2682,8 @@ LanduseDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[2]),]
 LanduseFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 LanduseDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-LanduseFloodTrend$f2020=LanduseFloodTrend$Rchange.Y2020
-LanduseDroughtTrend$f2020=LanduseDroughtTrend$Rchange.Y2020
+LanduseFloodTrend$f2015=LanduseFloodTrend$Rchange.Y2015
+LanduseDroughtTrend$f2015=LanduseDroughtTrend$Rchange.Y2015
 
 FlPoint=full_join(GHshpp,LanduseFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
@@ -2067,16 +2698,16 @@ Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
+Flplot$d2015=Drplot$Rchange.Y2015
+Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotLu=Flplot
-a=sd(FlplotLu$f2020,na.rm=T)
-b=sd(FlplotLu$d2020,na.rm=T)
+a=sd(FlplotLu$f2015,na.rm=T)
+b=sd(FlplotLu$d2015,na.rm=T)
 a=b=1
 databilu=FlplotLu
-databilu$x=databilu$f2020/a
-databilu$y=databilu$d2020/b
+databilu$x=databilu$f2015/a
+databilu$y=databilu$d2015/b
 
 breaker1=0
 breaker2=5
@@ -2107,8 +2738,8 @@ databilu$combined_category <-databilu$bi_class
 
 ## Pixel level
 
-luflood=LuFloodTrendPix$Y2020
-ludrought=LuDroughtTrendPix$Y2020
+luflood=LuFloodTrendPix$Y2015
+ludrought=LuDroughtTrendPix$Y2015
 a=sd(luflood,na.rm=T)
 b=sd(ludrought,na.rm=T)
 a=b=1
@@ -2146,16 +2777,16 @@ cx=paste(c2,c1,sep="-")
 
 databipilu$bi_class=cx
 
-mbilu=data.frame(x=mean(databilu$d2020,na.rm=T),y=mean(databilu$f2020,na.rm=T),xsd=sd(databilu$d2020,na.rm=T),ysd=sd(databilu$f2020,na.rm=T))
+mbilu=data.frame(x=mean(databilu$d2015,na.rm=T),y=mean(databilu$f2015,na.rm=T),xsd=sd(databilu$d2015,na.rm=T),ysd=sd(databilu$f2015,na.rm=T))
 
 
-mbilu=data.frame(x=mean(databilu$d2020,na.rm=T),y=mean(databilu$f2020,na.rm=T),
-                  xq1=quantile(databilu$d2020,0.05,na.rm=T),yq1=quantile(databilu$f2020,0.05,na.rm=T),
-                  xq2=quantile(databilu$d2020,0.95,na.rm=T),yq2=quantile(databilu$f2020,0.95,na.rm=T))
+mbilu=data.frame(x=mean(databilu$d2015,na.rm=T),y=mean(databilu$f2015,na.rm=T),
+                  xq1=quantile(databilu$d2015,0.05,na.rm=T),yq1=quantile(databilu$f2015,0.05,na.rm=T),
+                  xq2=quantile(databilu$d2015,0.95,na.rm=T),yq2=quantile(databilu$f2015,0.95,na.rm=T))
 
 # 
 # 
-# ggplot(databilu, aes(x = d2020, y = f2020, fill = combined_category)) +
+# ggplot(databilu, aes(x = d2015, y = f2015, fill = combined_category)) +
 #   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
 #   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
 #   scale_fill_manual(values = colors) +
@@ -2255,16 +2886,16 @@ period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
 
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
+Flplot$d2015=Drplot$Rchange.Y2015
+Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotRes=Flplot
-a=sd(FlplotRes$f2020,na.rm=T)
-b=sd(FlplotRes$d2020,na.rm=T)
+a=sd(FlplotRes$f2015,na.rm=T)
+b=sd(FlplotRes$d2015,na.rm=T)
 a=b=1
 databire=FlplotRes
-databire$x=databire$f2020/a
-databire$y=databire$d2020/b
+databire$x=databire$f2015/a
+databire$y=databire$d2015/b
 
 # breaker1=0
 # breaker2=0.25
@@ -2295,8 +2926,8 @@ databire$combined_category <-databire$bi_class
 
 
 #Reservoir signal
-crsiflood=ResFloodTrendPix$Y2020
-crsidrought=ResDroughtTrendPix$Y2020
+crsiflood=ResFloodTrendPix$Y2015
+crsidrought=ResDroughtTrendPix$Y2015
 a=sd(crsiflood,na.rm=T)
 b=sd(crsidrought,na.rm=T)
 a=b=1
@@ -2334,9 +2965,9 @@ cx=paste(c2,c1,sep="-")
 
 databipire$bi_class=cx
 
-mbires=data.frame(x=mean(databire$d2020,na.rm=T),y=mean(databire$f2020,na.rm=T),
-                  xq1=quantile(databire$d2020,0.05,na.rm=T),yq1=quantile(databire$f2020,0.05,na.rm=T),
-                  xq2=quantile(databire$d2020,0.95,na.rm=T),yq2=quantile(databire$f2020,0.95,na.rm=T))
+mbires=data.frame(x=mean(databire$d2015,na.rm=T),y=mean(databire$f2015,na.rm=T),
+                  xq1=quantile(databire$d2015,0.05,na.rm=T),yq1=quantile(databire$f2015,0.05,na.rm=T),
+                  xq2=quantile(databire$d2015,0.95,na.rm=T),yq2=quantile(databire$f2015,0.95,na.rm=T))
 
 
 #5. Water Demand signal ------------------
@@ -2362,16 +2993,16 @@ period=c(1951,2020)
 haz="flood"
 Drplot <- st_transform(Drplot, crs = 3035)
 
-Flplot$d2020=Drplot$Rchange.Y2020
-Flplot$f2020=Flplot$Rchange.Y2020
+Flplot$d2015=Drplot$Rchange.Y2015
+Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotWD=Flplot
-a=sd(FlplotWD$f2020,na.rm=T)
-b=sd(FlplotWD$d2020,na.rm=T)
+a=sd(FlplotWD$f2015,na.rm=T)
+b=sd(FlplotWD$d2015,na.rm=T)
 a=b=1
 databiwd=FlplotWD
-databiwd$x=databiwd$f2020/a
-databiwd$y=databiwd$d2020/b
+databiwd$x=databiwd$f2015/a
+databiwd$y=databiwd$d2015/b
 
 # breaker1=0
 # breaker2=0.25
@@ -2402,8 +3033,8 @@ databiwd$combined_category <-databiwd$bi_class
 
 
 ## Pixel level ---------------
-crsiflood=WuFloodTrendPix$Y2020
-crsidrought=WuDroughtTrendPix$Y2020
+crsiflood=WuFloodTrendPix$Y2015
+crsidrought=WuDroughtTrendPix$Y2015
 a=sd(crsiflood,na.rm=T)
 b=sd(crsidrought,na.rm=T)
 a=b=1
@@ -2441,26 +3072,84 @@ cx=paste(c2,c1,sep="-")
 
 databipiwd$bi_class=cx
 
-#mbiwd=data.frame(x=mean(databiwd$d2020,na.rm=T),y=mean(databiwd$f2020,na.rm=T),xsd=sd(databiwd$d2020,na.rm=T),ysd=sd(databiwd$f2020,na.rm=T))
+#mbiwd=data.frame(x=mean(databiwd$d2015,na.rm=T),y=mean(databiwd$f2015,na.rm=T),xsd=sd(databiwd$d2015,na.rm=T),ysd=sd(databiwd$f2015,na.rm=T))
 
 
-mbiwd=data.frame(x=mean(databiwd$d2020,na.rm=T),y=mean(databiwd$f2020,na.rm=T),
-                  xq1=quantile(databiwd$d2020,0.05,na.rm=T),yq1=quantile(databiwd$f2020,0.05,na.rm=T),
-                  xq2=quantile(databiwd$d2020,0.95,na.rm=T),yq2=quantile(databiwd$f2020,0.95,na.rm=T))
+mbiwd=data.frame(x=mean(databiwd$d2015,na.rm=T),y=mean(databiwd$f2015,na.rm=T),
+                  xq1=quantile(databiwd$d2015,0.05,na.rm=T),yq1=quantile(databiwd$f2015,0.05,na.rm=T),
+                  xq2=quantile(databiwd$d2015,0.95,na.rm=T),yq2=quantile(databiwd$f2015,0.95,na.rm=T))
 
 
 # Bivariate plots of mean contribution ----------------------
 
 
+#plot of location by driver
 
-biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
-biogeof=fortify(biogeo)
-st_geometry(biogeof)<-NULL
-biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
-Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
-biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
-biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
-biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
+databipicl=data.frame(databipic[,c(79:86)])
+databipicl$driver="Climate"
+
+databipilul=data.frame(databipilu[,c(79:86)])
+databipilul$driver="LandUse"
+
+databipirel=data.frame(databipire[,c(79:86)])
+databipirel$driver="Reservoir"
+
+databipiwdl=data.frame(databipiwd[,c(79:86)])
+databipiwdl$driver="WaterDemand"
+
+databipD=rbind(databipicl,databipilul,
+               databipirel,databipiwdl)
+
+databipD$bi_class[which(databipD$bi_class=="NA-NA")]=NA
+databipD$bi_class[which(is.na(databipD$Y2015))]=NA
+databipD$bi_class[which(is.na(databipD$d2015))]=NA
+
+magg2 = aggregate(list(val=databipD$upa),
+                 by = list(reg=databipD$driver ,traj=databipD$bi_class),
+                 FUN = function(x) c(len=length(x)))
+magg2 <- do.call(data.frame, magg2)
+magg2=magg2[-which(magg2$traj=="NA-1" | magg2$traj=="NA-2" 
+                 | magg2$traj=="NA-3"),]
+magg2$trcat="Wetting"
+magg2$trcat[which(magg2$traj=="2-2" | magg2$traj=="3-2" |
+                   magg2$traj=="2-3" | magg2$traj=="3-3")]="Stable"
+magg2$trcat[which(magg2$traj=="1-1" | magg2$traj=="1-2" |
+                   magg2$traj=="2-1")]="Drying"
+magg2$trcat[which(magg2$traj=="1-4" | magg2$traj=="2-4" |
+                   magg2$traj=="1-3")]="Accelerating"
+magg2$trcat[which(magg2$traj=="4-1" | magg2$traj=="4-2" |
+                   magg2$traj=="3-1")]="Decelerating"
+magg2$order=1
+magg2$order[which(magg2$trcat=="Wetting")]=2
+magg2$order[which(magg2$trcat=="Decelerating")]=3
+magg2$order[which(magg2$trcat=="Drying")]=4
+magg2$order[which(magg2$trcat=="Accelerating")]=5
+
+matshit=match(magg2$traj,names(colord))
+magg2$ordf=colord[matshit]
+magg2 <- magg2 %>% 
+  mutate(traj = reorder(traj, ordf, FUN = mean))
+
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
+magg3=magg2[which(magg2$reg=="LandUse"),]
+ggplot(magg3, aes(x = trcat, y = val, fill = trcat)) +
+  geom_bar(stat = "identity") +
+  scale_fill_manual(values = loscolors) +
+  scale_x_discrete(name="Trajectory")+
+  scale_y_continuous(label=c(0,25,50,75,100),name="River pixels (%)")+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+
+
 
 
 
@@ -2725,7 +3414,7 @@ bpc=ggplot() +
     legend.title = element_text(size = 20, face = "bold"),
     legend.text = element_text(size = 16),
     #legend.key = element_rect(fill = "lightgray", colour = "lightgray"),
-    legend.position = "right",
+    legend.position = "bottom",
     panel.grid.major = element_line(colour = "grey60"),
     panel.grid.minor= element_line(colour = "grey70", linetype = "dashed"),
     #legend.key = element_rect(fill = "white", colour = "white"),
@@ -2733,7 +3422,15 @@ bpc=ggplot() +
   )
 
 bpc
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HR_new3.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HR_9.jpg"),bpc, width=20, height=20, units=c("cm"),dpi=300) 
+
+
+
+#Temporal evolution per region
+mbicli=aggregate(list(val=databiclixHR$y.y),
+                  by = list(HR=databiclixHR$HydrRName),
+                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
+mbicli1 <- do.call(data.frame, mbicli1)
 
 
 
@@ -2742,46 +3439,66 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contributio
 mb1=mbfX[which(mbfX$bg=="Mediterranean"),]
 mb1=mbfX[which(mbfX$bg=="Continental"),]
 
-bpc=ggplot(mb1, aes(x = x, y = y, fill = names)) +
-  geom_point(data=mb1, aes(x = x, y = y, color = names, size=val.l.x), show.legend = TRUE, stroke=1, alpha=.5) +
-  #scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
-  scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
-  #scale_shape_manual(values = shapex, name = "Regions") +
-  coord_cartesian(xlim=c(-100,100),ylim=c(-50,50)) +
-  annotate("text", x = 50, y = 20, label = "Wetting", color = "#169dd0", size = 7, fontface = "bold") +
-  annotate("text", x = -50, y = 20, label = "Accelerating", color = "#174f28", size = 7, fontface = "bold") +
-  annotate("text", x = -50, y = -20, label = "Drying", color = "#dd6a29", size = 7, fontface = "bold") +
-  annotate("text", x = 50, y = -20, label = "Decelerating", color = "burlywood", size = 7, fontface = "bold") +
-  labs(x = "Change in drought (%)", 
-       y = "Change in flood (%)") +
-  scale_x_continuous(trans=scales::modulus_trans(.5),
-                     breaks=seq(-100,100,50),
-                     minor_breaks = seq(-100,100,10)) +
-  scale_y_continuous(trans=scales::modulus_trans(.5),
-                     breaks=seq(-100,100,25),
-                     minor_breaks = seq(-100,100,10)) +
-  guides( fill = guide_legend(override.aes = list(size = 6)))+
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    title = element_text(size = 22, face = "bold"),
-    axis.text = element_text(size = 16, face = "bold"),
-    panel.background = element_rect(fill = "white", colour = "white"),
-    panel.grid = element_blank(),
-    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
-    legend.title = element_text(size = 20, face = "bold"),
-    legend.text = element_text(size = 16),
-    #legend.key = element_rect(fill = "lightgray", colour = "lightgray"),
-    legend.position = "right",
-    panel.grid.major = element_line(colour = "grey60"),
-    panel.grid.minor= element_line(colour = "grey70", linetype = "dashed"),
-    #legend.key = element_rect(fill = "white", colour = "white"),
-    #legend.key.size = unit(1, "cm")
-  )
-
-bpc
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_bv.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
-
 length(unique(GHshpp$IRST_NAMEB))
+
+#Here my plot by driver for different trajectories
+
+
+
+#wetting
+mbfX$traj="maggle"
+mbfX$traj[which(mbfX$y>=0 & mbfX$x>0)]="Wetting"
+
+mbfX$traj[which(mbfX$y<=0 & mbfX$x>=0)]="Decelerating"
+
+mbfX$traj[which(mbfX$y<=0 & mbfX$x<=0)]="Drying"
+
+mbfX$traj[which(mbfX$y>=0 & mbfX$x<=0)]="Accelerating"
+
+s1=sum(magg2$val[which(magg2$reg=="Landuse")])
+magg2 = aggregate(list(val=mbfX$HR),
+                  by = list(reg=mbfX$names,traj=mbfX$traj),
+                  FUN = function(x) c(len=length(x)))
+magg2 <- do.call(data.frame, magg2)
+
+magg2$perc=magg2$val/s1*100
+clabels=c("Climate","Landuse","Reservoirs", "WaterDemand")
+atraj=c("Wetting","Decelerating","Drying","Accelerating")
+for (driv in atraj){
+  # driv=atraj[1]
+  magg3=magg2[which(magg2$traj==driv),]
+
+  mierda=match(clabels,magg3$reg)
+  addup=clabels[which(is.na(mierda))]
+  if (length(addup)>0){
+    mad=c(addup,driv,0)
+    magg3=rbind(magg3,mad)
+    magg3$val=as.numeric(magg3$val)
+  }
+  magg3$valp=magg3$val/length(mbfH$HR)*100
+  ggplot(magg3, aes(x = reg, y = valp, fill = reg)) +
+    geom_bar(stat = "identity") +
+    scale_fill_manual(values = colorn) +
+    scale_x_discrete(name=" ")+
+    scale_y_continuous("HydroRegion (%)", limits=c(0,100))+
+    theme(axis.title=element_text(size=16),
+          axis.text = element_text(size=12),
+          panel.background = element_rect(fill = "white", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "none",
+          plot.title=element_text(size=20),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle(driv)
+  
+  
+  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/driverxtraj3_",driv,".jpg"), width=12, height=8, units=c("cm"),dpi=300) 
+  
+
+}
+
 
 #plot of historical change with colors by biogeoregions
 
@@ -2831,6 +3548,27 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Map_HRxBG2.
 
 h2p=match(mbfH$HR,bioplot$IRST_NAMEB)
 mbfH$biogeo=bioplot$BR[h2p]
+mbfH$CODEB=bioplot$CODEB[h2p]
+
+n2t=match(trendFlood$HydroR ,bioplot$CODEB)
+trendFlood$Hname=bioplot$IRST_NAMEB[n2t]
+s2p=match(mbfH$HR,trendFlood$Hname)
+mbfH$fsig=trendFlood$change[s2p]
+
+length(trendDrought$HydroR[which(trendDrought$change==2)])/length(trendDrought$HydroR)
+n2t=match(trendDrought$HydroR ,bioplot$CODEB)
+trendDrought$Hname=bioplot$IRST_NAMEB[n2t]
+s2p=match(mbfH$HR,trendDrought$Hname)
+mbfH$dsig=trendDrought$change[s2p]
+
+mbfH$fdsig=0
+mbfH$fdsig=abs(mbfH$fsig)+abs(mbfH$dsig)
+
+mbfHsig=mbfH[which(mbfH$fdsig==4),]
+
+
+mbfHuns=mbfH[which(mbfH$fdsig==3),]
+
 colx=c("Alpine"="deeppink","Atlantic"="forestgreen","Boreal"="darkviolet", "Continental"="orange3","Mediterranean"="gold")
 bpc=ggplot() +
   geom_vline(xintercept = 0, 
@@ -2840,11 +3578,15 @@ bpc=ggplot() +
   #geom_linerange(data=mbfH,aes(x=x, ymin=yq1,ymax=yq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   #geom_linerange(data=mbfH,aes(y=y, xmin=xq1,xmax=xq2,color = names,group=factor(names)),lwd=2,alpha=0.5) +
   # geom_point(data=mbf, aes(x = x, y = y, fill = names), shape = 21, color = "black", size = 5, show.legend = FALSE) +
-  geom_point(data=mbfH, aes(x = x, y = y, color=biogeo,size=val.l.x), show.legend = TRUE, stroke=1, alpha=.6) +
+  geom_point(data=mbfH, aes(x = x, y = y, color=biogeo,size=val.l.x), show.legend = TRUE, stroke=0, alpha=.7) +
+  geom_text(data=mbfH, aes(x=x, y=y,label = CODEB), size = 3, color = "black",fontface = "bold") +
+  #geom_point(data=mbfHuns, aes(x = x, y = y,size=val.l.x), fill=NA,show.legend = F,pch=1, stroke=1, col="black", alpha=.6) +
+  #geom_circle(data=mbfHuns, aes(x0 = x, y0 = y,r=.2),linetype="dashed", col="black", alpha=1,inherit.aes = FALSE)+
+  geom_point(data=mbfHsig, aes(x = x, y = y,size=val.l.x), fill=NA,show.legend = F, shape=1, stroke=1, col="black", alpha=.8) +
   #scale_fill_manual(values = colorn, name = "Drivers", labels = clabels) +
   #scale_color_manual(values = colorn, name = "Drivers", labels = clabels) +
   scale_color_manual(values = colx, name = "Regions") +
-  scale_size(range = c(3, 8))+
+  scale_size(range = c(6, 14))+
   coord_cartesian(xlim=c(-lalim,lalim+10),ylim=c(-lalim,lalim)) +
   annotate("text", x = 40, y = 45, label = "Wetting", color = "#169dd0", size = 6, fontface = "bold") +
   annotate("text", x = -35, y = 45, label = "Accelerating", color = "#174f28", size = 6, fontface = "bold") +
@@ -2878,10 +3620,57 @@ bpc=ggplot() +
   )
 
 bpc
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HRxBG_new3.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_HRxBG_6.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
 
+#histogram per BGR of count of HER per categories
+
+mbfH$fdg=mbfH$fsig+mbfH$dsig
+mbfH$traj=0
+
+#wetting
+mbfH$traj[which(mbfH$fsig>0 & mbfH$dsig>0)]=1
+#signifcant wetting
+mbfH$traj[which(mbfH$traj==1 & mbfH$fdsig==4)]=2
+
+#wetting
+mbfH$traj[which(mbfH$fsig>0 & mbfH$dsig>0)]=1
+#signifcant wetting
+mbfH$traj[which(mbfH$traj==1 & mbfH$fdsig==4)]=2
+
+#decelerating
+mbfH$traj[which(mbfH$fsig<0 & mbfH$dsig>0)]=3
+#signifcant decelerating
+mbfH$traj[which(mbfH$traj==3 & mbfH$fdsig==4)]=4
+
+#drying
+mbfH$traj[which(mbfH$fsig<0 & mbfH$dsig<0)]=5
+#signifcant drying
+mbfH$traj[which(mbfH$traj==5 & mbfH$fdsig==4)]=6
+
+#accelerating
+mbfH$traj[which(mbfH$fsig>0 & mbfH$dsig<0)]=7
+#signifcant accelerating
+mbfH$traj[which(mbfH$traj==7 & mbfH$fdsig==4)]=8
+#aggregation
+magg = aggregate(list(val=mbfH$x),
+                 by = list(reg=mbfH$biogeo,traj=mbfH$traj),
+                 FUN = function(x) c(len=length(x)))
+magg <- do.call(data.frame, magg)
+
+paet=c("lightblue","royalblue", "beige","lightgoldenrod",
+       "orange","darkorange","lightgreen","forestgreen")
+labeli=c("wetting","sig. wetting","decelerating","sig. decelerating",
+         "drying","sig. drying","accelerating","sig. accelerating")
+ggplot(magg, aes(x = reg, y = val, fill = factor(traj))) +
+  geom_bar(stat = "identity", position = "stack") +
+  scale_fill_manual(
+    values=paet, labels=labeli)
+
+
+
+
+library(ggplot2)
 v=0
-
 #wetting
 length(which(mbfH$x>v & mbfH$y>v))/length(mbfH$HR)*100
 #accelerating
@@ -2904,8 +3693,17 @@ length(which(mbfC$x>v & mbfC$y<(-v)))/length(mbfC$HR)*100
 length(which(mbfC$x<(-v) & mbfC$y<(-v)))/length(mbfC$HR)*100
 
 mbfL=mbfX[which(mbfX$names=="Landuse"),]
-length(which(mbfL$x>v & mbfL$y>v))/length(mbfL$HR)*100
+length(which(mbfL$x<v & mbfL$y>v))/length(mbfL$HR)*100
 
+#wetting
+length(mbfHsig$HR)/length(mbfH$HR)*100
+length(which(mbfHsig$x>v & mbfHsig$y>v))/length(mbfH$HR)*100
+#accelerating
+length(which(mbfHsig$x<(-v) & mbfHsig$y>v))/length(mbfH$HR)*100
+#decelerating
+length(which(mbfHsig$x>v & mbfHsig$y<(-v)))/length(mbfH$HR)*100
+#drying
+length(which(mbfHsig$x<(-v) & mbfHsig$y<(-v)))/length(mbfH$HR)*100
 
 mbfR=mbfX[which(mbfX$names=="Reservoirs"),]
 length(which(mbfL$x>v & mbfL$y>v))/length(mbfL$HR)*100
@@ -2942,17 +3740,17 @@ mbfH$cat3[(which(mbfC$x<(-v) & mbfC$y>v))]="accelerating"
 
 
 mbfMAAX=inner_join(mbfH,mbfL,by="HR")
-mbana=mbfH[which(mbfH$cat2=="decelerating"),]
-
+mbana=mbfH[which(mbfH$cat=="decelerating"),]
+length(mbana$x)
 length(which(mbana$cat3=="decelerating"))
 length(which(mbana$cat3=="accelerating"))
 length(which(mbana$cat3=="drying"))
 length(which(mbana$cat3=="wetting"))
 
-16/(24)
-write.csv(mbfH,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Histo_res_bvHR_new2.csv"))
+9/(16)
+write.csv(mbfH,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Histo_res_bvHR_6.csv"))
 
-write.csv(mbfX,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Drivers_res_bvHR_new2.csv"))
+write.csv(mbfX,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Drivers_res_bvHR_6.csv"))
 
 
 
@@ -2961,7 +3759,7 @@ write.csv(mbfX,file=paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Driv
 st_geometry(databiclim) <- NULL
 databic2=inner_join(mbfH,GHshpp,by=c("HR"="IRST_NAMEB"))
 #databic2=full_join(databic2,mbfH,by=c("IRST_NAMEB.y"="HR"))
-databic2$xdr=2*(databic2$val.sd.x/sqrt(databic2$val.l.x))*1.96
+databic2$xdr=databic2$val.l.x/length(databiclixBG$PK_UID)*(databic2$val.sd.x)^2
 databic2$xfl=2*(databic2$val.sd.y/sqrt(databic2$val.l.x))*1.96
 plot(databic2$xdr)
 palet=c(hcl.colors(11, palette = "OrRd", alpha = NULL, rev = T, fixup = TRUE))
@@ -2973,7 +3771,7 @@ map <- ggplot(basemap) +
   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
   # scale_fill_manual(values = colorp) +
   scale_fill_gradientn(
-    colors=palet, name="95% CI of the mean", limits=c(0,5), oob = scales::squish)   +
+    colors=palet, name="95% CI of the mean", limits=c(0,50), oob = scales::squish)   +
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
   # scale_color_manual(values = colorp) +
@@ -3049,6 +3847,8 @@ map <- ggplot(basemap) +
 map
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapreg_HR.jpg"), map, width=30, height=20, units=c("cm"),dpi=300) 
+
+
 # Combination of drivers ------------------------
 databicr=databiclim
 databicr$x= databire$x + databiclim$x
@@ -3059,7 +3859,7 @@ hist(databire$x,breaks=100,xlim=c(-50,50))
 hist(databicr$y,breaks=100,xlim=c(-5,5))
 
 breaker1=0
-breaker2=10
+breaker2=5
 
 alterclass=data.frame(databicr$x)
 alterclass$class=NA
@@ -3083,7 +3883,7 @@ databicr$bi_class=cx
 databicr$combined_category <-databicr$bi_class
 
 # 
-# ggplot(databicr, aes(x = d2020, y = f2020, fill = combined_category)) +
+# ggplot(databicr, aes(x = d2015, y = f2015, fill = combined_category)) +
 #   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
 #   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
 #   scale_fill_manual(values = colors) +
@@ -3146,6 +3946,42 @@ databicrl$bi_class=cx
 # Combine the main category and subcategory to make a label
 databicrl$combined_category <-databicrl$bi_class
 
+
+databicrlw=databiclim
+
+databicrlw$x=databilu$x + databire$x + databiclim$x + databiwd$x
+databicrlw$y=databilu$y + databire$y + databiclim$y + databiwd$y
+
+
+hist(databicrlw$x,breaks=100,xlim=c(-5,5))
+hist(databicrlw$y,breaks=100,xlim=c(-5,5))
+
+# breaker1=0
+# breaker2=10
+
+alterclass=data.frame(databicrlw$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databicrlw$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+cx=paste(c2,c1,sep="-")
+databicrlw$bi_class=cx
+# Combine the main category and subcategory to make a label
+databicrlw$combined_category <-databicrlw$bi_class
+
+databicrlw=databicrlw[-which(is.na(databicrlw$d2015)),]
+
+plot(databicrlw$y,databitot$y)
 
 ## Pixel level -----------
 databipicr=databipic
@@ -3210,7 +4046,7 @@ databipicrl$combined_category <-databipicrl$bi_class
 # Some plots here --------------
 # 
 # 
-# ggplot(databicrl, aes(x = d2020, y = f2020, fill = combined_category)) +
+# ggplot(databicrl, aes(x = d2015, y = f2015, fill = combined_category)) +
 #   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
 #   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
 #   scale_fill_manual(values = colors) +
@@ -3291,13 +4127,45 @@ databipicrl$combined_category <-databipicrl$bi_class
 # pl
 
 
+
+databipicrlw=databipilu
+
+databipicrlw$x=databipilu$x + databipire$x + databipic$x + databipiwd$x
+databipicrlw$y=databipilu$y + databipire$y + databipic$y + databipiwd$y
+
+# breaker1=0
+# breaker2=0.25
+
+alterclass=data.frame(databipicrlw$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databipicrlw$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+cx=paste(c2,c1,sep="-")
+databipicrlw$bi_class=cx
+# Combine the main category and subcategory to make a label
+databipicrlw$combined_category <-databipicrlw$bi_class
+
+plot(databipicrlw$x[c(1:100000)],databipi$x[c(1:100000)])
+
+
 # SANKEY AT CATCHMENT LEVEL ------------
 
 #Sankey diagram of transers between classes
-databiclim=databiclim[-which(is.na(databiclim$d2020)),]
-databicrl=databicrl[-which(is.na(databicrl$d2020)),]
-databicr=databicr[-which(is.na(databicr$d2020)),]
-databitot=databitot[-which(is.na(databitot$d2020)),]
+# databiclim=databiclim[-which(is.na(databiclim$d2015)),]
+# databicrl=databicrl[-which(is.na(databicrl$d2015)),]
+# databicr=databicr[-which(is.na(databicr$d2015)),]
+#databitot=databitot[-which(is.na(databitot$d2015)),]
 
 
 databiclim$maxicat="Wetting"
@@ -3413,6 +4281,7 @@ df2 <- merge(df,
              by.x = 'node', 
              by.y = 'node', 
              all.x = FALSE)
+
 df2=df2[which(df2$x.x==df2$x.y),]
 df2$np=round(df2$n/ltot*100)
 pl <- ggplot(df2, aes(x = x.x,                        
@@ -3442,26 +4311,26 @@ pl <- pl + theme(axis.title = element_blank(),
                  panel.grid = element_blank())
 
 pl=pl + scale_fill_manual(values = loscolors) +
-  ggtitle("Change in the Europe's hydrological cycle between 1951 and 2020")
+  ggtitle("Change in the Europe's hydrological cycle between the 1950s and the 2010s")
 
 pl
 
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_catNew.jpg"), pl, width=30, height=20, units=c("cm"),dpi=300) 
 
-mean_lf=c(mean(databitot$d2020,na.rm=T),mean(databiclim$d2020,na.rm=T),mean(databicr$d2020,na.rm=T),mean(databicrl$d2020,na.rm=T))
+mean_lf=c(mean(databitot$d2015,na.rm=T),mean(databiclim$d2015,na.rm=T),mean(databicr$d2015,na.rm=T),mean(databicrl$d2015,na.rm=T))
 mean_scen=data.frame()
 
 ggplot() +
-  geom_point(data=databitot, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databitot, aes(x = d2015, y = f2015, fill = combined_category),
              shape = 21, color = "transparent", fill="blue",size = 3,alpha=0.1,show.legend = FALSE) +
-  geom_point(data=databiclim, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databiclim, aes(x = d2015, y = f2015, fill = combined_category),
              shape = 21, color = "transparent", fill= "red",alpha=0.1, size = 3,show.legend = FALSE) +
-  geom_point(data=databicr, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databicr, aes(x = d2015, y = f2015, fill = combined_category),
              shape = 21, color = "transparent", fill= "darkgreen",alpha=0.1,size = 3,show.legend = FALSE) +
-  geom_point(data=databicrl, aes(x = d2020, y = f2020, fill = combined_category),
+  geom_point(data=databicrl, aes(x = d2015, y = f2015, fill = combined_category),
              shape = 21, color = "transparent", fill= "purple",alpha=0.1,size = 3,show.legend = FALSE) +
-  #gg_bagplot(data=databicrl, d2020, f2020, color = "#00659e", scatterplot = FALSE)
+  #gg_bagplot(data=databicrl, d2015, f2015, color = "#00659e", scatterplot = FALSE)
   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
   #scale_fill_manual(values = colors) +
   coord_cartesian(xlim=c(-100,100),ylim=c(-50,50)) +
@@ -3493,10 +4362,10 @@ ggplot() +
 #reproduce my color palette: 
 loscolors=c("#174f28","#845e29","#dd6a29","#167984","#819185","#d8a386","#169dd0","#7ebbd2","#d3d3d3")
 al=0.8
-dataX=databitot[-which(is.na(databitot$d2020)),]
-#dataX=dataX[-which(is.na(dataX$f2020)),]
+dataX=databitot[-which(is.na(databitot$d2015)),]
+#dataX=dataX[-which(is.na(dataX$f2015)),]
 library(MASS)
-dataX$density <- get_density(dataX$d2020, dataX$f2020, n = 300)
+dataX$density <- get_density(dataX$d2015, dataX$f2015, n = 300)
 monstre_legend<-ggplot() +
   
   # annotate("rect", xmin=-Inf, xmax=-0.1, ymin=-Inf, ymax=-5, fill=loscolors[9], alpha=al) +
@@ -3523,7 +4392,7 @@ monstre_legend<-ggplot() +
   # Set axis labels
   labs(x = "Change in drought flows (% per decade)", 
        y = "Change in flood flows (% per decade)") +
-  geom_point(data=dataX, aes(x=d2020, y=f2020, col=density),alpha=0.5,size=2, shape=16) +
+  geom_point(data=dataX, aes(x=d2015, y=f2015, col=density),alpha=0.5,size=2, shape=16) +
   #geom_point(data= Rsig, aes(x=ObsChange, y=SimChange),fill="transparent", color="gray25",shape=21,size=2)+
   #geom_abline(slope=1,intercept=0,col="gray25",lwd=1.5,alpha=.5)+
   # 
@@ -3582,12 +4451,13 @@ mean(databipi$x,na.rm=T)
 mean(databipic$y,na.rm=T)
 mean(databipire$y,na.rm=T)
 mean(databipicrl$x,na.rm=T)
+mean(databipicrlw$x,na.rm=T)
 #Sankey diagram of transers between classes
 databipi=databipi[-which(is.na(databipicrl$x)),]
 databipic=databipic[-which(is.na(databipicrl$x)),]
 databipicr=databipicr[-which(is.na(databipicrl$x)),]
+databipicrlw=databipicrlw[-which(is.na(databipicrl$x)),]
 databipicrl=databipicrl[-which(is.na(databipicrl$x)),]
-
 
 databipic$maxicat="Wetting"
 databipic$maxicat[which(databipic$bi_class == "1-1" |
@@ -3642,6 +4512,24 @@ databipicrl$maxicat[which(databipicrl$bi_class == "3-3" |
                            databipicrl$bi_class == "3-2" |
                            databipicrl$bi_class == "2-3" |
                            databipicrl$bi_class == "2-2" )]="Stable"
+
+databipicrlw$maxicat="Wetting"
+databipicrlw$maxicat[which(databipicrlw$bi_class == "1-1" |
+                            databipicrlw$bi_class == "1-2" |
+                            databipicrlw$bi_class == "2-1" )]="Drying"
+
+databipicrlw$maxicat[which(databipicrlw$bi_class == "3-1" |
+                            databipicrlw$bi_class == "4-2" |
+                            databipicrlw$bi_class == "4-1" )]="Decelerating"
+
+databipicrlw$maxicat[which(databipicrlw$bi_class == "1-3" |
+                            databipicrlw$bi_class == "1-4" |
+                            databipicrlw$bi_class == "2-4" )]="Accelerating"
+
+databipicrlw$maxicat[which(databipicrlw$bi_class == "3-3" |
+                            databipicrlw$bi_class == "3-2" |
+                            databipicrlw$bi_class == "2-3" |
+                            databipicrlw$bi_class == "2-2" )]="Stable"
 
 
 databipi$maxicat="Wetting"
@@ -3731,7 +4619,7 @@ print(results_df)
 class1=databipic$maxicat
 class2=databipicr$maxicat
 class3=databipicrl$maxicat
-class4=databipi$maxicat
+class4=databipicrlw$maxicat
 
 ltot=length(databipi$bi_class)
 # class1=databiclim$combined_category
@@ -3800,22 +4688,22 @@ pl <- pl + theme(axis.title = element_blank(),
                  panel.grid = element_blank())
 
 pl=pl + scale_fill_manual(values = loscolors) +
-  ggtitle("Change in the Europe's hydrological cycle between 1951 and 2020")
+  ggtitle("Change in the Europe's hydrological cycle between the 1950s and the 2010s")
 
 pl
 
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixelsNew3.jpg"), pl, width=30, height=10, units=c("cm"),dpi=300) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixels5.jpg"), pl, width=30, height=10, units=c("cm"),dpi=300) 
 
 
 # part with barplots ------------------
 #barplot of contribution by driver for each category
-ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2020,LuFloodTrendPix$Y2020,WuFloodTrendPix$Y2020)
+ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2015,LuFloodTrendPix$Y2015,WuFloodTrendPix$Y2015)
 ptnnn=FloodTrends
 mx=(match(FloodTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 
-fagg = aggregate(list(val=dt_acc$Y2020),
+fagg = aggregate(list(val=dt_acc$Y2015),
                        by = list(Group=dt_acc$AllDrivers,driver=dt_acc$driver),
                        FUN = function(x) c(mean2=mean(x,na.rm=T),dev2=sd(x,na.rm=T),len2=length(x),median2=quantile(x,0.5,na.rm=T)))
 fagg <- do.call(data.frame, fagg)
@@ -3825,7 +4713,7 @@ ptnnn=DroughtTrends
 mx=(match(DroughtTrends$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 
-dagg =aggregate(list(val=dt_acc$Y2020),
+dagg =aggregate(list(val=dt_acc$Y2015),
                 by = list(Group=dt_acc$AllDrivers,driver=dt_acc$driver),
                 FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),median=quantile(x,0.5,na.rm=T)))
 dagg <- do.call(data.frame, dagg)
@@ -3924,7 +4812,7 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/change_by_c
 
 #redo this plot by Biogeoregions
 
-mean(FloodTrendsP$Y2020[which(driver==driver[3])])
+mean(FloodTrendsP$Y2015[which(driver==driver[3])])
 
 biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
 biogeof=fortify(biogeo)
@@ -3941,13 +4829,13 @@ bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
 
 
 #barplot of contribution by driver for each category
-ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2020,LuFloodTrendPix$Y2020,WuFloodTrendPix$Y2020)
+ptnnn=cbind(ClimFloodTrendPix,ResFloodTrendPix$Y2015,LuFloodTrendPix$Y2015,WuFloodTrendPix$Y2015)
 ptnnn=FloodTrendsP
 mx=(match(FloodTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
-# bio_acc$Y2020[which(bio_acc$Y2020==0)]=NA
-fagg =aggregate(list(val=bio_acc$Y2020),
+# bio_acc$Y2015[which(bio_acc$Y2015==0)]=NA
+fagg =aggregate(list(val=bio_acc$Y2015),
                 by = list(Group=bio_acc$code,driver=bio_acc$driver),
                 FUN = function(x) c(mean2=mean(x,na.rm=T),dev2=sd(x,na.rm=T),len2=length(x),median2=quantile(x,0.5,na.rm=T)))
 fagg <- do.call(data.frame, fagg)
@@ -3958,11 +4846,11 @@ mx=(match(DroughtTrendsP$outl2,ptnnn$outl2))
 dt_acc=data.frame(d[mx,],ptnnn)
 bio_acc=inner_join(biogeo_rivers,dt_acc,by=c("outl2"))
 #put a limit to max change: 1000
-bio_acc$Y2020[which(bio_acc$Y2020>200)]=200
+bio_acc$Y2015[which(bio_acc$Y2015>200)]=200
 #or 
-#bio_acc$Y2020[which(bio_acc$Y2020==0)]=NA
-#bio_acc$Y2020[which(bio_acc$Y2020<(-200))]=200
-dagg =aggregate(list(val=bio_acc$Y2020),
+#bio_acc$Y2015[which(bio_acc$Y2015==0)]=NA
+#bio_acc$Y2015[which(bio_acc$Y2015<(-200))]=200
+dagg =aggregate(list(val=bio_acc$Y2015),
                 by = list(Group=bio_acc$code,driver=bio_acc$driver),
                 FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),median=quantile(x,0.5,na.rm=T)))
 dagg <- do.call(data.frame, dagg)

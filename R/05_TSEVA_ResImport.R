@@ -112,9 +112,9 @@ Peaksave=c()
 outf=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="RWCF2"
-hazard="Drought"
-season="nonfrost"
+scenario="Histo2"
+hazard="Flood"
+season="year"
 mmx=""
 lf=list.files(path = paste0(hydroDir,"/TSEVA/",scenario,"/",hazard,"/",season,mmx), full.names = TRUE, recursive = TRUE)
 lf
@@ -236,7 +236,7 @@ gc()
 IRES_save=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="WCF"
+scenario="SocCF2"
 hazard="Drought"
 season="nonfrost"
 mmx=""
@@ -280,7 +280,7 @@ for (file in lf){
   
 }
 
-length(which(IRES_save$IRES==1))
+length(which(IRES_save$IRES>1))
 
 print(paste0(hydroDir,"/",hazard,"/IRES.",season,".",scenario,mmx,"_new2.Rdata"))
 
