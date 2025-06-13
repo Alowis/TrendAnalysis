@@ -1,3 +1,5 @@
+#Identification of pre and post 1951 reservoirs in EFAS-----
+# Library calling --------------------------------------------------
 library(rgdal)
 library(raster)
 library(rgdal)
@@ -12,10 +14,7 @@ library(rnaturalearth)
 library(rnaturalearthdata)
 library(rgeos)
 
-
-workDir<-("//ies.jrc.it/H07/nahaUsers/tilloal/ERA5l_x_lisflood")
 dataDir<-("D:/tilloal/Documents/LFRuns_utils/data")
-
 # Load the CSV file into a data frame
 data <- read.csv(paste0(dataDir,"/Catchments/from_hybas_eu_allATTR.csv"), header = TRUE)
 
@@ -100,156 +99,8 @@ resOpen=function(dir,outletname){
 }
 
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
-outletname="/res_European_01min_1951.nc"
-
-reservoirs=resOpen(hydroDir,outletname)
-
-
-#Import reservoir txt file
-res.meta=read.table(paste0(hydroDir,"/reservoirs/rtstor.txt"),sep="")
-
-#match metadata with reservoir volume
-resall=inner_join(reservoirs,res.meta, by=c("res"="V1"))
-
-
-#function to create netcdf
-
-history = 'Created Mar 2024' #####
-Conventions = 'CF-1.6'
-Source_Software = 'R netCDF4'
-reference = 'JRC Climate risk team'  #####
-title = 'Lisflood reservoir volume maps for EUROPE setting Feb. 2023'
-keywords = 'Lisflood, Global'
-source = 'JRC Ispra'
-institution = 'European Commission - Economics of climate change Unit (JRC.C.6) : https://ec.europa.eu/jrc/en/research-topic/climate-change'
-comment = 'no.'
-
-ncdf_creator<- function(arrin, ncname ,path, lon, lat, tsize, longname,name.var){
-  
-  ncfname <- paste(path, ncname, ".nc", sep="")
-  dname <- name.var  # note: tmp means temperature (not temporary)
-  # create and write the netCDF file -- ncdf4 version
-  # define dimensions
-  londim <- ncdim_def("lon","degrees_east",as.double(lon)) 
-  latdim <- ncdim_def("lat","degrees_north",as.double(lat)) 
-  
-  
-  arret0=as.array(arrin)
-  # define variables
-  fillvalue <- 0.0
-  dlname <- longname
-  if (length(tsize)==3){
-    timedim <- ncdim_def("time",tunits2,as.double(time2))
-    tmp_def <- ncvar_def(name.var,t$units,list(londim,latdim,timedim),fillvalue,dlname,prec="float",compression=4)
-    proj <-ncvar_def("wgs_1984","1",NULL,NULL,longname="wgs_1984",prec="integer")
-  }else{
-    tmp_def <- ncvar_def(name.var,t$units,list(londim,latdim),fillvalue,dlname,prec="float",compression=1)
-    #proj <-ncvar_def("wgs_1984","1",NULL,NULL,longname="wgs_1984",prec="integer")
-  }
-  
-  
-  
-  # create netCDF file and put arrays
-  ncout <- nc_create(ncfname,tmp_def,force_v4=TRUE)
-  
-  # put variables
-  ncvar_put(ncout,tmp_def,arret0)
-  
-  
-  # put additional attributes into dimension and data variables
-  ncatt_put(ncout,"lon","axis","X") #,verbose=FALSE) #,definemode=FALSE)
-  ncatt_put(ncout,"lat","axis","Y")
-  
-  ncatt_put(ncout,tmp_def,"standard_name",longname)
-  # ncatt_put(ncout,tmp_def,"grid_mapping","wgs_1984")
-  # ncatt_put(ncout,tmp_def,"esri_pe_string",'GEOGCS["WGS 84",DATUM["WGS_1984",SPHEROID["WGS 84",6378137,298.257223563,AUTHORITY["EPSG","7030"]],AUTHORITY["EPSG","6326"]],PRIMEM["Greenwich",0],UNIT["degree",0.0174532925199433],AUTHORITY["EPSG","4326"]]')
-  ncatt_put(ncout,tmp_def,"missing_value",as.numeric(0.0))
-  
-  # put the CRS attributes
-  # projname <- "wgs_1984"
-  # ncatt_put(ncout,proj,"name",projname)
-  # ncatt_put(ncout,proj,"long_name",projname)
-  # ncatt_put(ncout,proj,"grid_mapping_name","latitude_longitude")
-  # ncatt_put(ncout,proj,"semi_major_axis", 6378137)
-  # ncatt_put(ncout,proj,"inverse_flattening", 298.257223563)
-  # ncatt_put(ncout,proj,"proj4_params", "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs")
-  # ncatt_put(ncout,proj,"EPSG_code","EPSG:4326")
-  
-  
-  # add global attributes
-  ncatt_put(ncout,0,"title",title)
-  ncatt_put(ncout,0,"institution",institution)
-  ncatt_put(ncout,0,"source",source)
-  ncatt_put(ncout,0,"references",reference)
-  history <- paste("A.M. Tilloy", date(), sep=", ")
-  ncatt_put(ncout,0,"history",history)
-  ncatt_put(ncout,0,"Conventions",Conventions)
-  
-  # Get a summary of the created file:
-  return(ncout)
-  
-  #nc_close(ncout)
-}
-
-
-# loop-avoidance approaches 
-# get vectors of the grid-cell indices for each row in the data frame
-ncdis=paste0(hydroDir,outletname)
-ncd=nc_open(ncdis)
-
-nav=names(ncd[['var']])
-#Band1 is the second variable
-t=ncd$var[[1]]
-name.var=names(ncd$var)[1]
-tsize<-t$varsize
-tdims<-t$ndims
-nt1<-tsize[tdims]
-
-name.lon="lon"
-name.lat="lat"
-
-lon=ncvar_get(ncd,name.lon)
-lat=ncvar_get(ncd,name.lat)
-efas_lat=c(34.50,72.25)
-efas_lon=c(-25.25, 35.00)
-lolon=c(which(round(lon,2)==efas_lon[1]),which(round(lon,2)==efas_lon[2]))
-lolat=c(which(round(lat,2)==efas_lat[1]),which(round(lat,2)==efas_lat[2]))
-
-ptm <- proc.time() 
-j2 <- sapply(resall$Var1, function(x) which.min(abs(lon-x)))
-k2 <- sapply(resall$Var2, function(x) which.min(abs(lat-x)))
-
-j2=as.matrix(j2)
-llon=length(lon)
-llat=length(lat)
-
-fillvalue <- NA
-# partial loop avoidance for tmp_array3
-temp_array <- array(fillvalue, dim=c(llon,llat))
-
-temp_array[cbind(j2,k2)] <- as.matrix(resall$V2) 
-
-ncpath <- paste0(hydroDir,"/reservoirs/")
-ncname <- "reservoirs_volumes_1951" 
-nvar="volume"
-temp_arfl=as.double(temp_array)
-ncfout=ncdf_creator(temp_arfl, ncname, ncpath,lon=lon, lat=lat, tsize=2, longname="reservoir volume (m3)",name.var=nvar)
-nc_close(ncfout)
-
-
-
 #comparison file between 2020 and 1951
 
-res2020=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_2020_v2.nc")
-res1951=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_1951.nc")
-
-res_comp=full_join(res2020,res1951,by="idlalo")
-
-
-
-
-#comparison file between 2020 and 1951
-res2020i=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_2020_v2.nc")
 res2020=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_2020_Domain2.nc")
 res2020$idla=2970-res2020$idla+1
 res2020$idlalo=paste(res2020$idlo,res2020$idla,sep=" ")
@@ -263,7 +114,7 @@ res_new=res2020[-matres,]
 res_comp=left_join(res_old,res1951,by="idlalo")
 
 
-#I need to make a plot out of this
+### [Plot] - Figure S4 - Old and new reservoirs included in HERA -----
 
 palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
 outletname="efas_rnet_100km_01min"
@@ -320,11 +171,5 @@ damm<-ggplot(basemap) +
         panel.grid.minor = element_line(colour = "grey90"),
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
-#damm
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/DamKontraktion.jpg"), damm, width=20, height=20, units=c("cm"),dpi=1000) 
-
-
-#I can now look at the correlation between reservoir ration change and low flow change due to landuse
-
-

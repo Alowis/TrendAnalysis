@@ -60,7 +60,6 @@ outletopen=function(dir,outletname,nrspace=rep(NA,5)){
   outll=data.frame(outlets,outll)
   return (outll)
 }
-
 UpAopen=function(dir,outletname,Sloc_final){
   ncbassin=paste0(dir,outletname)
   ncb=nc_open(ncbassin)
@@ -112,7 +111,7 @@ Peaksave=c()
 outf=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="Histo2"
+scenario="Histo"
 hazard="Flood"
 season="year"
 mmx=""
@@ -139,17 +138,11 @@ for (file in lf){
   print(Nsq)
   parlist=Results$parameters
   parlist=data.table(parlist)
-  
-  # unikpar=unique(parlist$catchment)
-  # dparmerde=diff(unikpar)
-  # plot(dparmerde)
-  
   rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
   rspace=rspace[,-1]
   nrspace=rspace[Nsq,]
   
-  #specify with which outlets I am working with
-  #outletname="outlets_hybas09_01min"
+  #specify outlets
   outletname="efas_rnet_100km_01min"
   
   outhybas=outletopen(hydroDir,outletname,nrspace)
@@ -159,9 +152,8 @@ for (file in lf){
     outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
     outhybas$outl2=seq((Idstart2+1),(Idstart2+length(outhybas$outlets)))
     outhybas$latlong=paste(round(outhybas$Var1,4),round(outhybas$Var2,4),sep=" ")
-    #outcut=which(!is.na(match(outhybas$outlets,parlist$catchment)))
-    zebi=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
-    outcut=which(!is.na(match(outhybas$outl2,zebi)))
+    out2cat=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
+    outcut=which(!is.na(match(outhybas$outl2,out2cat)))
     outhloc=outhybas[outcut,]
     outf=rbind(outf,outhloc)
   }
@@ -174,6 +166,7 @@ for (file in lf){
   RetLevGEV=Results$RetLevGEV
   RetPerGEV=Results$RetPerGEV
   
+  #remove values for year 1950 is necessary
   rm50=which(colnames(RetLevGPD)=="1950")
   
   if (length(rm50)>0){
@@ -231,12 +224,12 @@ if (saveout==T){
 gc()
 
 
-## IRES ----
+## Intermittent Rivers and Ephemeral Streams ----
 
 IRES_save=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="SocCF2"
+scenario="SocCF"
 hazard="Drought"
 season="nonfrost"
 mmx=""

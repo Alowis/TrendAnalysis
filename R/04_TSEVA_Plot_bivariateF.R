@@ -1,4 +1,4 @@
-#Library calling
+# Library calling --------------------------------------------------
 suppressWarnings(suppressMessages(library(ncdf4)))
 suppressWarnings(suppressMessages(library(sf)))
 suppressWarnings(suppressMessages(library(rnaturalearth)))
@@ -19,7 +19,7 @@ library(modifiedmk)
 library(ks)
 library(pracma)
 library(data.table)
-
+library(ggnewscale)
 #  Function declaration ---------------------------------------------------
 
 
@@ -367,7 +367,6 @@ plotTrendSig=function(basemap,catmap,datar,type,period=c(1950,2020),valuenames,I
   
 }
 
-#Function displaying changes in both drought and floods
 
 #Function to plot changes in RL along with statistical significance of the trend. do significance at catchment level by averaging.
 plotTrendSipix=function(basemap,datar,period=c(1950,2020),hybasf,valuenames,nco){
@@ -1368,492 +1367,7 @@ UpAopen=function(dir,outletname,Sloc_final){
   outfinal=inner_join(outll, Sloc_final, by="latlong")
   return (outfinal)
 }
-#Set data directory
-hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
-
-# Define the get_density function
-get_density <- function(x, y, n = 200) {
-  dens <- MASS::kde2d(x = x, y = y, n = n)
-  ix <- findInterval(x, dens$x)
-  iy <- findInterval(y, dens$y)
-  ii <- cbind(ix, iy)
-  return(dens$z[ii])
-}
-
-# Pre-loaded results -----------
-
-
-#still need to create the outlets file outf
-if (!exists("outf")){
-  outf=c()
-  for( Nsq in 1:88){
-    print(Nsq)
-    rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
-    rspace=rspace[,-1]
-    nrspace=rspace[Nsq,]
-    #outletname="outletsv8_hybas07_01min"
-    #outletname="outlets_hybas09_01min"
-    outletname="efas_rnet_100km_01min"
-    
-    outhybas=outletopen(hydroDir,outletname,nrspace)
-    Idstart=as.numeric(Nsq)*10000
-    Idstart2=as.numeric(Nsq)*100000
-    if (length(outhybas$outlets)>0){
-      outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
-      outhybas$outl2=seq((Idstart2+1),(Idstart2+length(outhybas$outlets)))
-      outhybas$latlong=paste(round(outhybas$Var1,4),round(outhybas$Var2,4),sep=" ")
-      #outcut=which(!is.na(match(outhybas$outlets,parlist$catchment)))
-      # zebi=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
-      # outcut=which(!is.na(match(outhybas$outlets,zebi)))
-      outhloc=outhybas
-      outf=rbind(outf,outhloc)
-    }
-  }
-}
-
-
-#### Total change plots -------
-#load results from previous script 
-
-#floods
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_8.Rdata"))
-#droughts
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_9.Rdata"))
-#I extract the trend at MUTS3 level fist
-
-FloodTrends=Output_fl_year$TrendRegio
-#FloodTrends=Output_fl_year$TrendPix
-
-#Output_dr_nonfrost=Output_dr_year
-DroughtTrends=Output_dr_nonfrost$TrendRegio
-#DroughtTrends=Output_dr_nonfrost$TrendPix
-
-#First barpolt Figure 1:
-Totrend=FloodTrends[which(FloodTrends$driver=="Total"),]
-#Totrend=Totrend[,-c(1,2,3,5,6,7,8,9,10,11,82,83,84,85)]
-colnames(Totrend)[c(2:71)]=c(1951:2020)
-#trtest <- suppressWarnings(melt(Totrend, id.vars = "llcoord", variable.name = "variable", value.name = "value"))
-trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
-
-# Convert variable to character and extract the year
-trtest$variable <- as.character(trtest$variable)
-#craplife <- data.frame(strsplit(trtest$variable, ".Y"))
-#trtest$yr <- as.numeric(craplife[2,])
-trtest$yr <- as.numeric(trtest$variable)
-trtest$value=as.numeric(trtest$value)
-#trtest$decad=trtest$yr
-trtime_global <- aggregate(list(value = trtest$value),
-                           by = list(yr = trtest$yr),
-                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
-                                               l = length(x),
-                                               med= median(x, na.rm=T),
-                                               ql = quantile(x, 0.25, na.rm = TRUE),
-                                               qh = quantile(x, 0.75, na.rm = TRUE),
-                                               w1 = quantile(x, 0.025, na.rm = TRUE),
-                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
-
-# Convert to a data frame
-FloodTh <- do.call(data.frame, trtime_global)
-
-
-decades=c(1955,1965,1975,1985,1995,2005,2015)
-valcol=which(!is.na(match(trtest$yr,decades)))
-# Calculate the decade
-#trtest$decad <- 10 * round(trtest$yr / 10)
-trtest=trtest[valcol,]
-trtest$value=as.numeric(trtest$value)
-trtest$decad=trtest$yr
-# Aggregate only by decade (without location)
-trtime_global <- aggregate(list(value = trtest$value),
-                           by = list(yr = trtest$decad),
-                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
-                                               l = length(x),
-                                               med= median(x, na.rm=T),
-                                               ql = quantile(x, 0.25, na.rm = TRUE),
-                                               qh = quantile(x, 0.75, na.rm = TRUE),
-                                               w1 = quantile(x, 0.025, na.rm = TRUE),
-                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
-
-# Convert to a data frame
-FloodGlobal <- do.call(data.frame, trtime_global)
-
-
-#First barpolt Figure 1:
-Totrend=DroughtTrends[which(DroughtTrends$driver=="Total"),]
-#Totrend=Totrend[,-c(1,2,3,5,6,7,8,9,10,11,82,83,84,85)]
-colnames(Totrend)[c(2:71)]=c(1951:2020)
-trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
-# Convert variable to character and extract the year
-trtest$variable <- as.character(trtest$variable)
-#craplife <- data.frame(strsplit(trtest$variable, ".Y"))
-#trtest$yr <- as.numeric(craplife[2,])
-trtest$yr <- as.numeric(trtest$variable)
-trtest$value=as.numeric(trtest$value)
-#trtest$decad=trtest$yr
-trtime_global <- aggregate(list(value = trtest$value),
-                           by = list(yr = trtest$yr),
-                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
-                                               l = length(x),
-                                               med= median(x, na.rm=T),
-                                               ql = quantile(x, 0.25, na.rm = TRUE),
-                                               qh = quantile(x, 0.75, na.rm = TRUE),
-                                               w1 = quantile(x, 0.025, na.rm = TRUE),
-                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
-
-# Convert to a data frame
-DroughtTh <- do.call(data.frame, trtime_global)
-
-
-FloodTh$haz="Flood"
-DroughtTh$haz="Drought"
-
-FDChanges=rbind(FloodTh,DroughtTh)
-
-
-colorz = c("Flood" ='darkblue',"Drought"="darkorange")
-colorn = c("Flood" ='darkblue',"Drought"="orange")
-
-#trtF=trtF[-which(trtF$yr==2020),]
-#use pointap for bars
-library(ggnewscale)
-fac=1
-
-xlabs=seq(1950,2020,5)
-clabels=c("Drought","Flood")
-
-nplot="Change (% 10yRL)"
-br=seq(-50,100,10)
-#nplot="Mean change (l/s/km2)"
-#br=seq(-.5,1,.1)
-br=seq(-50,300,10)
-br=c(seq(-100,-20,20),c(-10,-5,-2,0,2,5,10),seq(20,100,20))
-ggplot() +
-  geom_hline(yintercept = 0, color = "black", size = 1) +
-  # IQR represented as rectangles
-  geom_line(data=FDChanges,aes(x=yr, y=value.mean,color = (haz),group=(haz)),
-                lwd=2) +
-geom_ribbon(data = FDChanges, aes(x = yr, ymin = value.w1.2.5., ymax = value.w2.97.5., fill = haz, group = haz), 
-            alpha = 0.2) +
-  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
-  # Y-axis settings
-  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.4)) +
-  
-  # X-axis settings
-  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Years",limits=c(1955,2020),
-                     minor_breaks = seq(1955,2005,10), expand = c(.001,0.001)) +
-  
-  # Manual fill and color scales
-  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
-  #scale_color_manual(values = colorz, name = "Hazard", labels = clabels) +
-  
-  # Customize legend
-  #guides(color = guide_legend(override.aes = list(color = colorn))) +
-  
-  # Theme customization
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    title = element_text(size = 22, face = "bold"),
-    axis.text = element_text(size = 16),
-    axis.text.x = element_text(size = 16, face = "bold"),
-    panel.background = element_rect(fill = "white", colour = "white"),
-    panel.grid = element_blank(),
-    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
-    legend.title = element_text(size = 20, face = "bold"),
-    legend.text = element_text(size = 16),
-    axis.ticks.y = element_blank(),
-    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
-    #panel.grid.minor.y = element_line(color = "lightgray"),
-    legend.position = "right",
-    #panel.grid.major = element_line(colour = "grey80"),
-    #panel.grid.minor.x = element_line(colour = "grey23",linetype = "dashed"),
-    legend.key = element_rect(fill = "transparent", colour = "transparent"),
-    legend.key.size = unit(0.8, "cm")
-  ) +
-  
-  # Add title
-  ggtitle("Europe")
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/temporalCh_clim_fldr23.jpg"), width=30, height=10, units=c("cm"),dpi=1000) 
-
-
-
-
-trtF=rbind(FloodGlobal,DroughtGlobal)
-
-
-
-decades=c(1955,1965,1975,1985,1995,2005,2015)
-valcol=which(!is.na(match(trtest$yr,decades)))
-# Calculate the decade
-#trtest$decad <- 10 * round(trtest$yr / 10)
-trtest=trtest[valcol,]
-trtest$value=as.numeric(trtest$value)
-trtest$decad=trtest$yr
-# Aggregate only by decade (without location)
-trtime_global <- aggregate(list(value = trtest$value),
-                           by = list(yr = trtest$decad),
-                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
-                                               l = length(x),
-                                               med= median(x, na.rm=T),
-                                               ql = quantile(x, 0.25, na.rm = TRUE),
-                                               qh = quantile(x, 0.75, na.rm = TRUE),
-                                               w1 = quantile(x, 0.025, na.rm = TRUE),
-                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
-
-# Convert to a data frame
-DroughtGlobal <- do.call(data.frame, trtime_global)
-
-
-
-
-trtF=rbind(FloodGlobal,DroughtGlobal)
-trtF
-trtF$year=rep(seq(1950,2010,10),2)
-trtF$hazard=c(rep("Flood",7),rep("Drought",7))
-
-names(trtF)[c(2,4,5,6,7,8)]=c("changeC","med","cq1","cq2","w1","w2")
-
-colorz = c("Flood" ='darkblue',"Drought"="darkorange")
-colorn = c("Flood" ='darkblue',"Drought"="orange")
-
-#trtF=trtF[-which(trtF$yr==2020),]
-#use pointap for bars
-library(ggnewscale)
-fac=1
-
-xlabs=seq(1950,2010,10)
-clabels=c("Drought","Flood")
-
-nplot="Mean change (% 10yRL)"
-br=seq(-50,100,10)
-#nplot="Mean change (l/s/km2)"
-#br=seq(-.5,1,.1)
-br=seq(-50,300,10)
-br=c(seq(-100,-10,10),seq(-5,5,5),seq(10,100,10))
-ggplot() +
-  # IQR represented as rectangles
-  geom_linerange(data=trtF,aes(x=year, ymin=fac*(w1),ymax=fac*w2,color = (hazard),group=(hazard)),
-                 position = position_dodge2(width = 9),lwd=1,alpha=0.8) +
-  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
-  new_scale_color()+
-  
-  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
-                           ymin = cq1, ymax = cq2, fill = (hazard), group = (hazard)), 
-            alpha = 0.5, position = position_dodge(width = 9)) +
-  
-  # Mean as points over the IQR
-  geom_point(data=trtF, aes(x = year, y = changeC, color = (hazard), group = (hazard)),
-             position = position_dodge(width = 9), size = 3) +
-  
-  # Median as a horizontal line within the IQR rectangle
-  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
-                           ymin = med-1e-1, ymax = med+1e-1, fill = (hazard), group = (hazard)), 
-            alpha = 1, position = position_dodge(width = 9)) +
-  
-  # Y-axis settings
-  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.6)) +
-  
-  # X-axis settings
-  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Decades",
-                     minor_breaks = seq(1955,2005,10), expand = c(.01,0.01)) +
-  
-  # Manual fill and color scales
-  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
-  scale_color_manual(values = colorz, name = "Hazard", labels = clabels) +
-  
-  # Customize legend
-  #guides(color = guide_legend(override.aes = list(color = colorn))) +
-  
-  # Theme customization
-  theme(
-    axis.title = element_text(size = 18, face = "bold"),
-    title = element_text(size = 22, face = "bold"),
-    axis.text = element_text(size = 16),
-    axis.text.x = element_text(size = 16, face = "bold"),
-    panel.background = element_rect(fill = "white", colour = "white"),
-    panel.grid = element_blank(),
-    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
-    legend.title = element_text(size = 20, face = "bold"),
-    legend.text = element_text(size = 16),
-    axis.ticks.y = element_blank(),
-    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
-    #panel.grid.minor.y = element_line(color = "lightgray"),
-    legend.position = "right",
-    #panel.grid.major = element_line(colour = "grey80"),
-    panel.grid.minor.x = element_line(colour = "grey23",linetype = "dashed"),
-    legend.key = element_rect(fill = "transparent", colour = "transparent"),
-    legend.key.size = unit(0.8, "cm")
-  ) +
-  
-  # Add title
-  ggtitle("Europe")
-
-
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bxplot_fldr5.jpg"), width=30, height=20, units=c("cm"),dpi=1000) 
-
-
-
-driver=unique(FloodTrends$driver)
-driver=unique(DroughtTrends$driver)
-#I need to aggregate all the changes
-# TotalFloodTrend=FloodTrends[which(FloodTrends$driver==driver[1]),c(2:71)]+
-#   FloodTrends[which(FloodTrends$driver==driver[2]),c(2:71)]+
-#   FloodTrends[which(FloodTrends$driver==driver[3]),c(2:71)]+
-#   FloodTrends[which(FloodTrends$driver==driver[4]),c(2:71)]
-#   
-# TotalDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[1]),c(2:71)]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[2]),c(2:71)]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:71)]+
-#   DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2:71)]
-
-
-#spatial smoothing with distance ---------
-
-### Hybas09 -------
-# Catchmentrivers9=read.csv(paste0(hydroDir,"/hybas09_attributes.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
-# Catchmentrivers9=Catchmentrivers9[,c(1,2,15,16,17,22)]
-# hybas09 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev09_v1c.shp"))
-# hybasf9=fortify(hybas09) 
-# Gridhybas09=raster( paste0(hydroDir,"/hybas09_raster.tif"))
-# Ghybas=as.data.frame(Gridhybas09,xy=T)
-# Ghybas=Ghybas[which(!is.na(Ghybas[,3])),]
-# Ghybas$llcoord=paste(round(Ghybas$x,4),round(Ghybas$y,4),sep=" ") 
-# Ghybas_riv=inner_join(Ghybas,outf,by= c("llcoord"="latlong"))
-# Catamere09=inner_join(hybasf9,Ghybas_riv,by= c("SORT"="hybas09_raster"))
-# Catf9=inner_join(Catamere09,outf,by= c("llcoord"="latlong"))
-# 
-# unique(DroughtTrends$driver)
-# DrotrendsLU=DroughtTrends[which(DroughtTrends$driver=="Landuse"),]
-# 
-# DrotrendsLU=inner_join(Catf9,DrotrendsLU,by= c("llcoord"))
-# 
-# HYBASlist=unique(DrotrendsLU$SORT)
-# 
-# mycat=Ghybas[which(Ghybas$hybas09_raster==HYBASlist[6]),]
-# 
-# plot(mycat)
-
-
-
-biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
-biogeof=fortify(biogeo)
-st_geometry(biogeof)<-NULL
-biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
-Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
-biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
-biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
-biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
-
-
-#load the netcdf:
-
-outletname="efas_rnet_100km_01min"
-ncbassin=paste0(hydroDir,"/",outletname,".nc")
-ncb=nc_open(ncbassin)
-name.vb=names(ncb[['var']])
-namev=name.vb[1]
-if ("Band1"%in% name.vb)namev="Band1"
-name.lon="lon"
-name.lat="lat"
-londat = ncvar_get(ncb,name.lon) 
-llo=length(londat)
-latdat = ncvar_get(ncb,name.lat)
-lla=length(latdat)
-start=c(1,1)
-count=c(llo,lla)
-
-
-londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
-llo=length(londat)
-latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
-lla=length(latdat)
-outlets = ncvar_get(ncb,namev,start = start, count= count) 
-outlets=as.vector(outlets)
-outll=expand.grid(londat,latdat)
-lonlatloop=expand.grid(c(1:llo),c(1:lla))
-outll$idlo=lonlatloop$Var1
-outll$idla=lonlatloop$Var2
-outll$riv=outlets
-colnames(outll)[c(1,2,5)]=c("x","y","z")
-outll$llcoord=paste(round(outll$x,4),round(outll$y,4),sep=" ")
-
-mout=match(mycat$llcoord,outll$llcoord)
-
-# outll$riv[which(is.na(outll$riv))]=0
-outlx=outll[mout,c(1,2,5)]
-myriv=which(outlx$z==1)
-outlxu=as.matrix(outlx[myriv,c(1,2)])
-# Step 1: Convert to raster
-r <- rasterFromXYZ(outlx)
-# Step 2 (Optional): Set CRS
-crs(r) <- CRS("+init=epsg:4326")  # or another CRS
-plot(r)
-outlx2=outll[mout,]
-rivmask=outlx2[-which(outlx2$z==0),]
-
-
-### Hybas07 ----
-Catchmentrivers7=read.csv(paste0(hydroDir,"/Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
-hybas07 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev07_v1c.shp"))
-hybasf7=fortify(hybas07)
-Catamere07=inner_join(hybasf7,Catchmentrivers7,by= "HYBAS_ID")
-Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ")
-cst7=right_join(Catamere07,outf,by= c("llcoord"="latlong"))
-GNF=cst7
-st_geometry(GNF)=NULL
-
-UnHY=unique(GNF$HYBAS_ID)
-
-
-### HydroRegions ----
-
-GridHR=raster( paste0(hydroDir,"/HydroRegions_raster_WGS84.tif"))
-GHR=as.data.frame(GridHR,xy=T)
-GHR=GHR[which(!is.na(GHR[,3])),]
-a1=(unique(GHR$HydroRegions_raster_WGS84))
-GHR$llcoord=paste(round(GHR$x,4),round(GHR$y,4),sep=" ")
-GHR_riv=inner_join(GHR,outf,by= c("llcoord"="latlong"))
-a2=(unique(GHR_riv$HydroRegions_raster_WGS84))
-
-ups=which(is.na(match(a1,a2)))
-mierda=a1[ups]
-GHshpp <- read_sf(dsn ="Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted_cor.shp")
-HydroRsf=fortify(GHshpp)
-length(unique(GHshpp$IRST_NAMEB))
-
-#correction of the Baltic shield
-# GHshppCor=GHshpp[which(GHshpp$IRST_NAMEB=="BALTIC SHIELD"),]
-# GHshppCor$IRST_NAMEB=c("FINLAND BALTIC COAST SOUTH","FINLAND BALTIC COAST SOUTH","FINLAND NORTH","FINLAND BALTIC COAST NORTH","FINLAND BALTIC COAST CENTRAL","FINLAND CENTRAL")
-# GHshpp$IRST_NAMEB[which(GHshpp$IRST_NAMEB=="BALTIC SHIELD")]=c("FINLAND BALTIC COAST SOUTH","FINLAND BALTIC COAST SOUTH","FINLAND NORTH","FINLAND BALTIC COAST NORTH","FINLAND BALTIC COAST CENTRAL","FINLAND CENTRAL")
-# st_write(GHshpp,"Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted_cor.shp")
-
-### Plot parameters ----
-palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
-outletname="efas_rnet_100km_01min"
-outll=outletopen(hydroDir,outletname)
-cord.dec=outll[,c(2,3)]
-cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
-cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
-nco=cord.UTM@coords
-world <- ne_countries(scale = "medium", returnclass = "sf")
-Europe <- world[which(world$continent == "Europe"),]
-e2=st_transform(Europe,  crs=3035)
-w2=st_transform(world,  crs=3035)
-biobase=st_transform(biogeo, crs=3035)
-tsize=12
-osize=12
-Impdates=seq(1950,2020,by=10)
-valuenames=paste0("Y",Impdates)
-catmap=cst7
-basemap=w2
-
-# Load required libraries
-library(ggplot2)
-
-
-
-#recomputing trend significance
 
 calculateTrendSig <- function(trendPlot, pointagg) {
   
@@ -1865,12 +1379,12 @@ calculateTrendSig <- function(trendPlot, pointagg) {
   
   for (it in 1:length(pointagg[,1])) {
     # print(it)
-    #it=76
+    it=121
     mks <- NA
     mkt <- NA
     miniTS <- as.numeric((tmpval[it,]))
     miniTS=miniTS[-which(is.na(miniTS))]
-    
+    plot(miniTS)
     # Perform Mann-Kendall test if data exists and positive trend is detected
     if (!is.na(miniTS[2]) & max(abs(diff(miniTS[-1])), na.rm = TRUE) > 0) {
       mk2 <- mmkh(miniTS[-1], ci = 0.95)
@@ -1909,7 +1423,339 @@ calculateTrendSig <- function(trendPlot, pointagg) {
   return(pointagg)
 }
 
+# Define the get_density function
+get_density <- function(x, y, n = 200) {
+  dens <- MASS::kde2d(x = x, y = y, n = n)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
 
+# Pre-loaded results -----------
+
+#Set data directory
+hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
+
+###create the outlets file outf ----
+if (!exists("outf")){
+  outf=c()
+  for( Nsq in 1:88){
+    print(Nsq)
+    rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
+    rspace=rspace[,-1]
+    nrspace=rspace[Nsq,]
+    #outletname="outletsv8_hybas07_01min"
+    #outletname="outlets_hybas09_01min"
+    outletname="efas_rnet_100km_01min"
+    
+    outhybas=outletopen(hydroDir,outletname,nrspace)
+    Idstart=as.numeric(Nsq)*10000
+    Idstart2=as.numeric(Nsq)*100000
+    if (length(outhybas$outlets)>0){
+      outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
+      outhybas$outl2=seq((Idstart2+1),(Idstart2+length(outhybas$outlets)))
+      outhybas$latlong=paste(round(outhybas$Var1,4),round(outhybas$Var2,4),sep=" ")
+      #outcut=which(!is.na(match(outhybas$outlets,parlist$catchment)))
+      # zebi=seq(parlist$catchment[1],parlist$catchment[length(parlist$catchment)])
+      # outcut=which(!is.na(match(outhybas$outlets,zebi)))
+      outhloc=outhybas
+      outf=rbind(outf,outhloc)
+    }
+  }
+}
+
+###load results from previous script ----
+
+#### floods ----
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_8.Rdata"))
+#### droughts ----
+load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_9.Rdata"))
+
+#Trend at regional level
+FloodTrends=Output_fl_year$TrendRegio
+DroughtTrends=Output_dr_nonfrost$TrendRegio
+
+
+#1. Bivariate results plot ----
+
+Totrend=FloodTrends[which(FloodTrends$driver=="Total"),]
+colnames(Totrend)[c(2:71)]=c(1951:2020)
+trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
+
+# Convert variable to character and extract the year
+trtest$variable <- as.character(trtest$variable)
+trtest$yr <- as.numeric(trtest$variable)
+trtest$value=as.numeric(trtest$value)
+#Temporal aggregation over the domain
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$yr),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+FloodTh <- do.call(data.frame, trtime_global)
+
+#extract results by decade
+decades=c(1955,1965,1975,1985,1995,2005,2015)
+valcol=which(!is.na(match(trtest$yr,decades)))
+trtest=trtest[valcol,]
+trtest$value=as.numeric(trtest$value)
+trtest$decad=trtest$yr
+
+# Aggregate only by decade (without location)
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$decad),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+FloodGlobal <- do.call(data.frame, trtime_global)
+
+#Similar procedure for drought changes
+Totrend=DroughtTrends[which(DroughtTrends$driver=="Total"),]
+colnames(Totrend)[c(2:71)]=c(1951:2020)
+trtest <- suppressWarnings(melt(Totrend, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
+
+# Convert variable to character and extract the year
+trtest$variable <- as.character(trtest$variable)
+trtest$yr <- as.numeric(trtest$variable)
+trtest$value=as.numeric(trtest$value)
+
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$yr),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+DroughtTh <- do.call(data.frame, trtime_global)
+
+#extract results by decade
+decades=c(1955,1965,1975,1985,1995,2005,2015)
+valcol=which(!is.na(match(trtest$yr,decades)))
+trtest=trtest[valcol,]
+trtest$value=as.numeric(trtest$value)
+trtest$decad=trtest$yr
+
+# Aggregate only by decade (without location)
+trtime_global <- aggregate(list(value = trtest$value),
+                           by = list(yr = trtest$decad),
+                           FUN = function(x) c(mean = mean(x, na.rm = TRUE),
+                                               l = length(x),
+                                               med= median(x, na.rm=T),
+                                               ql = quantile(x, 0.25, na.rm = TRUE),
+                                               qh = quantile(x, 0.75, na.rm = TRUE),
+                                               w1 = quantile(x, 0.025, na.rm = TRUE),
+                                               w2 = quantile(x, 0.975, na.rm = TRUE)))
+
+# Convert to a data frame
+DroughtGlobal <- do.call(data.frame, trtime_global)
+
+
+## [Plot] - Figure 1 - total changes in time for flood and drought hazards -----
+
+FloodTh$haz="Flood"
+DroughtTh$haz="Drought"
+FDChanges=rbind(FloodTh,DroughtTh)
+colorz = c("Flood" ='darkblue',"Drought"="darkorange")
+colorn = c("Flood" ='darkblue',"Drought"="orange")
+fac=1
+xlabs=seq(1950,2020,5)
+clabels=c("Drought","Flood")
+nplot="Change (% 10yRL)"
+br=c(seq(-100,-20,20),c(-10,-5,-2,0,2,5,10),seq(20,100,20))
+
+ggplot() +
+  geom_hline(yintercept = 0, color = "black", size = 1) +
+  # IQR represented as rectangles
+  geom_line(data=FDChanges,aes(x=yr, y=value.mean,color = (haz),group=(haz)),
+                lwd=2) +
+geom_ribbon(data = FDChanges, aes(x = yr, ymin = value.w1.2.5., ymax = value.w2.97.5., fill = haz, group = haz), 
+            alpha = 0.2) +
+  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
+  # Y-axis settings
+  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.4)) +
+  
+  # X-axis settings
+  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Years",limits=c(1955,2020),
+                     minor_breaks = seq(1955,2005,10), expand = c(.001,0.001)) +
+  
+  # Manual fill and color scales
+  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
+
+  # Theme customization
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
+    legend.position = "right",
+    legend.key = element_rect(fill = "transparent", colour = "transparent"),
+    legend.key.size = unit(0.8, "cm")
+  ) +
+  # Add title
+  ggtitle("Europe")
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/temporalCh_clim_fldr23.jpg"), width=30, height=10, units=c("cm"),dpi=1000) 
+
+##[Plot] - Supplement figure - Boxplot of changes in flood and drought hazards by decade -----
+
+trtF=rbind(FloodGlobal,DroughtGlobal)
+trtF$year=rep(seq(1950,2010,10),2)
+trtF$hazard=c(rep("Flood",7),rep("Drought",7))
+
+names(trtF)[c(2,4,5,6,7,8)]=c("changeC","med","cq1","cq2","w1","w2")
+
+colorz = c("Flood" ='darkblue',"Drought"="darkorange")
+colorn = c("Flood" ='darkblue',"Drought"="orange")
+
+xlabs=seq(1950,2010,10)
+clabels=c("Drought","Flood")
+
+nplot="Mean change (% 10yRL)"
+br=seq(-50,100,10)
+br=seq(-50,300,10)
+br=c(seq(-100,-10,10),seq(-5,5,5),seq(10,100,10))
+ggplot() +
+  # IQR represented as rectangles
+  geom_linerange(data=trtF,aes(x=year, ymin=fac*(w1),ymax=fac*w2,color = (hazard),group=(hazard)),
+                 position = position_dodge2(width = 9),lwd=1,alpha=0.8) +
+  scale_color_manual(values = colorn, name = "Hazard", labels = clabels) +
+  new_scale_color()+
+  
+  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
+                           ymin = cq1, ymax = cq2, fill = (hazard), group = (hazard)), 
+            alpha = 0.5, position = position_dodge(width = 9)) +
+  
+  # Mean as points over the IQR
+  geom_point(data=trtF, aes(x = year, y = changeC, color = (hazard), group = (hazard)),
+             position = position_dodge(width = 9), size = 3) +
+  
+  # Median as a horizontal line within the IQR rectangle
+  geom_rect(data=trtF, aes(xmin = year - 4.5, xmax = year + 4.5, 
+                           ymin = med-1e-1, ymax = med+1e-1, fill = (hazard), group = (hazard)), 
+            alpha = 1, position = position_dodge(width = 9)) +
+  
+  # Y-axis settings
+  scale_y_continuous(name = nplot, breaks = br, trans=scales::modulus_trans(.6)) +
+  
+  # X-axis settings
+  scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Decades",
+                     minor_breaks = seq(1955,2005,10), expand = c(.01,0.01)) +
+  
+  # Manual fill and color scales
+  scale_fill_manual(values = colorn, name = "Hazard", labels = clabels) +
+  scale_color_manual(values = colorz, name = "Hazard", labels = clabels) +
+
+  # Theme customization
+  theme(
+    axis.title = element_text(size = 18, face = "bold"),
+    title = element_text(size = 22, face = "bold"),
+    axis.text = element_text(size = 16),
+    axis.text.x = element_text(size = 16, face = "bold"),
+    panel.background = element_rect(fill = "white", colour = "white"),
+    panel.grid = element_blank(),
+    panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    legend.title = element_text(size = 20, face = "bold"),
+    legend.text = element_text(size = 16),
+    axis.ticks.y = element_blank(),
+    panel.grid.major.y = element_line(color = "lightgray",linetype = "dashed"),
+    legend.position = "right",
+    panel.grid.minor.x = element_line(colour = "grey23",linetype = "dashed"),
+    legend.key = element_rect(fill = "transparent", colour = "transparent"),
+    legend.key.size = unit(0.8, "cm")
+  ) +
+  
+  # Add title
+  ggtitle("Europe")
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bxplot_fldr5.jpg"), width=30, height=20, units=c("cm"),dpi=1000) 
+
+
+
+driver=unique(DroughtTrends$driver)
+
+## load Biogeographic regions ----
+biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
+biogeof=fortify(biogeo)
+st_geometry(biogeof)<-NULL
+biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
+Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
+biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
+biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
+biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
+
+### load Hybas07 ----
+Catchmentrivers7=read.csv(paste0(hydroDir,"/Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
+hybas07 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev07_v1c.shp"))
+hybasf7=fortify(hybas07)
+Catamere07=inner_join(hybasf7,Catchmentrivers7,by= "HYBAS_ID")
+Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ")
+cst7=right_join(Catamere07,outf,by= c("llcoord"="latlong"))
+GNF=cst7
+st_geometry(GNF)=NULL
+UnHY=unique(GNF$HYBAS_ID)
+
+### load HydroRegions ----
+
+GridHR=raster( paste0(hydroDir,"/HydroRegions_raster_WGS84.tif"))
+GHR=as.data.frame(GridHR,xy=T)
+GHR=GHR[which(!is.na(GHR[,3])),]
+a1=(unique(GHR$HydroRegions_raster_WGS84))
+GHR$llcoord=paste(round(GHR$x,4),round(GHR$y,4),sep=" ")
+GHR_riv=inner_join(GHR,outf,by= c("llcoord"="latlong"))
+a2=(unique(GHR_riv$HydroRegions_raster_WGS84))
+
+ups=which(is.na(match(a1,a2)))
+mierda=a1[ups]
+GHshpp <- read_sf(dsn ="Z:/ClimateRun4/nahaUsers/tilloal/HydroRegions/her_all_adjusted_cor.shp")
+HydroRsf=fortify(GHshpp)
+length(unique(GHshpp$IRST_NAMEB))
+
+### Plot parameters ----
+palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
+outletname="efas_rnet_100km_01min"
+outll=outletopen(hydroDir,outletname)
+cord.dec=outll[,c(2,3)]
+cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
+cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
+nco=cord.UTM@coords
+world <- ne_countries(scale = "medium", returnclass = "sf")
+Europe <- world[which(world$continent == "Europe"),]
+e2=st_transform(Europe,  crs=3035)
+w2=st_transform(world,  crs=3035)
+biobase=st_transform(biogeo, crs=3035)
+tsize=12
+osize=12
+Impdates=seq(1950,2020,by=10)
+valuenames=paste0("Y",Impdates)
+catmap=cst7
+basemap=w2
+
+
+#recomputing trend significance
 trendplot=Output_fl_year$TrendRegio[which(Output_fl_year$TrendRegio$driver=="Clim"),]
 median(trendplot$Rchange.Y2015)
 trendpfas=t(trendplot[which(trendplot$HydroR==23),-c(1,72)])
@@ -1930,7 +1776,7 @@ length(which(trendDrought$change<(0)))
 FloodTrends=Output_fl_year$TrendRegio
 DroughtTrends=Output_dr_nonfrost$TrendRegio
 
-
+#other analysis
 DroughtTP=Output_dr_nonfrost$TrendPix
 DroughtTP=DroughtTP[which(DroughtTP$driver=="Clim"),]
 length(DroughtTP$Y2015[which(DroughtTP$Y2015>0)])/length(DroughtTP$Y2015[which(!is.na(DroughtTP$Y2015))])
@@ -1941,20 +1787,16 @@ length(FloodTP$Y2015[which(FloodTP$Y2015>=15)])/length(FloodTP$Y2015[which(!is.n
 
 #1. TOTAL Trend ------------
 
-## catchment level ---------------
+##1.1 Bivariate categorization at catchment level ---------------
 TotalFloodTrend=FloodTrends[which(FloodTrends$driver==driver[5]),c(2:71)]
 TotalDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[5]),c(2:71)]
 TotalFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
 TotalDroughtTrend$HydroR=DroughtTrends[which(DroughtTrends$driver==driver[1]),1]
 
-
-
-
 FlPoint=inner_join(GHshpp,TotalFloodTrend,by=c("CODEB"="HydroR"))
 st_geometry(FlPoint)<-NULL
 
 
-#First barpolt Figure 1:
 FlpointT=TotalFloodTrend
 colnames(FlpointT)[c(1:70)]=c(1951:2020)
 trtest <- suppressWarnings(melt(FlpointT, id.vars = "HydroR", variable.name = "variable", value.name = "value"))
@@ -1962,6 +1804,7 @@ trtest <- suppressWarnings(melt(FlpointT, id.vars = "HydroR", variable.name = "v
 trtest$variable <- as.character(trtest$variable)
 trtest$variable<-as.numeric(trtest$variable)
 
+#Plot trajectories of different regions
 for (idr in FlpointT$HydroR){
   trp=trtest[which(trtest$HydroR==idr),]
   plot(trp$variable,trp$value,main=idr)
@@ -1988,48 +1831,15 @@ Flplot$d2015=Drplot$Rchange.Y2015
 Flplot$f2015=Flplot$Rchange.Y2015
 FlplotTot=Flplot
 
-#Univariate plot for verification
-colNA="transparent"
-# legend="Relative change (%)"
-tsize=16
-osize=12
-legend="Change in Qsp \n(l/s/km2)"
-palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
-# 
-# br=seq(-100,100,.1)
-# labels=br
-# limi=c(-50,50)
-# ggplot(basemap) +
-#   geom_sf(fill="white")+
-#   geom_sf(data = Flplot, mapping = aes(fill = f2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
-#   geom_sf(fill=NA, color="gray42") +
-#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-#   scale_fill_gradientn(
-#     colors=palet,
-#     breaks=br,limits=limi,
-#     oob = scales::squish,na.value=colNA, name=legend)  +
-#   labs()+
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
 
-#create a new variable which make flood and drought on the same scale
-#normalize flood change
-a=sd(FlplotTot$f2015,na.rm=T)
-b=sd(FlplotTot$d2015,na.rm=T)
+#normalize flood change possibility
+#here I do not normalize
 a=b=1
 databitot=FlplotTot
 databitot$x=databitot$f2015/a
 databitot$y=databitot$d2015/b
 
+# breakers for category change: 0% and 5% absolute change
 breaker1=0
 breaker2=5
 
@@ -2054,7 +1864,7 @@ c2=alterclass$class
 cx=paste(c2,c1,sep="-")
 databitot$bi_class=cx
 databitot$combined_category <-databitot$bi_class
-## Pixel level ------------------------
+##2.2 Bivariate categorization at pixel level ---------------
 
 FloodTrendsP=Output_fl_year$TrendPix
 DroughtTrendsP=Output_dr_nonfrost$TrendPix
@@ -2096,15 +1906,11 @@ points <- st_transform(points, crs = 3035)
 Flpixplot=points
 Flpixplot$d2015=TotalDroughtTrendPix$Y2015
 
-#normalize changes
-a=sd(Flpixplot$Y2015,na.rm=T)
-b=sd(Flpixplot$d2015,na.rm=T)
 a=b=1
 databipi=Flpixplot
 databipi$x=databipi$Y2015/a
 databipi$y=databipi$d2015/b
 
-hist(databipi$x)
 breaker1=0
 breaker2=5
 
@@ -2129,7 +1935,7 @@ c2=alterclass$class
 cx=paste(c2,c1,sep="-")
 databipi$bi_class=cx
 
-## plot section --------------
+##1.3 [Plot] - Figure 4 - Bivariate hydrological extremes change ---------
 
 colors <- c(
   "1-1" = "#dd6a29",  # high x, low y
@@ -2154,7 +1960,6 @@ colors <- c(
 
 )
 
-
 colorp <- c(
   "1-1" = "#dd6a40",  # high x, low y
   "2-1" = "#d9926a",  # medium-high x, low y
@@ -2178,83 +1983,26 @@ colorp <- c(
   
 )
 
-colors2 <- c(
-  "1-1" = "#dd6a29",  # high x, low y
-  "2-1" = "#dd6a29",  # medium-high x, low y
-  "3-1" = "#ffe1ff",  # medium-low x, low y
-  "4-1" = "#ffe1ff",  # low x, low y
-  
-  "1-2" = "#dd6a29",  # high x, medium-low y
-  "2-2" = "#9ea69f",  # medium-high x, medium-low y
-  "3-2" = "#9ea69f",  # medium-low x, medium-low y
-  "4-2" = "#ffe1ff",  # low x, medium-low y
-  
-  "1-3" = "#174f28",  # high x, medium-high y
-  "2-3" = "#9ea69f",  # medium-high x, medium-high y
-  "3-3" = "#9ea69f",  # medium-low x, medium-high y
-  "4-3" = "#169dd0",  # low x, medium-high y
-  
-  "1-4" = "#174f28",  # high x, high y
-  "2-4" = "#174f28",  # medium-high x, high y
-  "3-4" = "#169dd0",  # medium-low x, high y
-  "4-4" = "#169dd0"  # low x, high y
-  
-)
-
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 
 bi_pal(pal = colors, dim = 4)
-#colors=(c("#dd6a29","#169dd0","#7ebbd2","#d3d3d3","#167984","#174f28","#845e29","#819185","#d8a386"))
 
-
-ggplot(databitot, aes(x = d2015, y = f2015, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colorp) +
-  coord_cartesian(xlim=c(-50,50),ylim=c(-50,50)) +
-
-  # Add main quadrant labels
-  annotate("text", x = 18, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -18, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -18, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 18, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)",
-       y = "Change in flood flows (l/s/km2)") +
-
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
+#removal of pixel with NA direction
 databipi$bi_class[which(databipi$bi_class=="NA-NA")]=NA
 databipi$bi_class[which(is.na(databipi$Y2015))]=NA
 databipi$bi_class[which(is.na(databipi$d2015))]=NA
 
-
-
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
   geom_sf(data = databitot, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-  #geom_sf(data = databitotsig, alpha=0.8, color = "black", fill="NA" ,size = 0.01,show.legend = F) +
   geom_sf(data = databipi, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
   geom_sf(fill=NA, color="gray42") +
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_fill_manual(values = colorp) +
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
                                                                        sep = " ")),
              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
              guide = "none")+
-  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_color_manual(values = colorp,na.value=NA) +
   labs()+
   theme(axis.title=element_text(size=tsize),
@@ -2282,13 +2030,12 @@ pl=ggarrange(map, legend,
              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
 
 
-pl
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/totchange_bvPIX_HR_n10.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500)
 
 
+#1.4 Aggregation by Biogeoregion ----
 
-#aggregation
-
+#Color scale
 colord <- c(
   "1-1" = 12,  # high x, low y
   "2-1" = 11,  # medium-high x, low y
@@ -2316,6 +2063,7 @@ zob=unique(databipi$bi_class)
 zob=zob[-which(is.na(zob))]
 
 databipi2=databipi
+
 databipi2$trcat="Wetting"
 databipi2$trcat[which(databipi2$bi_class=="2-2" | databipi2$bi_class=="3-2" |
                     databipi2$bi_class=="2-3" | databipi2$bi_class=="3-3")]="Stable"
@@ -2327,8 +2075,15 @@ databipi2$trcat[which(databipi2$bi_class=="4-1" | databipi2$bi_class=="4-2" |
                     databipi2$bi_class=="3-1")]="Decelerating"
 
 databipi2$Biogeo_id[which(databipi2$Biogeo_id=="Pannonian")]="Continental"
-databipi3=databipi2[-which(is.na(databipi2$bi_class)),]
 
+if (length(which(is.na(databipi2$bi_class)))>0){
+  databipi3=databipi2[-which(is.na(databipi2$bi_class)),]
+}else{
+  databipi3=databipi2
+}
+
+
+#Aggregation over each change trajectory subclasses
 EuAgg = aggregate(list(val=databipi2$upa),
                  by = list(traj=databipi2$bi_class),
                  FUN = function(x) c(len=length(x)))
@@ -2342,26 +2097,27 @@ EuAgg$trcat[which(EuAgg$traj=="1-4" | EuAgg$traj=="2-4" |
 EuAgg$trcat[which(EuAgg$traj=="4-1" | EuAgg$traj=="4-2" |
                    EuAgg$traj=="3-1")]="Decelerating"
 
-
+#Aggregation over each change trajectory
 EuAgg2 = aggregate(list(val=EuAgg$val),
                   by = list(traj=EuAgg$trcat),
                   FUN = function(x) c(sum=sum(x)))
 SumEuPix=sum(EuAgg2$val)
 EuAgg2$rel.val=EuAgg2$val/SumEuPix*100
-sum(EuAgg2$rel.val)
-magg$order=1
+
+
 RegioSize = aggregate(list(val=databipi3$upa),
                       by = list(region=databipi3$Biogeo_id),
                       FUN = function(x) c(len=length(x)))
 
 sum(RegioSize$val)
 
-unique(databipi2$Biogeo_id)
+#Aggregate by region and trajectory
 magg = aggregate(list(val=databipi2$upa),
                  by = list(reg=databipi2$Biogeo_id ,traj=databipi2$bi_class),
                  FUN = function(x) c(len=length(x)))
 magg <- do.call(data.frame, magg)
-sum(magg$val)
+
+#Remove peripheral regions
 magg=magg[-which(magg$reg=="Steppic" | magg$reg=="BlackSea" | magg$reg=="Arctic"),]
 magg$trcat="Wetting"
 magg$trcat[which(magg$traj=="2-2" | magg$traj=="3-2" |
@@ -2372,14 +2128,16 @@ magg$trcat[which(magg$traj=="1-4" | magg$traj=="2-4" |
                    magg$traj=="1-3")]="Accelerating"
 magg$trcat[which(magg$traj=="4-1" | magg$traj=="4-2" |
                    magg$traj=="3-1")]="Decelerating"
+
+#Plot preparation
 magg$order=1
 magg$order[which(magg$trcat=="Wetting")]=2
 magg$order[which(magg$trcat=="Decelerating")]=3
 magg$order[which(magg$trcat=="Drying")]=4
 magg$order[which(magg$trcat=="Accelerating")]=5
 
-matshit=match(magg$traj,names(colord))
-magg$ordf=colord[matshit]
+matm=match(magg$traj,names(colord))
+magg$ordf=colord[matm]
 magg <- magg %>% 
   mutate(traj = reorder(traj, ordf, FUN = mean))
 
@@ -2395,6 +2153,7 @@ magg2$ratio=magg2$val/magg2$rsize*100
 sum(magg$val[which(magg$reg=="Mediterranean")])
 
 
+### [Plot] - Figure 4 - Stacked barplot of change trajectory by Biogeoregion ----
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 
 tsize=15
@@ -2420,7 +2179,7 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Regional_tr
 
 #2. CLIMATE TREND ------------------
 
-
+##2.1 Bivariate categorization at catchment level ---------------
 ClimateFloodTrend=FloodTrends[which(FloodTrends$driver==driver[1]),]
 ClimateDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[1]),]
 ClimateFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
@@ -2439,31 +2198,26 @@ DrPoint=full_join(GHshpp,ClimateDroughtTrend,by=c("CODEB"="HydroR"))
 st_geometry(DrPoint)<-NULL
 period=c(1951,2020)
 haz="flood"
-#Drplot <- st_transform(DrPoint, crs = 3035)
 Drplot=inner_join(HydroRsf,DrPoint,by= c("Id"))
 
 mv=match(Drplot$Id,Flplot$Id)
-plot(diff(mv))
 Flplot$d2015=Drplot$Rchange.Y2015
 Flplot$f2015=Flplot$Rchange.Y2015
 
-#Univariate plot for verification
 colNA="transparent"
-# legend="Relative change (%)"
 tsize=16
 osize=12
 legend="Change in Q (%)"
 palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
-
+### [SPlot] - SUpplementary plot - Univariate plot for verification ----
 uplot=F
-
 if (uplot==T){
   br=seq(-100,100,2)
   labels=br
   limi=c(-20,20)
   ggplot(basemap) +
     geom_sf(fill="white")+
-    geom_sf(data = Flplot, mapping = aes(fill = d2020), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
+    geom_sf(data = Flplot, mapping = aes(fill = d2015), alpha=0.9, color = "transparent", size = 0.01, show.legend = TRUE) +
     geom_sf(fill=NA, color="gray42") +
     coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
     scale_fill_gradientn(
@@ -2485,21 +2239,15 @@ if (uplot==T){
 
 #normalize change
 FlplotClim=Flplot
-a=sd(FlplotClim$f2015,na.rm=T)
-b=sd(FlplotClim$d2015,na.rm=T)
 a=b=1
 databiclim=FlplotClim
 databiclim$x=databiclim$f2015/a
 databiclim$y=databiclim$d2015/b
 
-hist(databiclim$x,breaks=100,xlim=c(-5,5))
-hist(databiclim$y,breaks=100,xlim=c(-5,5))
-sd(databiclim$x)
-
 breaker1=0
 breaker2=5
 
-### floods --------------------
+#### floods --------------------
 alterclass=data.frame(databiclim$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2508,7 +2256,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 c1=alterclass$class
 
-### droughts --------------------
+#### droughts --------------------
 alterclass=data.frame(databiclim$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2522,17 +2270,13 @@ databiclim$bi_class=cx
 # Combine the main category and subcategory to make a label
 databiclim$combined_category <-databiclim$bi_class
 
-merdas=ClimateDroughtTrend$Rchange.Y2015[which(ClimateDroughtTrend$HydroR==2070016940)]
-merdav=databiclim$d2015[which(databiclim$Id==2070016940)]
-## Pixel level --------------
-
+##1.2 Bivariate categorization at pixel level ---------------
 a=sd(ClimFloodTrendPix$Y2015,na.rm=T)
 b=sd(ClimDroughtTrendPix$Y2015,na.rm=T)
 a=b=1
 databipic=Flpixplot
 databipic$x=ClimFloodTrendPix$Y2015/a
 databipic$y=ClimDroughtTrendPix$Y2015/b
-
 
 sd(databipic$x,na.rm=T)
 breaker1=0
@@ -2565,52 +2309,17 @@ mbicli=data.frame(x=mean(databiclim$d2015,na.rm=T),y=mean(databiclim$f2015,na.rm
                  xq1=quantile(databiclim$d2015,0.05,na.rm=T),yq1=quantile(databiclim$f2015,0.05,na.rm=T),
                  xq2=quantile(databiclim$d2015,0.95,na.rm=T),yq2=quantile(databiclim$f2015,0.95,na.rm=T))
 
-
-
-ggplot(databiclim, aes(x = d2015, y = f2015, fill = combined_category)) +
-  geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-  #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-  scale_fill_manual(values = colors) +
-  coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
-
-  # Add main quadrant labels
-  annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-  annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-
-  # Set axis labels
-  labs(x = "Change in drought flows (l/s/km2)",
-       y = "Change in flood flows (l/s/km2)") +
-
-  # Customize the theme
-  theme(axis.title=element_text(size=tsize),
-        panel.background = element_rect(fill = "transparent", colour = "grey1"),
-        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-        legend.title = element_text(size=tsize),
-        legend.text = element_text(size=osize),
-        legend.position = "bottom",
-        panel.grid.major = element_line(colour = "grey70"),
-        panel.grid.minor = element_line(colour = "grey90"),
-        legend.key = element_rect(fill = "transparent", colour = "transparent"),
-        legend.key.size = unit(.8, "cm"))
-
-
-
-
 map <- ggplot(basemap) +
   geom_sf(fill="white")+
   geom_sf(data = databiclim, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
   geom_sf(data = databipic, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
   geom_sf(fill=NA, color="gray42") +
-  # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_fill_manual(values = colorp) +
   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
                                                                        sep = " ")),
              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
              guide = "none")+
-  #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
   scale_color_manual(values = colorp, na.value=NA) +
   labs()+
   theme(axis.title=element_text(size=tsize),
@@ -2642,40 +2351,9 @@ pl=ggarrange(map, legend,
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_HR_9.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800)
 
 
-#extra analysis
-
-databipic2=databipic
-databipic2$trcat="Wetting"
-databipic2$trcat[which(databipic2$bi_class=="2-2" | databipic2$bi_class=="3-2" |
-                        databipic2$bi_class=="2-3" | databipic2$bi_class=="3-3")]="Stable"
-databipic2$trcat[which(databipic2$bi_class=="1-1" | databipic2$bi_class=="1-2" |
-                        databipic2$bi_class=="2-1")]="Drying"
-databipic2$trcat[which(databipic2$bi_class=="1-4" | databipic2$bi_class=="2-4" |
-                        databipic2$bi_class=="1-3")]="Accelerating"
-databipic2$trcat[which(databipic2$bi_class=="4-1" | databipic2$bi_class=="4-2" |
-                        databipic2$bi_class=="3-1")]="Decelerating"
-
-databipiD=databipi2[which(databipi2$trcat=="Decelerating"),]
-databipicD=databipic2[which(databipi2$trcat=="Decelerating"),]
-
-math=match(databipiD$HydroRegions_raster_WGS84,GHshpp$Id)
-databipiD$HERName=GHshpp$IRST_NAMEB[math]
-databipiD$HERcheck=databipiD$HydroRegions_raster_WGS84
-
-locD1=aggregate(list(val=databipi$upa),
-                by = list(regio=databipi$Biogeo_id),
-                FUN = function(x) c(len=length(x)))
-
-locDt=aggregate(list(val=databipiD$upa),
-                by = list(regio=databipiD$Biogeo_id),
-                FUN = function(x) c(len=length(x)))
-
-locDt$rat=locDt$val/locD1$val  
-ClimDT = aggregate(list(val=databipicD$upa),
-                      by = list(traj=databipicD$trcat),
-                      FUN = function(x) c(len=length(x)))
-
 #3. LAND USE TREND --------------
+
+##3.1 Bivariate categorization at catchment level ---------------
 
 LanduseFloodTrend=FloodTrends[which(FloodTrends$driver==driver[2]),]
 LanduseDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[2]),]
@@ -2702,8 +2380,6 @@ Flplot$d2015=Drplot$Rchange.Y2015
 Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotLu=Flplot
-a=sd(FlplotLu$f2015,na.rm=T)
-b=sd(FlplotLu$d2015,na.rm=T)
 a=b=1
 databilu=FlplotLu
 databilu$x=databilu$f2015/a
@@ -2712,8 +2388,7 @@ databilu$y=databilu$d2015/b
 breaker1=0
 breaker2=5
 
-
-### floods --------------------
+#### floods --------------------
 alterclass=data.frame(databilu$x)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2722,7 +2397,7 @@ alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=
 alterclass$class[which(alterclass[,1]>=breaker2)]=4
 c1=alterclass$class
 
-### droughts --------------------
+#### droughts --------------------
 alterclass=data.frame(databilu$y)
 alterclass$class=NA
 alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
@@ -2736,12 +2411,10 @@ databilu$bi_class=cx
 # Combine the main category and subcategory to make a label
 databilu$combined_category <-databilu$bi_class
 
-## Pixel level
+##3.2 Bivariate categorization at pixel level ---------------
 
 luflood=LuFloodTrendPix$Y2015
 ludrought=LuDroughtTrendPix$Y2015
-a=sd(luflood,na.rm=T)
-b=sd(ludrought,na.rm=T)
 a=b=1
 databipilu=Flpixplot
 databipilu$x=luflood/a
@@ -2749,12 +2422,6 @@ databipilu$y=ludrought/b
 
 
 sd(databipilu$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-# breaker1=0
-# breaker2=0.25
-# breaker2=10
 
 alterclass=data.frame(databipilu$x)
 alterclass$class=NA
@@ -2784,88 +2451,10 @@ mbilu=data.frame(x=mean(databilu$d2015,na.rm=T),y=mean(databilu$f2015,na.rm=T),
                   xq1=quantile(databilu$d2015,0.05,na.rm=T),yq1=quantile(databilu$f2015,0.05,na.rm=T),
                   xq2=quantile(databilu$d2015,0.95,na.rm=T),yq2=quantile(databilu$f2015,0.95,na.rm=T))
 
-# 
-# 
-# ggplot(databilu, aes(x = d2015, y = f2015, fill = combined_category)) +
-#   geom_point(shape = 21, color = "black", size = 3,show.legend = FALSE) +
-#   #bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA )+
-#   scale_fill_manual(values = colors) +
-#   coord_cartesian(xlim=c(-100,100),ylim=c(-100,100)) +
-#   geom_point(data=mbilu, aes(x = x,y = y), fill="red",color="red",size=4)+
-#   
-#   # Add main quadrant labels
-#   annotate("text", x = 1.8, y = 40, label = "Wetting", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = 40, label = "Accelerating", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = -1.8, y = -40, label = "Drying", color = "gray12", size = 5, fontface = "bold") +
-#   annotate("text", x = 1.8, y = -40, label = "Decelerating", color = "gray12", size = 5, fontface = "bold") +
-#   
-#   # Set axis labels
-#   labs(x = "Change in drought flows (l/s/km2)", 
-#        y = "Change in flood flows (l/s/km2)") +
-#   
-#   # Customize the theme
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "transparent", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# 
-# 
-# map <- ggplot(basemap) +
-#   geom_sf(fill="white")+
-#   geom_sf(data = databilu, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
-#   geom_sf(data = databipilu, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
-#   geom_sf(fill=NA, color="gray42") +
-#   # bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_fill_manual(values = colors) +
-#   coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-#   scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-#                                                                        sep = " ")),
-#              breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-#              guide = "none")+
-#   #bi_scale_color(pal = "BlueOr", dim = 3, na.value=colNA ) +
-#   scale_color_manual(values = colors) +
-#   labs()+
-#   theme(axis.title=element_text(size=tsize),
-#         panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-#         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-#         legend.title = element_text(size=tsize),
-#         legend.text = element_text(size=osize),
-#         legend.position = "bottom",
-#         panel.grid.major = element_line(colour = "grey70"),
-#         panel.grid.minor = element_line(colour = "grey90"),
-#         legend.key = element_rect(fill = "transparent", colour = "transparent"),
-#         legend.key.size = unit(.8, "cm"))
-# 
-# 
-# 
-# legend <- bi_legend(pal = colors,
-#                     dim = 4,
-#                     xlab = "  +  Drought changes  -  ",
-#                     ylab = "  -  Flood changes  +  ",
-#                     size = 16,
-#                     arrows = FALSE)
-# 
-# pl=ggarrange(map, legend, 
-#              labels = c("Map", "Key"),
-#              ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
-# 
-# pl
-# 
-# ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/luchange_bvrel10p.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800) 
-# 
-
 
 #4. RESERVOIR trend --------------
 
-# Set up the Reservoir
+##4.1 Bivariate categorization at HER level level ---------------
 ReservoirFloodTrend=FloodTrends[which(FloodTrends$driver==driver[3]),c(2:71)]
 ReservoirDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[3]),c(2:71)]
 ReservoirFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[1]),1]
@@ -2890,16 +2479,10 @@ Flplot$d2015=Drplot$Rchange.Y2015
 Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotRes=Flplot
-a=sd(FlplotRes$f2015,na.rm=T)
-b=sd(FlplotRes$d2015,na.rm=T)
 a=b=1
 databire=FlplotRes
 databire$x=databire$f2015/a
 databire$y=databire$d2015/b
-
-# breaker1=0
-# breaker2=0.25
-# breaker2=10
 
 alterclass=data.frame(databire$x)
 alterclass$class=NA
@@ -2921,28 +2504,21 @@ c2=alterclass$class
 cx=paste(c2,c1,sep="-")
 
 databire$bi_class=cx
+
 # Combine the main category and subcategory to make a label
 databire$combined_category <-databire$bi_class
 
-
-#Reservoir signal
+##4.2 Bivariate categorization at pixel level ---------------
 crsiflood=ResFloodTrendPix$Y2015
 crsidrought=ResDroughtTrendPix$Y2015
-a=sd(crsiflood,na.rm=T)
-b=sd(crsidrought,na.rm=T)
+
 a=b=1
 databipire=Flpixplot
 databipire$x=crsiflood/a
 databipire$y=crsidrought/b
 
 
-sd(databipire$x,na.rm=T)
 
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-# breaker1=0
-# breaker2=0.25
-# breaker2=10
 
 alterclass=data.frame(databipire$x)
 alterclass$class=NA
@@ -2972,7 +2548,7 @@ mbires=data.frame(x=mean(databire$d2015,na.rm=T),y=mean(databire$f2015,na.rm=T),
 
 #5. Water Demand signal ------------------
 
-
+##5.1 Bivariate categorization at HER level ---------------
 WaterDemandFloodTrend=FloodTrends[which(FloodTrends$driver==driver[4]),c(2:71)]
 WaterDemandDroughtTrend=DroughtTrends[which(DroughtTrends$driver==driver[4]),c(2:71)]
 WaterDemandFloodTrend$HydroR=FloodTrends[which(FloodTrends$driver==driver[4]),1]
@@ -2997,16 +2573,10 @@ Flplot$d2015=Drplot$Rchange.Y2015
 Flplot$f2015=Flplot$Rchange.Y2015
 
 FlplotWD=Flplot
-a=sd(FlplotWD$f2015,na.rm=T)
-b=sd(FlplotWD$d2015,na.rm=T)
 a=b=1
 databiwd=FlplotWD
 databiwd$x=databiwd$f2015/a
 databiwd$y=databiwd$d2015/b
-
-# breaker1=0
-# breaker2=0.25
-# breaker2=10
 
 alterclass=data.frame(databiwd$x)
 alterclass$class=NA
@@ -3032,7 +2602,7 @@ databiwd$bi_class=cx
 databiwd$combined_category <-databiwd$bi_class
 
 
-## Pixel level ---------------
+##5.2 Bivariate categorization at pixel level ---------------
 crsiflood=WuFloodTrendPix$Y2015
 crsidrought=WuDroughtTrendPix$Y2015
 a=sd(crsiflood,na.rm=T)
@@ -3044,12 +2614,6 @@ databipiwd$y=crsidrought/b
 
 
 sd(databipiwd$x,na.rm=T)
-
-# databiclim <- bi_class(Flplot, x = x, y = y, style = "fisher", dim = 3, keep_factors = TRUE, dig_lab=2)
-
-# breaker1=0
-# breaker2=0.25
-# breaker2=10
 
 alterclass=data.frame(databipiwd$x)
 alterclass$class=NA
@@ -3072,9 +2636,6 @@ cx=paste(c2,c1,sep="-")
 
 databipiwd$bi_class=cx
 
-#mbiwd=data.frame(x=mean(databiwd$d2015,na.rm=T),y=mean(databiwd$f2015,na.rm=T),xsd=sd(databiwd$d2015,na.rm=T),ysd=sd(databiwd$f2015,na.rm=T))
-
-
 mbiwd=data.frame(x=mean(databiwd$d2015,na.rm=T),y=mean(databiwd$f2015,na.rm=T),
                   xq1=quantile(databiwd$d2015,0.05,na.rm=T),yq1=quantile(databiwd$f2015,0.05,na.rm=T),
                   xq2=quantile(databiwd$d2015,0.95,na.rm=T),yq2=quantile(databiwd$f2015,0.95,na.rm=T))
@@ -3082,19 +2643,16 @@ mbiwd=data.frame(x=mean(databiwd$d2015,na.rm=T),y=mean(databiwd$f2015,na.rm=T),
 
 # Bivariate plots of mean contribution ----------------------
 
-
-#plot of location by driver
-
-databipicl=data.frame(databipic[,c(79:86)])
+databipicl=data.frame(databipic[,c(74,80:86)])
 databipicl$driver="Climate"
 
-databipilul=data.frame(databipilu[,c(79:86)])
+databipilul=data.frame(databipilu[,c(74,80:86)])
 databipilul$driver="LandUse"
 
-databipirel=data.frame(databipire[,c(79:86)])
+databipirel=data.frame(databipire[,c(74,80:86)])
 databipirel$driver="Reservoir"
 
-databipiwdl=data.frame(databipiwd[,c(79:86)])
+databipiwdl=data.frame(databipiwd[,c(74,80:86)])
 databipiwdl$driver="WaterDemand"
 
 databipD=rbind(databipicl,databipilul,
@@ -3103,7 +2661,7 @@ databipD=rbind(databipicl,databipilul,
 databipD$bi_class[which(databipD$bi_class=="NA-NA")]=NA
 databipD$bi_class[which(is.na(databipD$Y2015))]=NA
 databipD$bi_class[which(is.na(databipD$d2015))]=NA
-
+unique(databipD$bi_class)
 magg2 = aggregate(list(val=databipD$upa),
                  by = list(reg=databipD$driver ,traj=databipD$bi_class),
                  FUN = function(x) c(len=length(x)))
@@ -3136,7 +2694,7 @@ ggplot(magg3, aes(x = trcat, y = val, fill = trcat)) +
   geom_bar(stat = "identity") +
   scale_fill_manual(values = loscolors) +
   scale_x_discrete(name="Trajectory")+
-  scale_y_continuous(label=c(0,25,50,75,100),name="River pixels (%)")+
+  #scale_y_continuous(label=c(0,25,50,75,100),name="River pixels (%)")+
   theme(axis.title=element_text(size=tsize),
         panel.background = element_rect(fill = "white", colour = "grey1"),
         panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
@@ -3148,12 +2706,7 @@ ggplot(magg3, aes(x = trcat, y = val, fill = trcat)) +
 
 
 
-
-
-
-
-
-#match biogeoregions with HRs
+### match biogeoregions with HRs ----
 databitotxHR=databipi
 RegioRLi=aggregate(list(val=databitotxHR$y),
                    by = list(HydroR=databitotxHR$HydroRegions_raster_WGS84),
@@ -3177,7 +2730,6 @@ GHR_riv$HydrRName=HydroRsf_dom$IRST_NAMEB[verif]
 bhp_m=na.omit(unique(match(HydroRsf_dom$Id,GHR_riv$HydroRegions_raster_WGS84)))
 HydroRsf_dom$biogeoreg=GHR_riv$biogeoR[bhp_m]
 
-
 sample=GHR_riv[bhp_m,]
 
 
@@ -3188,7 +2740,7 @@ RegioAg <- do.call(data.frame, RegioAg)
 
 ur=unique(RegioAg$HR)
 
-#matching biogeoregions and hybas07
+### matching biogeoregions and pixel level estimate -----
 databiwdxBG=inner_join(biogeo_rivers,databipiwd,by=c("outl2"))
 databiluxBG=inner_join(biogeo_rivers,databipilu,by=c("outl2"))
 databiclixBG=inner_join(biogeo_rivers,databipic,by=c("outl2"))
@@ -3196,29 +2748,22 @@ databiresxBG=inner_join(biogeo_rivers,databipire,by=c("outl2"))
 databitotxBG=inner_join(biogeo_rivers,databipi,by=c("outl2"))
 
 
-#matching hydroregions and hybas07
+### matching hydroregions and pixel level estimates ----
 databiwdxHR=inner_join(GHR_riv,databipiwd,by=c("outl2"))
 databiluxHR=inner_join(GHR_riv,databipilu,by=c("outl2"))
 databiclixHR=inner_join(GHR_riv,databipic,by=c("outl2"))
 databiresxHR=inner_join(GHR_riv,databipire,by=c("outl2"))
 databitotxHR=inner_join(GHR_riv,databipi,by=c("outl2"))
-# 
-# databiwdxHR=databipiwd
-# databiluxHR=databipilu
-# databiclixHR=databipic
-# databiresxHR=databipire
-# databitotxHR=databipi
+
 
 mbf=rbind(mbicli,mbires,mbilu,mbiwd)
 mbf$names=c('Climate',
             'Reservoirs',
             'Landuse',
             'WaterDemand')
-# mbf$lbx=mbf$x-mbf$xsd
-# mbf$hbx=mbf$x+mbf$xsd
-# mbf$lby=mbf$y-mbf$ysd
-# mbf$hby=mbf$x+mbf$ysd
 
+
+#### [SPlot] - Supplementary plot - Bivariate change aggregate -----
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 clabels=c("Climate","Land use","Reservoirs", "Water demand")
 colorn = c("WaterDemand" ='limegreen',"Reservoirs" ='tomato4',"Landuse" ='orange',"Climate" ='royalblue')
@@ -3264,9 +2809,10 @@ bpc
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Contribution_bv.jpg"),bpc, width=25, height=20, units=c("cm"),dpi=300) 
 
 
-length(which(is.na(databiresxHR$x.y)))
 
-# databiwdxHR$y.y[which(abs(databiwdxHR$y.y)>100)]=100
+#6. Bivariate change by driver Aggregated to HER level ----
+
+##I AM HERE ----
 mbiwd1=aggregate(list(val=databiwdxHR$y.y),
                  by = list(HR=databiwdxHR$HydrRName),
                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
@@ -3277,29 +2823,21 @@ mbicli1=aggregate(list(val=databiclixHR$y.y),
                   FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbicli1 <- do.call(data.frame, mbicli1)
 
-#databiresxHR$y[which(abs(databiresxHR$y)==0)]=NA
 mbires1=aggregate(list(val=databiresxHR$y.y),
                   by = list(HR=databiresxHR$HydrRName),
                   FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbires1 <- do.call(data.frame, mbires1)
 
-# mbires1$se=mbires1$val.sd/sqrt(mbires1$val.l)
-# databiluxHR$y.y[which(abs(databiluxHR$y.y)>100)]=100
 mbilu1=aggregate(list(val=databiluxHR$y.y),
                  by = list(HR=databiluxHR$HydrRName),
                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbilu1 <- do.call(data.frame, mbilu1)
 
-
-#databitotxHR$y.y[which(abs(databitotxHR$y.y)>100)] =100
 mball1=aggregate(list(val=databitotxHR$y.y),
                  by = list(HR=databitotxHR$HydrRName),
                  FUN = function(x) c(dmean=mean(x,na.rm=T),dmed=median(x,na.rm=T),dq1=quantile(x,0.05,na.rm=T),dq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mball1 <- do.call(data.frame, mball1)
-#mball1$se=mball1$val.sd/sqrt(mball1$val.l)  
 
-
-#databiwdxHR$x.y[which(abs(databiwdxHR$x.y)<=1e-3)]=NA
 mbiwd2=aggregate(list(val=databiwdxHR$x.y),
                  by = list(HR=databiwdxHR$HydrRName),
                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
@@ -3310,13 +2848,11 @@ mbicli2=aggregate(list(val=databiclixHR$x.y),
                   FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbicli2 <- do.call(data.frame, mbicli2)
 
-# databiresxHR$x.y[which(abs(databiresxHR$x.y)>1e4)]=1e3
 mbires2=aggregate(list(val=databiresxHR$x.y),
                   by = list(HR=databiresxHR$HydrRName),
                   FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
 mbires2 <- do.call(data.frame, mbires2)
 
-# databiluxHR$x.y[which(abs(databiluxHR$x.y)<=1e-3)]=NA
 mbilu2=aggregate(list(val=databiluxHR$x.y),
                  by = list(HR=databiluxHR$HydrRName),
                  FUN = function(x) c(fmean=mean(x,na.rm=T),fq1=quantile(x,0.05,na.rm=T),fq2=quantile(x,0.95,na.rm=T),l=length(x),sd=sd(x,na.rm=T)))
@@ -3347,21 +2883,11 @@ mbfX$names=c(rep('Climate',l1),
 zeb=match(mbfX$HR,RegionName$HR)
 mbfX$regioname=RegionName$IRST_NAMEB[zeb]
 
-
 #correlation between change in drought and flood of several drivers
 
 cor.test(mbicli3$val.dmean, mbicli3$val.fmean)
 cor.test(mbires3$val.dmean, mbires3$val.fmean)
 cor.test(mbilu3$val.dmean, mbilu3$val.fmean)
-# mbf$lbx=mbf$x-mbf$xsd
-# mbf$hbx=mbf$x+mbf$xsd
-# mbf$lby=mbf$y-mbf$ysd
-# mbf$hby=mbf$x+mbf$ysd
-
-# breg=unique(mbfX$HR)
-# breg=breg[c(1,3,5,6,7)]
-# mbk=which(!is.na(match(mbfX$bg,breg)))
-# mbfX=mbfX[mbk,]
 
 
 colnames(mbfX)[c(2,4,5,8,9,10)]=c("x","xq1","xq2","y","yq1","yq2")
