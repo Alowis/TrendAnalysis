@@ -1762,6 +1762,13 @@ weighted_average <- function(r,point, points, rivermask, max_distance) {
   return(weighted_avg)
 }
 
+neighbour_finder <- function(point, points, max_distance) {
+
+  distance3 <- spDists(points, point, longlat=T)
+  neighbours=points$z[which(distance3 < max_distance)]
+  return(neighbours)
+}
+
 ComputeChange<- function(Drivertrend, unikout, DataI, outhybas07, 
                          parameters, rmpixels, UpAvec, GNF, Regio, yrname, change, eps=0.1) {
   
@@ -2374,7 +2381,7 @@ if (haz=="Flood") {
 }
 if (haz=="Drought") {
   na="10-y low flows \n(l/s/km2)"
-  shp_bnd=c(0,-2)
+  shp_bnd=c(0,-1.5)
 }
 
 #shape parameter vector to remove pixels with crazy shape parameter
@@ -2382,6 +2389,9 @@ Shapepar1=ParamsflH[,c(1,2,4)]
 Shapepar2=ParamsflSCF[,c(1,2,4)]
 Shapepar3=ParamsflRWCF[,c(1,2,4)]
 Shapepar4=ParamsflWCF[,c(1,2,4)]
+Shapeparf=cbind(Shapepar2[which(Shapepar1$Year==2015),],Shapepar3$epsilonGPD[which(Shapepar2$Year==2015)],
+                Shapepar4$epsilonGPD[which(Shapepar3$Year==2015)],Shapepar1$epsilonGPD[which(Shapepar4$Year==2015)])
+
 rmpixs1=which(Shapepar1$epsilonGPD>shp_bnd[1] | Shapepar1$epsilonGPD<shp_bnd[2])
 length(rmpixs1)/length(Shapepar1$catchment)
 rmpixs2=which(Shapepar2$epsilonGPD>shp_bnd[1] | Shapepar2$epsilonGPD<shp_bnd[2])
@@ -2389,10 +2399,13 @@ rmpixs3=which(Shapepar3$epsilonGPD>shp_bnd[1] | Shapepar3$epsilonGPD<shp_bnd[2])
 rmpixs4=which(Shapepar4$epsilonGPD>shp_bnd[1] | Shapepar4$epsilonGPD<shp_bnd[2])
 rmpixs=unique(c(rmpixs1,rmpixs2,rmpixs3,rmpixs4))
 length(rmpixs)/length(Shapepar1$catchment)*100
-
 rmp2=na.omit(unique(ParamsflSCF$catchment[rmpixs]))
+ShapeparRM=Shapeparf[(match(rmp2,Shapeparf$catchment)),]
+Shapeparf=Shapeparf[-(match(rmp2,Shapeparf$catchment)),]
 
-
+Shapeparf$mean=(Shapeparf$epsilonGPD+Shapeparf$V2+Shapeparf$V3+Shapeparf$V4)/4
+Shapeparf$sd=sqrt(((Shapeparf$epsilonGPD-Shapeparf$mean)^2+(Shapeparf$V2-Shapeparf$mean)^2+
+  (Shapeparf$V3-Shapeparf$mean)^2+(Shapeparf$V4-Shapeparf$mean)^2)/4)
 ##3.4 Large scale error computation --------------
 
 RlevErrtH=c()
@@ -2456,8 +2469,247 @@ ggplot() +
   ) +
   ggtitle("Europe")
 
-###[Plot] - Supplement - 10y RL in 1950 ----
 
+
+### Error on the estimation of RL in 1955 -----
+# SocCF scenario
+unish=unique(ParamsflSCF$catchment)
+paraU=ParamsflSCF[which(ParamsflSCF$Year==1955),]
+
+unish=unique(ParamsflRWCF$catchment)
+paraU=ParamsflRWCF[which(ParamsflRWCF$Year==1955),]
+
+ParamSpecial<-paraU[-match(rmp2,paraU$catchment),]
+
+Paramf=ParamsflH[which(ParamsflH$Year==2015),]
+Paramf<-Paramf[-match(rmp2,Paramf$catchment),]
+Paramf<-Paramf[-which(is.na(ParamSpecial$epsilonGPD)),]
+RlevErrf <- calculate_return_levels(Paramf,ci=1)
+RlevErrf$year=2015
+
+ParamSpecial<-ParamSpecial[-which(is.na(ParamSpecial$epsilonGPD)),]
+RlevErri <- calculate_return_levels(ParamSpecial,ci=1)
+RlevErri$year=1955
+
+
+if(haz=="Drought"){
+  RlevErri$returnLevels= -RlevErri$returnLevels
+  RlevErri$returnLevels[which(RlevErri$returnLevels<0)]=RlevErri$returnLevelErr[which(RlevErri$returnLevels<0)]
+  
+  RlevErrf$returnLevels= -RlevErrf$returnLevels
+  RlevErrf$returnLevels[which(RlevErrf$returnLevels<0)]=RlevErrf$returnLevelErr[which(RlevErrf$returnLevels<0)]
+}
+mapu=na.omit((match(ParamSpecial$catchment,UpArea$outl2)))
+ParamSpecial$upa=UpArea$upa[mapu]
+RlevErri$catchment=ParamSpecial$catchment
+RlevErri$epsilon=ParamSpecial$epsilonGPD
+RlevErri$relErr=(RlevErri$returnLevelErr/RlevErri$returnLevels+1e-4)*100
+RlevErri$rlf=RlevErrf$returnLevels
+RlevErri$change=abs(RlevErri$rlf-RlevErri$returnLevels)
+RlevErri$relcf=(RlevErri$rlf/RlevErri$returnLevels+1e-4)*100
+RlevErri$ErrVsCh=RlevErri$rlf-RlevErri$returnLevelErr
+RlevErri$S2n="Err > Change"
+RlevErri$S2n[which(RlevErri$ErrVsCh>=0)]="Change > Err"
+RlevErri$S2n[which(is.nan(RlevErri$ErrVsCh))]="Unstable"
+length(which(RlevErri$S2n=="Err > Change"))
+ParamPlot=inner_join(RlevErri,UpArea,by=c("catchment"="outl2"))
+max(RlevErri$returnLevelErr,na.rm=T)
+Paraplot <- st_as_sf(ParamPlot, coords = c("Var1.x", "Var2.x"), crs = 4326)
+Paraplot <- st_transform(Paraplot, crs = 3035)
+Paraplot=Paraplot[-which(is.na(Paraplot$returnLevels)),]
+
+Unstable_locs=ParamPlot[which(ParamPlot$S2n=="Unstable"),]
+Unstable_locs <- right_join(GHR_riv, Unstable_locs, by = c("outl2" = "catchment"))
+#### [SPlot] - Supplement map - Relative of 10y-RL error in 1955 -----
+br=seq(0,200,by=20)
+labels=br
+tsize=22
+osize=16
+colNA="transparent"
+titleX=paste0("10-year RL error for ",haz)
+paletS=c(hcl.colors(11, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
+m1=ggplot(basemap) +
+  geom_sf(fill="gray90",color="darkgrey",size=0.5)+
+  geom_sf(data=Paraplot,aes(col=relErr,geometry=geometry,size=upa),alpha=1,stroke=0,shape=15)+ 
+  
+  scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                      sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_color_gradientn(
+    colors=paletS,
+    breaks=br,labels=labels, limits=c(0,200),
+    oob = scales::squish,na.value="white", name="RL(1955) RelErr (%)")   +
+  labs(x="Longitude", y = "Latitude")+
+  guides(colour = guide_colourbar(barheight = 16, barwidth = 1.5),
+         fill = guide_colourbar(barheight = 16, barwidth = .6))+
+  theme(axis.title=element_text(size=tsize),
+        title = element_text(size=osize),
+        axis.text=element_text(size=osize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.text = element_text(size=osize),
+        legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
+        legend.spacing.x = unit(0.2, "cm"),
+        legend.position = "right",
+        legend.box = "horizontal",  # Stack legends vertically
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(1, "cm"))
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relativerwcf_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
+
+#### [SPlot] - Supplement map - Comparison of Error and 2015-1955 changes -----
+m2=ggplot(basemap) +
+  geom_sf(fill="gray90",color="darkgrey",size=0.5)+
+  geom_sf(data=Paraplot,aes(col=S2n,geometry=geometry,size=upa),alpha=1,stroke=0,shape=15)+ 
+  
+  scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                      sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_color_manual(
+    values=c("Unstable"="purple","Err > Change"="darkred","Change > Err"="royalblue"),
+    name="Error classes")   +
+  labs(x="Longitude", y = "Latitude")+
+  guides(colour = guide_legend(override.aes = list(size = 10)))+
+  # guides(colour = guide_colourbar(barheight = 16, barwidth = 1.5),
+  #        fill = guide_colourbar(barheight = 16, barwidth = .6))+
+  theme(axis.title=element_text(size=tsize),
+        title = element_text(size=osize),
+        axis.text=element_text(size=osize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.text = element_text(size=osize),
+        legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
+        legend.spacing.x = unit(0.2, "cm"),
+        legend.position = "right",
+        legend.box = "horizontal",  # Stack legends vertically
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(1, "cm"))
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_classesrwcf_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
+
+
+
+RlevErrip=inner_join(RlevErri,Shapeparf,by="catchment")
+
+
+
+###5.1.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
+if (haz=="Drought"){
+  
+  #Spatial smooting of LUAgg
+  #tweak DataL to identify potentially problematic pixels
+  IRpoints <- right_join(GHR_riv, IRpoints, by = c("outl2" = "catlist"))
+  matRLi=match(IRpoints$outl2,RLGPDflSCF$unikout)
+  IRpoints$RLi=RLGPDflSCF$Y2015[matRLi]
+  length(which(IRpoints$RLi>10))
+  Param1=ParamsflSCF[which(ParamsflSCF$Year==2015),]
+  Param2=ParamsflRWCF[which(ParamsflRWCF$Year==2015),]
+  matP=match(DataL$outl2,Param1$catchment)
+  IRpoints$epsilon1=Param1$epsilonGPD[matP]
+  IRpoints$epsilon2=Param2$epsilonGPD[matP]
+  IRpoints$epsD=abs(DataL$epsilon1-DataL$epsilon2)
+  
+  # Pixels on which the spatial smoothing will be applied on
+  unikR=unique(HydroRsf$Id)
+  DataRSmooth=c()
+  for (rid in 1:length(unikR)){
+    print(rid)
+    regioid=unikR[rid]
+    DataReI=IRpoints[which(DataL$HydroRegions_raster_WGS84==regioid),]
+    DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
+    #spatial smoothing applied to pixels with unstable fits and pixels surrounding them
+    
+    DataReUn=Unstable_locs[which(Unstable_locs$HydroRegions_raster_WGS84==regioid),]
+    matchuns=which(!is.na(match(DataReI$outl2,DataReUn$outl2)))
+    DataRefix=DataReI[matchuns,]
+    if (length(DataRefix$x>0)){
+      # 
+      points <- data.frame(x=DataReI$x, y=DataReI$y, z=DataReI$outl2)
+      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$outl2)
+      coordinates(points) <- ~x + y
+      coordinates(pointX) <- ~x + y
+      
+      max_distance <- 5  # Define the maximum distance for weighting
+      neighbours <- sapply(1:length(pointX), function(i) {
+        point <- pointX[i, ]
+        neighbour_finder(point, points,max_distance)
+      })
+      neighbours=unique(as.vector(unlist(neighbours)))
+      matchd=which(!is.na(match(DataReI$outl2,neighbours)))
+      DataRefix2=DataReI[matchd,]
+      if (length(which(DataRefix2$RLi>10))>0){
+        print("hey")
+        DataRefix2=DataRefix2[-which(DataRefix2$RLi>10),]
+      }
+      #DataRefix2=rbind(DataRefix2,DataRefn)
+      DataRSmooth=rbind(DataRSmooth,DataRefix2)
+    }else{ print("no pixel to smooth")}
+  }
+  
+  
+  #plot pixel status
+  nas=IRpoints$outl2[which(is.na(DataL$epsD))]
+  mln=match(nas,IRpoints$outl2)
+  mld=match(DataRSmooth$outl2,IRpoints$outl2)
+  mli=which(IRpoints$gen_IR==2)
+  mlo=match(rmp2,IRpoints$outl2)
+  IRpoints$status="original"
+  IRpoints$status[mld]="smoothed"
+  IRpoints$status[mli]="IRES"
+  IRpoints$status[mlo]="off-limit parameter"
+  Paraplot <- st_as_sf(IRpoints, coords = c("Var1.x", "Var2.x"), crs = 4326)
+  Paraplot <- st_transform(Paraplot, crs = 3035)
+  
+  #### [SPlot] - Supplement map - Relative of 10y-RL error in 1955 -----
+  br=seq(0,200,by=20)
+  labels=br
+  tsize=22
+  osize=16
+  colNA="transparent"
+  titleX=paste0("10-year RL error for ",haz)
+  paletS=c(hcl.colors(11, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
+  m1=ggplot(basemap) +
+    geom_sf(fill="gray90",color="darkgrey",size=0.5)+
+    geom_sf(data=Paraplot,aes(geometry=geometry,size=upa,col=status),alpha=1,stroke=0,shape=15)+ 
+    scale_color_manual(values=c("original"="royalblue","smoothed"="darkorange","IRES"="darkred","off-limit parameter"="black"),name=" ")+
+    
+    scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                        sep = " ")),
+               breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+               guide = "none")+
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    guides(colour = guide_legend(override.aes = list(size = 10)))+
+    labs(x="Longitude", y = "Latitude")+
+    theme(axis.title=element_text(size=tsize),
+          title = element_text(size=osize),
+          axis.text=element_text(size=osize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.text = element_text(size=osize),
+          legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
+          legend.spacing.x = unit(0.2, "cm"),
+          legend.position = "right",
+          legend.box = "horizontal",  # Stack legends vertically
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(1, "cm"))
+  
+  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/smoothfit_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
+  length(DataRSmooth$x)
+}
+
+
+###[Plot] - Supplement - 10y RL in 1950 ----
+plotmean=F
 if (plotmean==T){
  
   #mean 10y RL over the period for each pixel
@@ -2532,126 +2784,7 @@ if (plotmean==T){
           legend.key.size = unit(1, "cm"))
   
   ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/RL10_",haz,"_mean_scfxNew2.jpg"), m0, width=23, height=20, units=c("cm"),dpi=1000) 
-  
-  ### Error on the estimation of RL in 1955 -----
-  # SocCF scenario
-  unish=unique(ParamsflSCF$catchment)
-
-  paraU=ParamsflSCF[which(ParamsflSCF$Year==1955),]
-  ParamSpecial<-paraU[-match(rmp2,paraU$catchment),]
-  
-  Paramf=ParamsflH[which(ParamsflH$Year==2015),]
-  Paramf<-Paramf[-match(rmp2,Paramf$catchment),]
-  Paramf<-Paramf[-which(is.na(ParamSpecial$epsilonGPD)),]
-  RlevErrf <- calculate_return_levels(Paramf,ci=1)
-  RlevErrf$year=2015
-  
-  ParamSpecial<-ParamSpecial[-which(is.na(ParamSpecial$epsilonGPD)),]
-  RlevErri <- calculate_return_levels(ParamSpecial,ci=1)
-  RlevErri$year=1955
-  
-
-  if(haz=="Drought"){
-    RlevErri$returnLevels= -RlevErri$returnLevels
-    RlevErri$returnLevels[which(RlevErri$returnLevels<0)]=RlevErri$returnLevelErr[which(RlevErri$returnLevels<0)]
-    
-    RlevErrf$returnLevels= -RlevErrf$returnLevels
-    RlevErrf$returnLevels[which(RlevErrf$returnLevels<0)]=RlevErrf$returnLevelErr[which(RlevErrf$returnLevels<0)]
-  }
-  mapu=na.omit((match(ParamSpecial$catchment,UpArea$outl2)))
-  ParamSpecial$upa=UpArea$upa[mapu]
-  #RlevErri=RlevErri/ParamSpecial$upa*1000
-  RlevErri$catchment=ParamSpecial$catchment
-  RlevErri$relErr=(RlevErri$returnLevelErr/RlevErri$returnLevels+1e-4)*100
-  RlevErri$rlf=RlevErrf$returnLevels
-  RlevErri$change=abs(RlevErri$rlf-RlevErri$returnLevels)
-  RlevErri$relcf=(RlevErri$rlf/RlevErri$returnLevels+1e-4)*100
-  RlevErri$ErrVsCh=RlevErri$rlf-RlevErri$returnLevelErr
-  RlevErri$S2n="Err > Change"
-  RlevErri$S2n[which(RlevErri$ErrVsCh>=0)]="Change > Err"
-  RlevErri$S2n[which(is.nan(RlevErri$ErrVsCh))]="Unstable"
-  length(which(RlevErri$S2n=="Err > Change"))
-  ParamPlot=inner_join(RlevErri,UpArea,by=c("catchment"="outl2"))
-  max(RlevErri$returnLevelErr,na.rm=T)
-  Paraplot <- st_as_sf(ParamPlot, coords = c("Var1.x", "Var2.x"), crs = 4326)
-  Paraplot <- st_transform(Paraplot, crs = 3035)
-  Paraplot=Paraplot[-which(is.na(Paraplot$returnLevels)),]
-  
-  #### [SPlot] - Supplement map - Relative of 10y-RL error in 1955 -----
-  br=seq(0,200,by=20)
-  labels=br
-  tsize=22
-  osize=16
-  colNA="transparent"
-  titleX=paste0("10-year RL error for ",haz)
-  paletS=c(hcl.colors(11, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
-  m1=ggplot(basemap) +
-    geom_sf(fill="gray90",color="darkgrey",size=0.5)+
-    geom_sf(data=Paraplot,aes(col=relErr,geometry=geometry,size=upa),alpha=1,stroke=0,shape=15)+ 
-    
-    scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                        sep = " ")),
-               breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-               guide = "none")+
-    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-    scale_color_gradientn(
-      colors=paletS,
-      breaks=br,labels=labels, limits=c(0,200),
-      oob = scales::squish,na.value="white", name="RL(1955) RelErr (%)")   +
-    labs(x="Longitude", y = "Latitude")+
-    guides(colour = guide_colourbar(barheight = 16, barwidth = 1.5),
-           fill = guide_colourbar(barheight = 16, barwidth = .6))+
-    theme(axis.title=element_text(size=tsize),
-          title = element_text(size=osize),
-          axis.text=element_text(size=osize),
-          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-          legend.text = element_text(size=osize),
-          legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
-          legend.spacing.x = unit(0.2, "cm"),
-          legend.position = "right",
-          legend.box = "horizontal",  # Stack legends vertically
-          panel.grid.major = element_line(colour = "grey70"),
-          panel.grid.minor = element_line(colour = "grey90"),
-          legend.key = element_rect(fill = "transparent", colour = "transparent"),
-          legend.key.size = unit(1, "cm"))
-  
-  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
-  
-  #### [SPlot] - Supplement map - Comparison of Error and 2015-1955 changes -----
-  m2=ggplot(basemap) +
-    geom_sf(fill="gray90",color="darkgrey",size=0.5)+
-    geom_sf(data=Paraplot,aes(col=S2n,geometry=geometry,size=upa),alpha=1,stroke=0,shape=15)+ 
-    
-    scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
-                                                                        sep = " ")),
-               breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
-               guide = "none")+
-    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-    scale_color_manual(
-      values=c("Unstable"="purple","Err > Change"="darkred","Change > Err"="royalblue"),
-      name="Error classes")   +
-    labs(x="Longitude", y = "Latitude")+
-    guides(colour = guide_legend(override.aes = list(size = 10)))+
-    # guides(colour = guide_colourbar(barheight = 16, barwidth = 1.5),
-    #        fill = guide_colourbar(barheight = 16, barwidth = .6))+
-    theme(axis.title=element_text(size=tsize),
-          title = element_text(size=osize),
-          axis.text=element_text(size=osize),
-          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
-          legend.text = element_text(size=osize),
-          legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
-          legend.spacing.x = unit(0.2, "cm"),
-          legend.position = "right",
-          legend.box = "horizontal",  # Stack legends vertically
-          panel.grid.major = element_line(colour = "grey70"),
-          panel.grid.minor = element_line(colour = "grey90"),
-          legend.key = element_rect(fill = "transparent", colour = "transparent"),
-          legend.key.size = unit(1, "cm"))
-  
-  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_classes_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
-  
+ 
   ####[SPlot] - Supplement - Bound on the GPD in 1955 -----
   # SocCF scenario
   paraU$bound=paraU$thresholdGPD-(paraU$sigmaGPD/paraU$epsilonGPD)
@@ -2866,16 +2999,16 @@ data=data[-match(rmp2,data$unikout),]
 ##4.6 Spatial aggregation to desired regions: HydroRegion ----------
 
 
-DataI=right_join(GHR_riv,data,by = c("outl2"="unikout"))
-HRM=match(DataI$HydroRegions_raster_WGS84,HydroRsf$Id)
-DataI$Hid=HydroRsf$Id[HRM]
-DataI$mdatS=DataI$mdat * 1000 / (DataI$upa)
-DataI$mdatmaxS=DataI$mdatmax * 1000 / (DataI$upa)
-mean(DataI$mdatS,na.rm=T)
-RegioRLi=aggregate(list(RL10=DataI$mdat),
-                   by = list(HydroR=DataI$Hid),
-                   FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-RegioRLi <- do.call(data.frame, RegioRLi)
+# DataI=right_join(GHR_riv,data,by = c("outl2"="unikout"))
+# HRM=match(DataI$HydroRegions_raster_WGS84,HydroRsf$Id)
+# DataI$Hid=HydroRsf$Id[HRM]
+# DataI$mdatS=DataI$mdat * 1000 / (DataI$upa)
+# DataI$mdatmaxS=DataI$mdatmax * 1000 / (DataI$upa)
+# mean(DataI$mdatS,na.rm=T)
+# RegioRLi=aggregate(list(RL10=DataI$mdat),
+#                    by = list(HydroR=DataI$Hid),
+#                    FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
+# RegioRLi <- do.call(data.frame, RegioRLi)
 
 #matching biogeoregions and hybas07
 bio_hybas=inner_join(biogeo_rivers,GNF,by=c("outl2"))
@@ -2911,6 +3044,8 @@ DataI$Init=RLGPDflSCF[,c1]
 DataI[,irange]=(DataI$Init+DataI[,irange])/2
 
 
+
+
 ##5.1 Land use change data processing -----------
 change="socio"
 DataL=ComputeChange(Drivertrend=Soctrend, unikout, DataI,
@@ -2919,47 +3054,57 @@ DataL=ComputeChange(Drivertrend=Soctrend, unikout, DataI,
 skw=which.min(DataL$Y1985)
 yrange=match(yrname,colnames(DataL))
 
+palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = T, fixup = TRUE))
 ###5.1.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
 if (haz=="Drought"){
-  
-  #Spatial smooting of LUAgg
-  #tweak DataL to identify potentially problematic pixels
-  matRLi=match(DataL$outl2,RLGPDflSCF$unikout)
-  DataL$RLi=RLGPDflSCF$Y2015[matRLi]
-  Param1=ParamsflSCF[which(ParamsflSCF$Year==2015),]
-  Param2=ParamsflRWCF[which(ParamsflRWCF$Year==2015),]
-  matP=match(DataL$outl2,Param1$catchment)
-  DataL$epsilon1=Param1$epsilonGPD[matP]
-  DataL$epsilon2=Param2$epsilonGPD[matP]
-  DataL$epsD=abs(DataL$epsilon1-DataL$epsilon2)
-  
   Change_smoothed=c()
   loc_smoothed=c()
   batar=c()
   fdp=c()
   unikR=unique(HydroRsf$Id)
   for (rid in 1:length(unikR)){
-    #rid=1
     print(rid)
     regioid=unikR[rid]
-    
     unique(DataL$HydroRegions_raster_WGS84)
     DataReI=DataL[which(DataL$Regio_id==regioid),]
-    DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
+    DataRefix=DataRSmooth[which(DataRSmooth$HydroRegions_raster_WGS84==regioid),]
+    dm=match(DataRefix$outl2,DataReI$outl2)
+    DataRefix$ch2015=DataReI$Y2015[dm]
+    #I have to avoid the fitting on  pixels with low changes
+    DataRefix=DataRefix[which(abs(DataRefix$ch2015)>0.5 ),]
+    #DataRetiny=DataReI[which(DataReI$RLi<.1),]
+    #DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
     #different rules to identify unstable pixels on which a spatial smoothing will 
     #be applied
-    DataRefix=DataReI[which( DataReI$RLi<10),]
-    DataRefix=DataRefix[which(DataRefix$epsD>(0.1) | DataRefix$RLi<1),]
-    DataRefix=DataRefix[which(abs(DataRefix$Y2015)>0.5 ),]
-    DataRefix=rbind(DataRefix,DataRefn)
-    
+    # DataRefix=DataReI[which(DataReI$epsD>(0.1)),]
+    # DataRefix=DataReI[which( DataReI$RLi<10),]
+    # DataRefix=DataRefix[which(DataRefix$epsD>(0.1) | DataRefix$RLi<1),]
+    # DataRefix=DataRefix[which(abs(DataRefix$Y2015)>0.5 ),]
+    # DataRefix=rbind(DataRefix,DataRefn)
+    # 
+    # DataReUn=Unstable_locs[which(Unstable_locs$HydroRegions_raster_WGS84==regioid),]
+    # matchuns=which(!is.na(match(DataReI$outlets,DataReUn$outlets.x)))
+    # DataRefix=DataReI[matchuns,]
+    # DataRefix=rbind(DataRefix,DataRefn)
+    # 
+    # points <- data.frame(x=DataReI$x, y=DataReI$y, z=DataReI$outlets)
+    # pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$outlets)
+    # coordinates(points) <- ~x + y
+    # coordinates(pointX) <- ~x + y
+    # 
+    # neighbours=unique(as.vector(unlist(neighbours)))
+    # matchd=which(!is.na(match(DataReI$outlets,neighbours)))
+    # DataRefix=DataReI[matchd,]
+    # DataRefix=rbind(DataRefix,DataRefn)
+      
     if (length(DataRefix$x)>1){
       points <- data.frame(x=DataReI$x, y=DataReI$y, z=DataReI$Y2015)
-      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$Y2015)
-      rivmask=data.frame(x=DataReI$x, y=DataReI$y, llcoord=DataReI$llcoord)
+      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$ch2015)
+      # rivmask=data.frame(x=DataReI$x, y=DataReI$y, llcoord=DataReI$llcoord)
       coordinates(points) <- ~x + y
       coordinates(pointX) <- ~x + y
       # Apply the weighted average function to each point
+      
       max_distance <- 15  # Define the maximum distance for weighting
       smoothed_values <- sapply(1:length(pointX), function(i) {
         point <- pointX[i, ]
@@ -2972,17 +3117,39 @@ if (haz=="Drought"){
       DataReI$Y2015b[rlocs]=smoothed_values
       Change_smoothed=c(Change_smoothed,smoothed_values)
       loc_smoothed=c(loc_smoothed, DataRefix$llcoord)
-      batar=c(batar,DataRefix$Y2015)
-      fdp=c(fdp,DataRefix$Regio_id)
+      batar=c(batar,DataRefix$ch2015)
+      fdp=c(fdp,DataRefix$HydroRegions_raster_WGS84)
     }
+    
+    # ggplot()+
+    #   geom_point(data=as.data.frame(DataReI),aes(x=x,y=y, col=epsD))+
+    #   scale_color_gradientn(colors=palet,limits=c(-.1,.1))+
+    #   geom_point(data=DataRefix,aes(x=x,y=y),col="black")
+    # 
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015b))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # #
+
   }
+  
+  #DataL=DataLs
   plot(batar,Change_smoothed)
   mean(batar,na.rm=T)
   cmL=Change_smoothed
   btL=batar
+
   lmL=loc_smoothed
-  
+  hist(cmL)
   ratio=cmL/btL
+  ratio[which(is.nan(ratio))]=1
+  ratio[which(is.infinite(ratio))]=1
+  ratio[which(is.na(btL))]=NA
   plot(ratio)
   rlocs=match(lmL,DataL$llcoord)
   DataL$Y2015b=DataL$Y2015
@@ -3030,18 +3197,6 @@ DataW=ComputeChange(Drivertrend=Wutrend, unikout,DataI,
 
 ###5.2.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
 if (haz=="Drought"){
-  matRLi=match(DataW$outl2,RLGPDflWCF$unikout)
-  DataW$RLi=RLGPDflWCF$Y2015[matRLi]
-  Param1=ParamsflWCF[which(ParamsflWCF$Year==2015),]
-  Param2=ParamsflH[which(ParamsflH$Year==2015),]
-  matP=match(DataW$outl2,Param1$catchment)
-  DataW$epsilon1=Param1$epsilonGPD[matP]
-  DataW$epsilon2=Param2$epsilonGPD[matP]
-  DataW$epsD=abs(DataW$epsilon1-DataW$epsilon2)
-  length(which(DataW$RLi<10 & (DataW$epsD)>(0.01) & abs(DataW$Y2015)>0.5))
-  length(which(DataW$RLi<10 & (DataW$epsilon1)<(-.51) & abs(DataW$Y2015)>0.5))
-  length(which(DataW$upa<10000 & abs(DataW$Y2015)>1))
-  
   Change_smoothed=c()
   loc_smoothed=c()
   batar=c()
@@ -3049,45 +3204,74 @@ if (haz=="Drought"){
   for (rid in 1:length(unikR)){
     print(rid)
     regioid=unikR[rid]
+    unique(DataW$HydroRegions_raster_WGS84)
     DataReI=DataW[which(DataW$Regio_id==regioid),]
-  
-    DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
-    DataRefix=DataReI[which( DataReI$RLi<10),]
-    DataRefix=DataRefix[which(DataRefix$epsD>(0.1) | DataRefix$RLi<1),]
-    DataRefix=DataRefix[which(abs(DataRefix$Y2015)>0.5 ),]
-    DataRefix=rbind(DataRefix,DataRefn)
+    DataRefix=DataRSmooth[which(DataRSmooth$HydroRegions_raster_WGS84==regioid),]
+    dm=match(DataRefix$outl2,DataReI$outl2)
+    DataRefix$ch2015=DataReI$Y2015[dm]
+    #I have to avoid the fitting on  pixels with low changes
+    DataRefix=DataRefix[which(abs(DataRefix$ch2015)>0.5 ),]
     if (length(DataRefix$x)>1){
       points <- data.frame(x=DataReI$x, y=DataReI$y, z=DataReI$Y2015)
-      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$Y2015)
+      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$ch2015)
+      # rivmask=data.frame(x=DataReI$x, y=DataReI$y, llcoord=DataReI$llcoord)
       coordinates(points) <- ~x + y
       coordinates(pointX) <- ~x + y
       # Apply the weighted average function to each point
-      max_distance <- 15  # Define the maximum distance for weighting
       
-      smoothed_values <- sapply(1:nrow(pointX), function(i) {
+      max_distance <- 15  # Define the maximum distance for weighting
+      smoothed_values <- sapply(1:length(pointX), function(i) {
         point <- pointX[i, ]
         weighted_average(r, point, points, rivermask,max_distance)
+        
       })
       
+      rlocs=match(DataRefix$llcoord,DataReI$llcoord)
+      DataReI$Y2015b=DataReI$Y2015
+      DataReI$Y2015b[rlocs]=smoothed_values
       Change_smoothed=c(Change_smoothed,smoothed_values)
       loc_smoothed=c(loc_smoothed, DataRefix$llcoord)
-      batar=c(batar,DataRefix$Y2015)
-      fdp=c(fdp,DataRefix$Regio_id)
+      batar=c(batar,DataRefix$ch2015)
+      fdp=c(fdp,DataRefix$HydroRegions_raster_WGS84)
     }
+    
+    # ggplot()+
+    #   geom_point(data=as.data.frame(DataReI),aes(x=x,y=y, col=epsD))+
+    #   scale_color_gradientn(colors=palet,limits=c(-.1,.1))+
+    #   geom_point(data=DataRefix,aes(x=x,y=y),col="black")
+    # 
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015b))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # #
+    
   }
+  
   btW=batar
   cmW=Change_smoothed
   lmW=loc_smoothed
   ratio=cmW/btW
+  ratio[which(is.nan(ratio))]=1
+  ratio[which(is.infinite(ratio))]=1
+  ratio[which(is.na(btL))]=NA
   rlocs=match(lmW,DataW$llcoord)
   DataW$Y2015b=DataW$Y2015
   DataW$Y2015b[rlocs]=cmW
   DataW2=DataW
   DataW2[rlocs,yrange]=DataW2[rlocs,yrange]*ratio
   DataWs=DataW
-  rlocp=which(is.na(DataW2$Y2015[rlocs]))
-  rlocx=rlocs[-rlocp]
+  #rlocp=which(is.na(DataW2$Y2015[rlocs]))
+  rlocx=rlocs
   #initial mean change in affected pixels
+
+  # aa= which(is.nan(DataW$Y2015))
+  # DataW[aa,yrange]=NA
+  print(mean(DataW2$Y2015[rlocx],na.rm=T))
   print(mean(DataWs$Y2015[rlocx],na.rm=T))
   #interpolated mean change
   print(mean(DataWs$Y2015b[rlocx],na.rm=T))
@@ -3147,38 +3331,63 @@ if (haz=="Drought"){
   for (rid in 1:length(unikR)){
     print(rid)
     regioid=unikR[rid]
-  
+    unique(DataT$HydroRegions_raster_WGS84)
     DataReI=DataT[which(DataT$Regio_id==regioid),]
-    DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
-    DataRefix=DataReI[which( DataReI$RLi<10),]
-    DataRefix=DataRefix[which(DataRefix$epsD>(0.1) | DataRefix$RLi<1),]
-    DataRefix=DataRefix[which(abs(DataRefix$Y2015)>0.5 ),]
-    DataRefix=rbind(DataRefix,DataRefn)
+    DataRefix=DataRSmooth[which(DataRSmooth$HydroRegions_raster_WGS84==regioid),]
+    dm=match(DataRefix$outl2,DataReI$outl2)
+    DataRefix$ch2015=DataReI$Y2015[dm]
+    #I have to avoid the fitting on  pixels with low changes
+    DataRefix=DataRefix[which(abs(DataRefix$ch2015)>0.5 ),]
     if (length(DataRefix$x)>1){
       points <- data.frame(x=DataReI$x, y=DataReI$y, z=DataReI$Y2015)
-      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$Y2015)
+      pointX<- data.frame(x=DataRefix$x, y=DataRefix$y, z=DataRefix$ch2015)
+      # rivmask=data.frame(x=DataReI$x, y=DataReI$y, llcoord=DataReI$llcoord)
       coordinates(points) <- ~x + y
       coordinates(pointX) <- ~x + y
       # Apply the weighted average function to each point
-      max_distance <- 15  # Define the maximum distance for weighting
       
-      smoothed_values <- sapply(1:nrow(pointX), function(i) {
+      max_distance <- 15  # Define the maximum distance for weighting
+      smoothed_values <- sapply(1:length(pointX), function(i) {
         point <- pointX[i, ]
         weighted_average(r, point, points, rivermask,max_distance)
+        
       })
+      
+      rlocs=match(DataRefix$llcoord,DataReI$llcoord)
+      DataReI$Y2015b=DataReI$Y2015
+      DataReI$Y2015b[rlocs]=smoothed_values
       Change_smoothed=c(Change_smoothed,smoothed_values)
       loc_smoothed=c(loc_smoothed, DataRefix$llcoord)
-      batar=c(batar,DataRefix$Y2015)
-      fdp=c(fdp,DataRefix$Regio_id)
+      batar=c(batar,DataRefix$ch2015)
+      fdp=c(fdp,DataRefix$HydroRegions_raster_WGS84)
     }
+    
+    # ggplot()+
+    #   geom_point(data=as.data.frame(DataReI),aes(x=x,y=y, col=epsD))+
+    #   scale_color_gradientn(colors=palet,limits=c(-.1,.1))+
+    #   geom_point(data=DataRefix,aes(x=x,y=y),col="black")
+    # 
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015b))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # 
+    # ggplot(as.data.frame(DataReI),aes(x=x,y=y, col=Y2015))+
+    #   geom_point()+
+    #   scale_color_gradientn(colors=palet,limits=c(-10,10),oob=scales::squish)
+    # #
+    
   }
   btW=batar
   cmW=Change_smoothed
   lmW=loc_smoothed
   plot(btW,cmW)
   ratio=cmW/btW
+  ratio[which(is.nan(ratio))]=1
+  ratio[which(is.infinite(ratio))]=1
+  ratio[which(is.na(btL))]=NA
   rlocs=match(lmW,DataT$llcoord)
-  DataTs=DataW
+  DataTs=DataT
   rlocp=which(is.na(DataW2$Y2015[rlocs]))
   rlocx=rlocs[-rlocp]
   DataT$Y2015b=DataT$Y2015
@@ -3187,9 +3396,9 @@ if (haz=="Drought"){
   DataT2[rlocs,yrange]=DataT2[rlocs,yrange]*ratio
   
   #initial mean change in affected pixels
-  print(mean(DataTs$Y2015[rlocx],na.rm=T))
+  print(mean(DataT$Y2015[rlocx],na.rm=T))
   #interpolated mean change
-  print(mean(DataTs$Y2015b[rlocx],na.rm=T))
+  print(mean(DataT$Y2015b[rlocx],na.rm=T))
   #corrected mean change
   print(mean(DataT2$Y2015[rlocx],na.rm=T))
   
@@ -3291,7 +3500,7 @@ Rcrap=Rcrap[-which(is.na(Rcrap$x)),]
 savedat=FALSE
 if (savedat==TRUE){
  DataSave=list("Total"=DataT,"Climate"=DataC,"LandUse"=DataL,"Reservoirs"=DataR,"WaterDemand"=DataW)
- save(DataSave,file=paste0(hydroDir,"/TSEVA/output_plots/Drought_pixChange_v3.Rdata"))
+ save(DataSave,file=paste0(hydroDir,"/TSEVA/output_plots/Drought_pixChange_v4.Rdata"))
 }
 
 #Suorva Dam example
@@ -3498,12 +3707,13 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/largestdriv
 #method for trend computation (th is thresold or trendPeaks)
 mmx="th"
 #iteration for plot ID
-it=24
+it=27
 ###6.1 large loop for change from different drivers ----
 
+###6.1 [Plot] - Figure 2 and Figure 3 ----
 yrlist=c(1951:2020)
 driverlist=c("climate","landuse","reservoirs","wateruse","all")
-driver=driverlist[1]
+driver=driverlist[2]
 Dchangelist=list()
 for (driver in driverlist){
   print(driver)
