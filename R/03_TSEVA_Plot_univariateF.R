@@ -2476,9 +2476,6 @@ ggplot() +
 unish=unique(ParamsflSCF$catchment)
 paraU=ParamsflSCF[which(ParamsflSCF$Year==1955),]
 
-unish=unique(ParamsflRWCF$catchment)
-paraU=ParamsflRWCF[which(ParamsflRWCF$Year==1955),]
-
 ParamSpecial<-paraU[-match(rmp2,paraU$catchment),]
 
 Paramf=ParamsflH[which(ParamsflH$Year==2015),]
@@ -2512,6 +2509,7 @@ RlevErri$S2n="Err > Change"
 RlevErri$S2n[which(RlevErri$ErrVsCh>=0)]="Change > Err"
 RlevErri$S2n[which(is.nan(RlevErri$ErrVsCh))]="Unstable"
 length(which(RlevErri$S2n=="Err > Change"))
+length(which(RlevErri$S2n=="Unstable"))/length(IRpoints$SCF)
 ParamPlot=inner_join(RlevErri,UpArea,by=c("catchment"="outl2"))
 max(RlevErri$returnLevelErr,na.rm=T)
 Paraplot <- st_as_sf(ParamPlot, coords = c("Var1.x", "Var2.x"), crs = 4326)
@@ -2559,7 +2557,7 @@ m1=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relativerwcf_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
 
 #### [SPlot] - Supplement map - Comparison of Error and 2015-1955 changes -----
 m2=ggplot(basemap) +
@@ -2593,7 +2591,7 @@ m2=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_classesrwcf_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_class_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
 
 
 
@@ -2606,16 +2604,11 @@ if (haz=="Drought"){
   
   #Spatial smooting of LUAgg
   #tweak DataL to identify potentially problematic pixels
-  IRpoints <- right_join(GHR_riv, IRpoints, by = c("outl2" = "catlist"))
+  IRpoints <- right_join(GHR_riv, IRpoints, by = c("llcoord" = "latlong"))
   matRLi=match(IRpoints$outl2,RLGPDflSCF$unikout)
   IRpoints$RLi=RLGPDflSCF$Y2015[matRLi]
   length(which(IRpoints$RLi>10))
-  Param1=ParamsflSCF[which(ParamsflSCF$Year==2015),]
-  Param2=ParamsflRWCF[which(ParamsflRWCF$Year==2015),]
-  matP=match(DataL$outl2,Param1$catchment)
-  IRpoints$epsilon1=Param1$epsilonGPD[matP]
-  IRpoints$epsilon2=Param2$epsilonGPD[matP]
-  IRpoints$epsD=abs(DataL$epsilon1-DataL$epsilon2)
+
   
   # Pixels on which the spatial smoothing will be applied on
   unikR=unique(HydroRsf$Id)
@@ -2623,7 +2616,7 @@ if (haz=="Drought"){
   for (rid in 1:length(unikR)){
     print(rid)
     regioid=unikR[rid]
-    DataReI=IRpoints[which(DataL$HydroRegions_raster_WGS84==regioid),]
+    DataReI=IRpoints[which(IRpoints$HydroRegions_raster_WGS84==regioid),]
     DataRefn=DataReI[which(is.na(DataReI$Y2015)),]
     #spatial smoothing applied to pixels with unstable fits and pixels surrounding them
     
@@ -2645,8 +2638,8 @@ if (haz=="Drought"){
       neighbours=unique(as.vector(unlist(neighbours)))
       matchd=which(!is.na(match(DataReI$outl2,neighbours)))
       DataRefix2=DataReI[matchd,]
+      #remove large rivers
       if (length(which(DataRefix2$RLi>10))>0){
-        print("hey")
         DataRefix2=DataRefix2[-which(DataRefix2$RLi>10),]
       }
       #DataRefix2=rbind(DataRefix2,DataRefn)
@@ -2656,12 +2649,12 @@ if (haz=="Drought"){
   
   
   #plot pixel status
-  nas=IRpoints$outl2[which(is.na(DataL$epsD))]
-  mln=match(nas,IRpoints$outl2)
   mld=match(DataRSmooth$outl2,IRpoints$outl2)
+  length(mld)/length(IRpoints$x)
   mli=which(IRpoints$gen_IR==2)
   mlo=match(rmp2,IRpoints$outl2)
   IRpoints$status="original"
+  length(which(IRpoints$status=="original"))/length(IRpoints$status)
   IRpoints$status[mld]="smoothed"
   IRpoints$status[mli]="IRES"
   IRpoints$status[mlo]="off-limit parameter"
@@ -3160,7 +3153,7 @@ if (haz=="Drought"){
   #verification of consistency of the averages
   DataLs=DataL
   rlocp=which(is.na(DataL2$Y2015[rlocs]))
-  rlocx=rlocs[-rlocp]
+  rlocx=rlocs
   
   #initial mean change in affected pixels
   print(mean(DataLs$Y2015[rlocx],na.rm=T))
