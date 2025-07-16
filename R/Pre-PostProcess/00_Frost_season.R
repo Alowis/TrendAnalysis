@@ -179,10 +179,6 @@ for (cn in cname[-1])
   col=which(colnames(tavg)==cn)
   print(col)
   tavg_out=tavg[,col]
-  #plot(tavg_out[1:4800],type="o")
-  #daily days running average
-  # tavg_rnm=round(tsEvaNanRunningMean(tavg_out,4),2)
-  # points(tavg_rnm[1:4800],col=2,type="o")
 
   #30-days running average
   tavg_mo2=round(tsEvaNanRunningMean(tavg_out,120),2)
@@ -242,10 +238,10 @@ colrep=match(noFrost,cname)
 #remove the columns without frost
 frostcat=zdays[,-colrep]
 #save 30-days averaged temperature at 6-hourly timestep resolution
-save(frostcat, file=paste0(hydroDir,"/Drought/catchment_frost.Rdata"))
+#save(frostcat, file=paste0(hydroDir,"/Drought/catchment_frost.Rdata"))
 
 #save 30-days averaged temperature at daily timestep resolution
-save(mavg, file=paste0(hydroDir,"/Drought/catchment_frost_daily.Rdata"))
+#save(mavg, file=paste0(hydroDir,"/Drought/catchment_frost_daily.Rdata"))
 
 
 
@@ -281,10 +277,7 @@ outlets=unique(AvgFrostAgg$outlet)
 plot(AvgFrostAgg$yr[which(AvgFrostAgg$outlet==1029)],AvgFrostAgg$temp.frost[which(AvgFrostAgg$outlet==1029)],type="l")
 #
 
-
-
 mavg=as.data.frame(mavg)
-
 mavg$time=timeStampx[mavg$V1]
 mavg$year=year(mavg$time)
 AvgFrostAgg=aggregate(list(temp=mavg$V3),
@@ -293,7 +286,6 @@ AvgFrostAgg=aggregate(list(temp=mavg$V3),
 AvgFrostAgg <- do.call(data.frame, AvgFrostAgg)
 
 AvgFrostAgg$ratpix=(AvgFrostAgg$temp.frost/AvgFrostAgg$temp.len)*100
-#AvgFrostAgg$ratpix[which(AvgFrostAgg$temp.frost<120)]=NA
 
 
 names(AvgFrostAgg)[1]="outlets"

@@ -1,29 +1,4 @@
 
-#Library calling
-suppressWarnings(suppressMessages(library(ncdf4)))
-suppressWarnings(suppressMessages(library(sf)))
-suppressWarnings(suppressMessages(library(rnaturalearth)))
-suppressWarnings(suppressMessages(library(rnaturalearthdata)))
-suppressWarnings(suppressMessages(library(rgeos)))
-suppressWarnings(suppressMessages(library(dplyr)))
-library(Kendall)
-library(biscale)
-library(cowplot)
-library(ggpubr)
-library(ggridges)
-library(ggplot2)
-library(viridis)
-library(hrbrthemes)
-library(tidyverse)
-library(raster)
-library(modifiedmk)
-library(ks)
-library(pracma)
-library(data.table)
-library(matrixStats)
-
-
-#1  Function declaration  ---------------------------------------------------
 
 
 # Function that open netcdf outlet files
@@ -171,10 +146,10 @@ RPcalc<- function(params,RPiGEV,RPiGPD){
 }
 
 #Initial functions to plot changes and trends at catchment level
-plotchangemaps=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2020),parlist,valuenames){
-  
-  
+plotchangemaps=function(basemap,catmap,datar,law="GPD",type,period=c(1951,1952),parlist,valuenames,haz){
   data=right_join(catmap,datar,by = c("outlets"="unikout"))
+  data$outlets
+  data$pointid
   datacol=names(data)
   valcol=match(valuenames,datacol)
   datatwin=data
@@ -187,69 +162,452 @@ plotchangemaps=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2020),
   
   if (length(which(is.na(mcor)))>0) datar=datar[-which(is.na(mcor)),]
   
-  cref=paste0("Y",period[1])
+  cref=paste0("X",period[1])
   crefloc=match(cref,dtc)
-  finalperiod=paste0("Y",period[2])
+  finalperiod=paste0("X",period[2])
   colsel=match(finalperiod,datacol)
   
   if (type=="RLchange"){
-    palet=c(hcl.colors(11, palette = "BrBG", alpha = NULL, rev = F, fixup = TRUE))
-    title=paste0("Relative change in 100-years flood Return Level between ", period[1], " and ", period[2])
+    palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+    title=paste0("Relative change in 10-years ",haz," Return Level between ", period[1], " and ", period[2])
     legend="Relative Change (%)"
+    datathin=datatwin[,c(valcol2)]
     tmpval=(datatwin[,valcol2])/(datatwin[,crefloc])*100-100
-    for (it in 1:length(tmpval[1,])){
-      tmpval[,it][which(tmpval[,it]>800)]=NA
+    if (haz=="drought"){
+      for (it in 1:length(tmpval[1,])){
+        tmpval[,it][which(data$IRES==1)]=NA
+        #tmpval[,it][which(data$IRES==1)]=datathin[which(data$IRES==1),it]/datathin[which(data$IRES==1),crefloc]
+        # tmpval[which(data$IRES==1),it][which(is.nan(tmpval[which(data$IRES==1),it]))]=0 #drying did not happen in both periods
+        # tmpval[which(data$IRES==1),it][which(is.infinite(tmpval[which(data$IRES==1),it]))]=-100 #drying only happens in recent period
+        # tmpval[which(data$IRES==1),it][which(tmpval[which(data$IRES==1),it]==0)]=100 #drying only happens in initial period
+        # tmpval[,it][which(is.infinite(tmpval[,it]))]=100
+        # tmpval[,it][which(is.na(tmpval[,it]))]=0
+        
+        tmpval[,it][which(is.infinite(tmpval[,it]))]=100
+        #tmpval[,it][which(is.na(tmpval[,it]))]=0
+        #more stuff
+        #tmpval[,it][which(is.infinite(datatwin[,it]))]=100
+      }
+      oyea=as.data.frame(datatwin[which(data$IRES==1),c(1,valcol2)])
+      oyeb=as.data.frame(datatwin[which(datatwin[,crefloc]==0),c(1,valcol2)])
+      oyval=rbind(oyea,oyeb)
     }
+    #tmpval[which(data$IRES==1),]=NA
     data[,valcol]=tmpval
     br=c(-100,-80,-60,-40,-20,0,20,40,60,80,100)
     limi=c(-100,100)
     trans=scales::modulus_trans(.8)
-    colNA="transparent"
+    colNA="green"
   }
   if (type=="RPchange"){
-    palet=c(hcl.colors(9, palette = "BrBG", alpha = NULL, rev = T, fixup = TRUE))
-    title=paste0(period[2]," return period of a 100-years Return Level flood in ", period[1])
+    palet=c(hcl.colors(9, palette = "BrBG", alpha = NULL, rev = F, fixup = TRUE))
+    title=paste0(period[2]," return period of a 100-years Return Level ",haz," in ", period[1])
     legend="Return Period (Years)"
-    br=c(1,10,100,1000,10000)
-    limi=c(1,10000)
+    br=c(0.1,1,10,100,1000)
+    limi=c(0.1,1000)
     trans="log"
     newRP=RPchangeCal(parlist, yi=period[1], yf=period[2], RetLev=datar,law, valuenames)
     ow=match(data$outlets,newRP$catchment)
+    oyea=data[which(data$IRES==1),colsel]
+    st_geometry(oyea) <- NULL
+    
     data[,colsel]=newRP$newRP[ow]
-    colNA="black"
+    data[which(data$IRES==1),colsel]=oyea
+    colNA="red"
     
   }
   
-  
   names(data)[colsel]="fillplot"
-  
-  ggplot(basemap) +
+  pl1=ggplot(basemap) +
     geom_sf(fill="white")+
     geom_sf(data=data,aes(fill=fillplot,geometry=geometry),color="transparent")+ 
     geom_sf(fill=NA, color="grey") +
-    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-    # coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
-    # geom_point(data=event,aes(x=lon,y=lat,col=dr))+
-    # scale_color_distiller(palette = "Spectral",
-    #                       direction = -1, limit=c(0,max(eventp$dr)),oob = scales::squish)+
     scale_fill_gradientn(
       colors=palet,
       breaks=br,limits=limi,trans=trans,
       oob = scales::squish,na.value=colNA, name=legend)   +
+    #geom_sf(data=dt3,aes(geometry=geometry,fill=factor(plot)),color="gray12")+ 
+    #scale_fill_manual(values=c("1"="purple","-1"="tan2"), name="IRES trend")+
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
     labs(x="Longitude", y = "Latitude")+
-    guides(fill = guide_colourbar(barwidth = 15, barheight = .8))+
+    guides(fill = guide_colourbar(barwidth = 20, barheight = .8))+
     theme(axis.title=element_text(size=tsize),
           panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
           panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
           legend.title = element_text(size=tsize),
           legend.text = element_text(size=osize),
           legend.position = "bottom",
+          legend.title.position = "top",
           panel.grid.major = element_line(colour = "grey70"),
           panel.grid.minor = element_line(colour = "grey90"),
           legend.key = element_rect(fill = "transparent", colour = "transparent"),
           legend.key.size = unit(.8, "cm"))+
     ggtitle(title)
   
+  
+  #Second plot showing IRES, dam influenced rivers and zero flow rivers
+  
+  if (haz=="drought"){
+    dt2=data[which(data$Reservoir_i>0.1),]
+    dt3=oyea
+    dt3=data[which(data$IRES==1),]
+    dt3$flag=1
+    dt4=data[which(datatwin[,crefloc]==0),]
+    dt4$flag=2
+    dt5=data[which(datatwin[,colsel-1]==0),]
+    dt5$flag=3
+    dtf=rbind(dt3,dt4,dt5)
+    dtff=aggregate(list(fl=dtf$flag),
+                   by = list(ID=dtf$HYBAS_ID),
+                   FUN = function(x) c(sum=sum(x)))
+    length(unique(dtf$HYBAS_ID))
+    
+    dtf=right_join(dtf,dtff,by=c("HYBAS_ID"="ID"))
+    dtf=dtf[,c(1,18,19,97:99)]
+    und=match(unique(dtf$HYBAS_ID),dtf$HYBAS_ID)
+    dtf=dtf[und,]
+    factor(dtf$fl)
+    dtf$flv=factor(dtf$fl)
+    
+    pl2=ggplot(basemap) +
+      geom_sf(fill="white")+
+      geom_sf(data=data,aes(geometry=geometry),fill="transparent",color="grey")+ 
+      geom_sf(fill=NA, color="grey") +
+      geom_sf(data=dt2,aes(geometry=geometry,color="darkblue"),fill="transparent")+ 
+      geom_sf(data=dtf,aes(geometry=geometry,fill=flv),color="transparent",show.legend = FALSE)+ 
+      geom_point(data=dtf,aes(x=POINT_X,y=POINT_Y,fill=flv), shape = 21, size = 0, show.legend = TRUE) +
+      scale_fill_manual(values=c("orange","cyan","orangered","grey30"),
+                        labels = c("IRES","10yRL[1]=0","10yRL[2]=0","10yRL[1]=10yRL[2]=0","tg"), 
+                        name="Low flows")+
+      coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+      labs(x="Longitude", y = "Latitude")+
+      scale_color_identity(name = "Reservoir construction\n1951-2020",
+                           guide = "legend",
+                           labels= " ")+
+      guides(fill = guide_legend(override.aes = list(size=5)))+
+      theme(axis.title=element_text(size=tsize),
+            panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+            panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+            legend.title = element_text(size=tsize),
+            legend.text = element_text(size=osize),
+            legend.position = "right",
+            panel.grid.major = element_line(colour = "grey70"),
+            panel.grid.minor = element_line(colour = "grey90"),
+            legend.key = element_rect(fill = "transparent", colour = "transparent"),
+            legend.key.size = unit(.8, "cm"))+
+      ggtitle("Reservoirs and zero flow")
+  }else{
+    pl2=NA
+  }
+  #save this as a shapefile for visu:
+  
+  # savecrap=inner_join(data,Catamere07,by= c("HYBAS_ID"))
+  # st_write(data, paste0(hydroDir,"/disasterdrought3.shp"))
+  # 
+  return(list(pl1,pl2))
+}
+
+#Initial functions to plot changes and trends at catchment level
+plotchangemaps_qsp=function(basemap,catmap,datar,upArea, GHR_riv, HydroRsf, law="GPD",type,period=c(1951,2020),parlist,valuenames,haz){
+  
+  data=right_join(GHR_riv,datar,by = c("outlets"="unikout"))
+  data=right_join(catmap,data,by = c("outlets"="outlets"))
+  names(data)[28]="HydroR"
+  upag=match(data$outlets,UpArea$outlets )
+  data$uparea=UpArea$upa[upag]
+  data$outlets
+  data$pointid
+  datacol=names(data)
+  valcol=match(valuenames,datacol)
+  # data=data[which(data$IRES==1),]
+  datatwin=data
+  st_geometry(datatwin) <- NULL
+  valcol2=valcol-1
+  
+  datatwin=as.data.frame(datatwin)
+  class(datatwin)
+  dtc=names(datatwin)
+  mcor=unique(match(datar$unikout,parlist$catchment))
+  
+  if (length(which(is.na(mcor)))>0) datar=datar[-which(is.na(mcor)),]
+  
+  cref=paste0("X",period[1])
+  crefloc=match(cref,dtc)
+  finalperiod=paste0("X",period[2])
+  colsel=match(finalperiod,datacol)
+  
+  
+  palet=c(hcl.colors(11, palette = "RdYlBu", alpha = NULL, rev = F, fixup = TRUE))
+  title=paste0("Change in 10-years ",haz," Return Level between ", period[1], " and ", period[2])
+  legend="Change in specific discharge (l/s/km2)"
+  datathin=datatwin[,c(valcol2)]
+  #value_L_s_m2 <- (depth_mm_day / 1000) / 86400 * 1000
+  tmpval=(datatwin[,valcol2]-datatwin[,crefloc])
+  tmpval=tmpval*1000/(data$uparea)
+  if (haz=="drought"){
+    data[,valcol]=tmpval*100
+    br=c(-150,-100,-50,0,50,100,150)
+    labels=br/100
+    limi=c(-150,150)
+  }
+  if (haz=="flood"){
+    data[,valcol]=tmpval
+    br=c(-30,-20,-10,0,10,20,30)
+    labels=br
+    limi=c(-30,30)
+  }
+  trans=scales::modulus_trans(.8)
+  colNA="gray10"
+  
+  names(data)[colsel]="fillplot"
+  data[which(data$IRES==1),colsel]=NA
+  pl1=ggplot(basemap) +
+    geom_sf(fill="white")+
+    geom_sf(data=data,aes(fill=fillplot,geometry=geometry),color="transparent")+ 
+    geom_sf(fill=NA, color="grey") +
+    scale_fill_gradientn(
+      colors=palet,
+      breaks=br,labels=labels, limits=limi,trans=trans,
+      oob = scales::squish,na.value=colNA, name=legend)   +
+    #geom_sf(data=dt3,aes(geometry=geometry,fill=factor(plot)),color="gray12")+ 
+    #scale_fill_manual(values=c("1"="purple","-1"="tan2"), name="IRES trend")+
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    labs(x="Longitude", y = "Latitude")+
+    guides(fill = guide_colourbar(barwidth = 20, barheight = .8))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          legend.title.position = "top",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle(title)
+  
+  # savecrap=inner_join(data,Catamere07,by= c("HYBAS_ID"))
+  # st_write(data, paste0(hydroDir,"/disasterdrought3.shp"))
+  # 
+  
+  
+  pointagg=aggregate(list(Rchange=data$fillplot),
+                     by = list(HydroR=data$HydroR),
+                     FUN = function(x) c(mean=median(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),q1=quantile(x, 0.25, na.rm=T),q3=quantile(x, 0.75, na.rm=T)))
+  pointagg <- do.call(data.frame, pointagg)
+  
+  
+  #natch pointagg with hybasf
+  pointplot=inner_join(HydroRsf,pointagg,by= c("Id"="HydroR"))
+  
+  pl2=ggplot(basemap) +
+    geom_sf(fill="white")+
+    geom_sf(data=pointplot,aes(fill=Rchange.mean,geometry=geometry),color="transparent")+ 
+    geom_sf(fill=NA, color="grey") +
+    scale_fill_gradientn(
+      colors=palet,
+      breaks=br,labels=labels, limits=limi,trans=trans,
+      oob = scales::squish,na.value=colNA, name=legend)   +
+    #geom_sf(data=dt3,aes(geometry=geometry,fill=factor(plot)),color="gray12")+ 
+    #scale_fill_manual(values=c("1"="purple","-1"="tan2"), name="IRES trend")+
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    labs(x="Longitude", y = "Latitude")+
+    guides(fill = guide_colourbar(barwidth = 20, barheight = .8))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          legend.title.position = "top",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle(title)
+  
+  
+  
+  #plot with kriging interpolation
+  
+  #reduced dtset
+  colnames(data)
+  dts=data[,c(1,21,22,23,colsel,106)]
+  st_geometry(dts) <- NULL
+  
+  #generate the grid:
+  #interpolating the sen-slopes via kriging
+  
+  library("sp")
+  library("rworldmap")
+  newmap <- getMap(resolution = "high")
+  europe_frame <- data.frame(country=NA,long=NA,lat=NA,plot_group=NA)
+  for(j in c(1:nrow(newmap@data))) {
+    print(j)
+    if(newmap@data$REGION[j]!="Europe"|is.na(newmap@data$REGION[j])) {next}
+    else {
+      n_polys = length(newmap@polygons[[j]]@Polygons)
+      for(k in c(1:n_polys)) {
+        tmp_frame <- data.frame(country=rep(newmap@polygons[[j]]@ID,nrow(newmap@polygons[[j]]@Polygons[[k]]@coords)),
+                                long=newmap@polygons[[j]]@Polygons[[k]]@coords[,1],
+                                lat=newmap@polygons[[j]]@Polygons[[k]]@coords[,2],
+                                plot_group = rep(paste(newmap@polygons[[j]]@ID,k,sep="-"),nrow(newmap@polygons[[j]]@Polygons[[k]]@coords)))
+        europe_frame <- rbind(europe_frame,tmp_frame)
+      }
+    }
+  }
+  europe_frame <- europe_frame[-1,]
+  
+  
+  #in order to perform kriging we need a different coordinate system than long-lat and a grid
+  
+  laea_proj="+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs +type=crs"
+  lambert_proj="+proj=laea +lat_0=55 +lon_0=20 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=km +no_defs"
+  
+  spatial_krig = SpatialPointsDataFrame(coords=dts[,c("Var1.x", "Var2.x")], data=dts[,c("fillplot","uparea")],proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+  
+  spatial_krig_trafo = spTransform(spatial_krig,CRS(laea_proj))
+  
+  dts$laea_x = spatial_krig_trafo@coords[,1]
+  dts$laea_y = spatial_krig_trafo@coords[,2]
+  
+  europe_krig = SpatialPointsDataFrame(coords=europe_frame[,c("long", "lat")], data=europe_frame[,c(1:4)],proj4string=CRS("+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs"))
+  europe_krig_trafo = spTransform(europe_krig,CRS(laea_proj))
+  
+  europe_frame$laea_x = europe_krig_trafo@coords[,1]
+  europe_frame$laea_y = europe_krig_trafo@coords[,2]
+  
+  
+  #cover of europe for spatial grid
+  europe_cover = data.frame(x=c(-2700,-2700,2000,2000),y=c(-2500,2000,2000,-2500),data=rep("data",4))
+  #another europe cover
+  lims=c(xmin=2665274, xmax=6528705, ymin=1464363, ymax=5360738)
+  europe_cover = data.frame(x=c(2000000,2000000,7000000,7000000),y=c(1000000,6000000,6000000,1000000),data=rep("data",4))
+  
+  coordinates(europe_cover) =~x+y
+  my_big_grid = makegrid(europe_cover,cellsize=20000)
+  keep_point = rep(0,nrow(my_big_grid))
+  relevant_countries = unique(europe_frame$plot_group)
+  relevant_countries <- relevant_countries[-grep("Rus|Aze|Turk|Ukr|Isra", relevant_countries, ignore.case = TRUE)]
+  
+  #for the grid, we check which points are contained in any country
+  for(country in relevant_countries)  {
+    tmp_country = europe_frame[which(europe_frame$plot_group==country),]
+    pt_in_country_tmp = point.in.polygon(point.x=my_big_grid[,1], point.y=my_big_grid[,2], pol.x=tmp_country[,"laea_x"], pol.y=tmp_country[,"laea_y"], mode.checked=FALSE)
+    if(length(which(pt_in_country_tmp==1))>0) {
+      keep_point[which(pt_in_country_tmp==1)] = 1
+    }
+    print(which(country==relevant_countries)/length(relevant_countries))
+  }
+  hist(keep_point)
+  my_grid = my_big_grid[which(keep_point==1),]
+  names(my_grid) = c("lambert_x","lambert_y")
+  
+  grid_krig = SpatialPointsDataFrame(coords=my_grid[,c(1,2)], data=my_grid[,c(1,2)],proj4string=CRS(laea_proj))
+  #kriging
+  library("automap")
+  kriging_result <- autoKrige(fillplot~1, input_data=spatial_krig_trafo, new_data = grid_krig)
+  
+  
+  # Convert kriging results to a data frame
+  kriging_data <- as.data.frame(kriging_result$krige_output)
+  
+  # Extract the coordinates from the SpatialPointsDataFrame
+  coords <- coordinates(kriging_result$krige_output)
+  
+  # Combine the coordinates with the kriging data
+  kriging_data$lon <- coords[, 1]
+  kriging_data$lat <- coords[, 2]
+  
+  
+  library(dplyr)
+  # Transform back to longlat projection if necessary
+  kriging_data_out = SpatialPointsDataFrame(coords=kriging_data[,c("lon", "lat")], data=kriging_data[,c(3:5)],proj4string=CRS(laea_proj))
+  kriging_data_longlat <- spTransform(kriging_data_out, CRS("+proj=longlat +datum=WGS84"))
+  
+  kriging_data_longlat=as.data.frame(kriging_data_out)
+  
+  
+  # Create a ggplot map of the kriging results
+  m3<-kriging_data_longlat
+  m4 <- m3 %>%
+    # create a new variable from count
+    mutate(countv1=cut(var1.pred,breaks=c(-100,-24,-12,-5,-2, 0,2, 5, 12,100),
+                       labels=c("< -24", "-24 - -12", "-12 - -5", "-5 - -2","-2 - 0","0 - 2", "0 - 5", "5 - 12","> 12"))) %>%
+    # change level order
+    mutate(countv1=factor(as.character(countv1), levels=rev(levels(countv1))))
+  
+  outletname="upArea_European_01min"
+  outll=outletopen(hydroDir,outletname)
+  cord.dec=outll[,c(2,3)]
+  cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
+  cord.UTM <- spTransform(cord.dec, CRS("+init=epsg:3035"))
+  nco=cord.UTM@coords
+  coord.lamb=spTransform(cord.dec, CRS(laea_proj))
+  nci=coord.lamb@coords
+  
+  coord.laea=spTransform(cord.dec, CRS(laea_proj))
+  nci=coord.laea@coords
+  
+  world <- ne_countries(scale = "medium", returnclass = "sf")
+  Europe <- world[which(world$continent == "Europe"),]
+  e2=st_transform(Europe,  crs=3035)
+  w2=st_transform(world,  crs=3035)
+  basemap=w2
+  basemap=st_transform(basemap, CRS(laea_proj))
+  
+  Recapoint <- st_as_sf(dts, coords = c("Var1.x", "Var2.x"), crs = 4326)
+  Recapoint <- st_transform(Recapoint, crs = 3035)
+  mp <- Recapoint %>%
+    # create a new variable from count
+    mutate(countv1=cut(fillplot, breaks=c(-100,-24,-12,-5,-2, 0,2, 5, 12,100),
+                       labels=c("< -24", "-24 - -12", "-12 - -5", "-5 - -2","-2 - 0","0 - 2", "0 - 5", "5 - 12","> 12"))) %>%
+    # change level order
+    mutate(countv1=factor(as.character(countv1), levels=rev(levels(countv1))))
+  
+  
+  tsize=12
+  osize=10
+  
+  paletc=c(hcl.colors(9, palette = "RdYlBu", alpha = NULL, rev = T, fixup = TRUE))
+  paletf=c(hcl.colors(7, palette = "RdYlBu", alpha = NULL, rev = T, fixup = TRUE))
+  pl3<-ggplot(basemap) +
+    geom_sf(fill="white")+
+    geom_tile(data=m4, aes(x = lon, y = lat, fill = countv1)) +
+    #metR::geom_contour_fill(data=kriging_data_longlat, aes(x = lon, y = lat, z = var1.pred),binwidth=2,alpha=1) +
+    geom_sf(fill=NA, color="grey") +
+    geom_sf(data=mp,aes(geometry=geometry,color=countv1),size=1.5,alpha=.5,shape=16,stroke=0.5)+ 
+    geom_sf(data=mp,aes(geometry=geometry),color="black",size=1.5,alpha=.5,shape=21,stroke=0.5)+ 
+    #scale_fill_distiller(palette = "RdYlBu",limits=c(-12,12),oob = scales::squish,guide="coloursteps",direction=1)+
+    #scale_fill_gradientn(colors=paletx,limits=c(-12,12),oob = scales::squish) +
+    scale_fill_manual(values=paletc, na.value = "grey90")+
+    scale_color_manual(values=paletc, na.value = "grey90")+
+    coord_sf(xlim = c(min(nci[,1]),max(nci[,1])), ylim = c(min(nci[,2]),max(nci[,2])))+
+    labs(x="Longitude", y = "Latitude")+
+    # guides(fill = guide_coloursteps(barwidth = 1, barheight = 10))+
+    labs(fill = "Change [%] ") +
+    guides( color= "none",
+            fill = guide_legend(theme = theme(
+              legend.title.position = "right")))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(angle = 90 , size=tsize),
+          legend.text = element_text(size=osize),
+          legend.key.height= unit(1.6, 'cm'),
+          legend.key.width= unit(.2, 'cm'),
+          legend.position = "right",
+          legend.text.position = "left",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))+
+    ggtitle(paste0("Change in 10y flood return level (",period[1],"-",period[2],")"))
+  pl3
+  
+  
+  return(list(pl1, pl2, pl3))
 }
 
 plotTrendSig=function(basemap,catmap,datar,type,period=c(1950,2020),valuenames,Impdates){
@@ -371,12 +729,12 @@ plotTrendSig=function(basemap,catmap,datar,type,period=c(1950,2020),valuenames,I
 }
 
 #Function displaying changes in both drought and floods
-plotbichangemaps=function(basemap,catmap,datar1,datar2,law="GPD",type,period=c(1950,1990),parlist,valuenames){
+plotbichangemaps=function(basemap,catmap,datarD,datarF,law="GPD",type,period=c(1951,2020),valuenames){
   
   
   catmap$outlets=catmap$pointid
-  data1=right_join(catmap,datar1,by = c("outlets"="unikout"))
-  data2=right_join(catmap,datar2,by = c("outlets"="unikout"))
+  data1=right_join(catmap,datarD,by = c("outlets"="unikout"))
+  data2=right_join(catmap,datarF,by = c("outlets"="unikout"))
   datacol=names(data1)
   valcol=match(valuenames,datacol)
   datatwin1=data1
@@ -388,23 +746,34 @@ plotbichangemaps=function(basemap,catmap,datar1,datar2,law="GPD",type,period=c(1
   datatwin2=as.data.frame(datatwin2)
   class(datatwin1)
   dtc=names(datatwin1)
-  mcor=unique(match(datar1$unikout,parlist$catchment))
+  mcor=unique(match(datarD$unikout,parlist$catchment))
   if (length(which(is.na(mcor)))>0) datar1=datar1[-which(is.na(mcor)),]
   
-  cref=paste0("Y",period[1])
+  cref=paste0("X",period[1])
   crefloc=match(cref,dtc)
-  finalperiod=paste0("Y",period[2])
+  finalperiod=paste0("X",period[2])
   colsel=match(finalperiod,datacol)
   
   
   palet=c(hcl.colors(11, palette = "BrBG", alpha = NULL, rev = F, fixup = TRUE))
   title=paste0("Relative change in 100-years flood Return Level between ", period[1], " and ", period[2])
   legend="Relative Change (%)"
+  datathin=datatwin1[valcol2]
   tmpval1=(datatwin1[,valcol2])/(datatwin1[,crefloc])*100-100
   tmpval2=(datatwin2[,valcol2])/(datatwin2[,crefloc])*100-100
   for (it in 1:length(tmpval1[1,])){
-    tmpval1[,it][which(tmpval1[,it]>200)]=NA
-    tmpval2[,it][which(tmpval2[,it]>200)]=NA
+    tmpval1[,it][which(data1$IRES==1)]=datathin[which(data1$IRES==1),it]/datathin[which(data1$IRES==1),crefloc]
+    tmpval1[which(data1$IRES==1),it][which(is.nan(tmpval1[which(data1$IRES==1),it]))]=0 #drying did not happen in both periods
+    tmpval1[which(data1$IRES==1),it][which(is.infinite(tmpval1[which(data1$IRES==1),it]))]=-100 #drying only happens in recent period
+    tmpval1[which(data1$IRES==1),it][which(tmpval1[which(data1$IRES==1),it]==0)]=100 #drying only happens in initial period
+    tmpval1[,it][which(is.infinite(tmpval1[,it]))]=100
+    tmpval1[,it][which(is.na(tmpval1[,it]))]=0
+    
+    tmpval1[,it][which(tmpval1[,it]>100)]=100
+    tmpval1[,it][which(tmpval1[,it]<(-100))]=-100
+    
+    tmpval2[,it][which(tmpval2[,it]>100)]=100
+    tmpval2[,it][which(tmpval2[,it]<(-100))]=-100
   }
   data1[,valcol]=tmpval1
   data2[,valcol]=tmpval2
@@ -421,6 +790,7 @@ plotbichangemaps=function(basemap,catmap,datar1,datar2,law="GPD",type,period=c(1
   data1$fillplot2=data2[datamatch,colsel-1]
   
   data1$fillplot=-data1$fillplot
+  plot(data1$fillplot,data1$fillplot2)
   
   quantile(data1$fillplot2,.5,na.rm=T)
   databi <- bi_class(data1, x = fillplot, y = fillplot2, style = "quantile", dim = 3, keep_factors = TRUE, dig_lab=2)
@@ -470,22 +840,209 @@ plotbichangemaps=function(basemap,catmap,datar1,datar2,law="GPD",type,period=c(1
                       size = 16,
                       arrows = FALSE)
   
-  # combine map with legend
-  finalPlot <- ggdraw() +
-    draw_plot(map, 0, 0, 1, 1) +
-    draw_plot(legend, 0.64, 0.7, 0.2, 0.2)
   
-  finalPlot
   
-  ggarrange(map, legend, 
-            labels = c("Map", "Key"),
-            ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+  pl=ggarrange(map, legend, 
+               labels = c("Map", "Key"),
+               ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+  return(pl)
+  
+  
+}
+
+#Function displaying changes in both drought and floods
+plotbichangemaps_qsp=function(basemap,catmap,datarD,datarF,UpArea,law="GPD",type,period=c(1951,2020),valuenames){
+  
+  
+  catmap$outlets=catmap$pointid
+  data1=right_join(catmap,datarD,by = c("outlets"="unikout"))
+  data2=right_join(catmap,datarF,by = c("outlets"="unikout"))
+  
+  upag=match(data1$outlets,UpArea$outlets )
+  data1$uparea=UpArea$upa[upag]
+  upag=match(data2$outlets,UpArea$outlets )
+  data2$uparea=UpArea$upa[upag]
+  
+  datacol=names(data1)
+  valcol=match(valuenames,datacol)
+  datatwin1=data1
+  datatwin2=data2
+  valcol2=valcol-1
+  st_geometry(datatwin2) <- NULL
+  st_geometry(datatwin1) <- NULL
+  datatwin1=as.data.frame(datatwin1)
+  datatwin2=as.data.frame(datatwin2)
+  class(datatwin1)
+  dtc=names(datatwin1)
+  mcor=unique(match(datarD$unikout,parlist$catchment))
+  if (length(which(is.na(mcor)))>0) datar1=datar1[-which(is.na(mcor)),]
+  
+  cref=paste0("X",period[1])
+  crefloc=match(cref,dtc)
+  finalperiod=paste0("X",period[2])
+  colsel=match(finalperiod,datacol)
+  
+  
+  palet=c(hcl.colors(11, palette = "BrBG", alpha = NULL, rev = F, fixup = TRUE))
+  title=paste0("Relative change in 100-years flood Return Level between ", period[1], " and ", period[2])
+  legend="Relative Change (%)"
+  datathin=datatwin1[valcol2]
+  
+  tmpval1=(datatwin1[,valcol2]-datatwin1[,crefloc])
+  tmpval2=(datatwin2[,valcol2]-datatwin2[,crefloc])
+  
+  tmpval1=tmpval1*1000/(data1$uparea)
+  tmpval2=tmpval2*1000/(data2$uparea)
+  # tmpval1=(datatwin1[,valcol2])/(datatwin1[,crefloc])*100-100
+  # tmpval2=(datatwin2[,valcol2])/(datatwin2[,crefloc])*100-100
+  # for (it in 1:length(tmpval1[1,])){
+  #   tmpval1[,it][which(data1$IRES==1)]=datathin[which(data1$IRES==1),it]/datathin[which(data1$IRES==1),crefloc]
+  #   tmpval1[which(data1$IRES==1),it][which(is.nan(tmpval1[which(data1$IRES==1),it]))]=0 #drying did not happen in both periods
+  #   tmpval1[which(data1$IRES==1),it][which(is.infinite(tmpval1[which(data1$IRES==1),it]))]=-100 #drying only happens in recent period
+  #   tmpval1[which(data1$IRES==1),it][which(tmpval1[which(data1$IRES==1),it]==0)]=100 #drying only happens in initial period
+  #   tmpval1[,it][which(is.infinite(tmpval1[,it]))]=100
+  #   tmpval1[,it][which(is.na(tmpval1[,it]))]=0
+  #   
+  #   tmpval1[,it][which(tmpval1[,it]>100)]=100
+  #   tmpval1[,it][which(tmpval1[,it]<(-100))]=-100
+  #   
+  #   tmpval2[,it][which(tmpval2[,it]>100)]=100
+  #   tmpval2[,it][which(tmpval2[,it]<(-100))]=-100
+  # }
+  data1[,valcol]=tmpval1
+  data2[,valcol]=tmpval2
+  br=c(-100,-80,-60,-40,-20,0,20,40,60,80,100)
+  limi=c(-100,100)
+  trans=scales::modulus_trans(.8)
+  colNA="transparent"
+  
+  st_geometry(data2) <- NULL
+  data2=as.data.frame(data2)
+  datamatch=match(data1$outlets,data2$outlets)
+  names(data1)[colsel]="fillplot"
+  
+  data1$fillplot2=data2[datamatch,colsel-1]
+  
+  data1$fillplot=-data1$fillplot
+  data1$fillplot[which(data1$IRES==1)]=NA
+  plot(data1$fillplot,data1$fillplot2, xlim=c(-2,2), ylim=c(-50,50))
+  
+  quantile(data1$fillplot2,.5,na.rm=T)
+  databi <- bi_class(data1, x = fillplot, y = fillplot2, style = "quantile", dim = 3, keep_factors = TRUE, dig_lab=2)
+  
+  plot(data1$fillplot)
+  quantile(data1$fillplot,c(0.75),na.rm=T)-quantile(data1$fillplot,c(0.25),na.rm=T)/5
+  alterclass=data.frame(data1$fillplot)
+  alterclass$class=NA
+  alterclass$class[which(alterclass[,1]<(-0.10))]=1
+  alterclass$class[which(alterclass[,1]>=-0.10 & alterclass[,1]<0.10)]=2
+  alterclass$class[which(alterclass[,1]>0.10)]=3
+  c1=alterclass$class
+  
+  
+  hist(data1$fillplot2)
+  quantile(data1$fillplot2,c(0.75),na.rm=T)-quantile(data1$fillplot2,c(0.25),na.rm=T)/5
+  alterclass=data.frame(data1$fillplot2)
+  alterclass$class=NA
+  alterclass$class[which(alterclass[,1]<(-5))]=1
+  alterclass$class[which(alterclass[,1]>=-5 & alterclass[,1]<5)]=2
+  alterclass$class[which(alterclass[,1]>5)]=3
+  c2=alterclass$class
+  
+  c1[which(is.na(c1))]=2
+  cx=paste(c1,c2,sep="-")
+  
+  databi$bi_class=cx
+  # create map
+  map <- ggplot(basemap) +
+    geom_sf(fill="white")+
+    geom_sf(data = databi, mapping = aes(fill = bi_class), alpha=0.9, color = "transparent", size = 0.01, show.legend = FALSE) +
+    geom_sf(fill=NA, color="gray42") +
+    coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+    bi_scale_fill(pal = "BlueOr", dim = 3, na.value=colNA ) +
+    labs()+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  
+  map
+  
+  legend <- bi_legend(pal = "BlueOr",
+                      dim = 3,
+                      xlab = "  -  Drought changes  +  ",
+                      ylab = "  -  Flood changes  +  ",
+                      size = 16,
+                      arrows = FALSE)
+  
+  #reproduce my color palette: 
+  loscolors=c("#174f28","#845e29","#dd6a29","#167984","#819185","#d8a386","#169dd0","#7ebbd2","#d3d3d3")
+  al=0.8
+  dataX=data1[-which(is.na(data1$fillplot)),]
+  dataX$density <- get_density(dataX$fillplot, dataX$fillplot2, n = 100)
+  monstre_legend<-ggplot() +
+    annotate("rect", xmin=-Inf, xmax=-0.1, ymin=-Inf, ymax=-5, fill=loscolors[9], alpha=al) +
+    annotate("rect", xmin=-Inf, xmax=-0.1, ymin=-5, ymax=5, fill=loscolors[8], alpha=al) +
+    annotate("rect", xmin=-Inf, xmax=-0.1, ymin=5, ymax=Inf, fill=loscolors[7], alpha=al) +
+    
+    annotate("rect", xmin=-0.1, xmax=0.1, ymin=-Inf, ymax=-5, fill=loscolors[6], alpha=al) +
+    annotate("rect", xmin=-0.1, xmax=0.1, ymin=-5, ymax=5, fill=loscolors[5], alpha=al) +
+    annotate("rect", xmin=-0.1, xmax=0.1, ymin=5, ymax=Inf, fill=loscolors[4], alpha=al) +
+    
+    annotate("rect", xmin=0.1, xmax=Inf, ymin=-Inf, ymax=-5, fill=loscolors[3], alpha=al) +
+    annotate("rect", xmin=0.1, xmax=Inf, ymin=-5, ymax=5, fill=loscolors[2], alpha=al) +
+    annotate("rect", xmin=0.1, xmax=Inf, ymin=5, ymax=Inf, fill=loscolors[1], alpha=al) +
+    
+    geom_point(data=dataX, aes(x=fillplot, y=fillplot2, col=density),alpha=0.6,size=2, shape=16) +
+    #geom_point(data= Rsig, aes(x=ObsChange, y=SimChange),fill="transparent", color="gray25",shape=21,size=2)+
+    #geom_abline(slope=1,intercept=0,col="gray25",lwd=1.5,alpha=.5)+
+    # 
+    # annotate("label", x=-90, y=100, label= paste0("N = ",ln2),size=5)+
+    # annotate("label", x=90, y=100, label= paste0("N = ",lp1),size=5)+
+    # annotate("label", x=90, y=-100, label= paste0("N = ",lp2),size=5)+
+    # annotate("label", x=-90, y=-100, label= paste0("N = ",ln1),size=5)+
+    scale_color_viridis(option="F")+
+    scale_x_continuous(name="10-y Drought RL change (l/s/km2)",breaks = seq(-5,5,by=1), labels=seq(5,-5,by=-1),limits = c(-2.5,2.5))+
+    scale_y_continuous(name="10-y Flood RL change (l/s/km2)",breaks = seq(-100,100,by=50), limits = c(-100,100))+
+    # scale_color_gradientn(
+    #   colors=palet, limits=c(-1,1),oob = scales::squish,
+    #   name="temporal correlation",breaks=seq(-1,1, by=0.2))+
+    # scale_alpha_continuous(name="trend significance",range = c(0.5, 1))+
+    theme(axis.title=element_text(size=tsize),
+          panel.background = element_rect(fill = "white", colour = "grey1"),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=tsize),
+          legend.text = element_text(size=osize),
+          legend.position = "none",
+          panel.grid.major = element_line(colour = "grey70"),
+          panel.grid.minor = element_line(colour = "grey90"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  
+  
+  
+  
+  pl=ggarrange(map, 
+               ggarrange(legend, monstre_legend, 
+                         ncol = 1, nrow = 2),
+               ncol=2, nrow=1, widths = c(3,2), heights=c(1,1),vjust=-1)
+  
+  pl<-annotate_figure(pl, top = text_grob(paste0("Joint changes in floods and droughts (",period[1],"-",period[2],")"), 
+                                          color = "black", face = "bold", size = 14))
+  pl
+  return(pl)
   
   
 }
 
 #Main function. Diplay changes in river flood at pixel and catchment level
-plotchangemapix=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2019),parlist,hybasf,haz="flood"){
+plotchangemapix=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2020),parlist,hybasf,haz="flood"){
   
   
   #data=right_join(outloc,datar,by = c("outlets"="unikout"))
@@ -524,7 +1081,7 @@ plotchangemapix=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2019)
     }
     data[,valcol]=tmpval
     br=c(-100,-80,-50,-20,0,20,50,80,100)
-    if(haz=="Drought"){
+    if(haz=="drought"){
       limi=c(-100,100)
     }else if (haz=="flood"){
       limi=c(-50,50)
@@ -539,7 +1096,7 @@ plotchangemapix=function(basemap,catmap,datar,law="GPD",type,period=c(1950,2019)
     br=c(10,20,50,100,200,500,1000)
     limi=c(10,1000)
     trans="log"
-    if(haz=="Drought"){
+    if(haz=="drought"){
       vc= match(valuenames,names(datacl))
       datacl[,vc]=1/datacl[,vc]
     }
@@ -651,7 +1208,7 @@ plotTrendSipix=function(basemap,datar,period=c(1950,2020),hybasf,valuenames,nco)
   data=datar
   data$unikout=data$outlets
   data$Y2020=data$Y2019
-  #st_geometry(data) <- NULL
+  st_geometry(data) <- NULL
   
   
   #mcor=unique(match(data$unikout,parlist$catchment))
@@ -696,7 +1253,7 @@ plotTrendSipix=function(basemap,datar,period=c(1950,2020),hybasf,valuenames,nco)
   #aggregate by hybas07 catchment
   
   pointagg=aggregate(list(Rchange=data[,valcol]),
-                     by = list(HYBAS_ID=data$outlets),
+                     by = list(HYBAS_ID=data$HYBAS_ID),
                      FUN = function(x) c(mean=mean(x)))
   pointagg <- do.call(data.frame, pointagg)
   
@@ -818,6 +1375,8 @@ plotTrendSipix=function(basemap,datar,period=c(1950,2020),hybasf,valuenames,nco)
   ocrap
   
 }
+
+
 
 #Function to compare two scenarios
 plotSceComp=function(basemap,data1,data2,date=c(2020),hybasf,valuenames,nco){
@@ -1033,7 +1592,7 @@ plotSceComp=function(basemap,data1,data2,date=c(2020),hybasf,valuenames,nco){
 
 
 #Ridgeplots of changes over a given area
-plotHistoDates=function(outloc,datar,law="GPD",type,period=c(1950,2020),parlist,valuenames){
+plotHistoDates=function(outloc,datar,law="GPD",type,period=c(1951,2020),parlist,valuenames){
   
   
   #data=right_join(outloc,datar,by = c("outlets"="unikout"))
@@ -1149,19 +1708,25 @@ RPchangeCal=function(parlist, yi, yf, RetLev,law,valuenames){
 }
 
 #Function to return a plot of the temporal distribution of changes in RL
-FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2){
+#fix this
+
+FascPlotChange<- function(datar,outloc,UpArea,period=c(1951,2020),lims=c(-1, 1),q1,q2){
   
   seqy=c(period[1]:period[2])
   data=datar
   subdata=inner_join(outloc,data,by=c("outlets"="unikout"))
+  upag=match(subdata$outlets,UpArea$outlets )
+  subdata$uparea=UpArea$upa[upag]
   
   datacol=names(subdata)
-  valuenames=paste0("Y",seq(period[1],period[2]))
+  valuenames=paste0("X",seq(period[1],period[2]))
   valcol=match(valuenames,datacol)
-  
+  oldata=subdata
   subdata=subdata[,valcol]
   
-  datrd=subdata/subdata[,1]*100-100
+  #datrd=subdata/subdata[,1]*100-100
+  datrd=subdata-subdata[,1]
+  datrd=datrd*1000/oldata$uparea
   #smooth
   datrp=data.frame(unikout=datar$unikout,datrd)
   lwtf=c()
@@ -1169,9 +1734,199 @@ FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2
   for (y in 1:length(seqy)){
     print(y)
     yx=seqy[y]
-    daty=datrp[,which(names(datrp)==paste0("Y",yx))]
+    daty=datrp[,which(names(datrp)==paste0("X",yx))]
     blss=which(daty>1000)
-    datrd[blss,which(names(datrd)==paste0("Y",yx))]=NA
+    datrd[blss,which(names(datrd)==paste0("",yx))]=NA
+    rmy=datrp$unikout[blss]
+    
+    #compare with list already existing
+    mex=na.omit(match(lwtf,rmy))
+    if (length(mex)>0) rmy=rmy[-mex]
+    yv=rep(yx,length(rmy))
+    yvf=c(yvf,yv)
+    lwtf=c(lwtf,rmy)
+  }
+  
+  outrm=data.frame(yvf,lwtf)
+  
+  dfplot= datrd %>% gather("Year","pixel")
+  dfplot$year=as.numeric(substr(dfplot$Year,2,5))
+  if (length(which(is.na(dfplot$pixel)))>0) dfplot=dfplot[-which(is.na(dfplot$pixel)),]
+  if (length(which(is.infinite(dfplot$pixel)))>0) dfplot=dfplot[-which(is.infinite(dfplot$pixel)),]
+  
+  countfunction<-function(values){
+    l1=length(which(values<0.3 & values>0))
+    l2=length(which(values>0.3))
+    l3=length(which(values<(-0.3)))
+    l4=length(which(values>-0.3 & values<0))
+    return(c(l2,l1,-l4,-l3))
+  }
+  dfq=aggregate(list(change=dfplot$pixel),
+                by = list(Year=dfplot$year),
+                FUN = function(x) c(bg=countfunction(x)))
+  dfq <- do.call(data.frame, dfq)
+  
+  data_long <- gather(dfq, group, value, change.bg1:change.bg4) %>%
+    arrange(factor(Year)) %>% 
+    mutate(x=factor(Year, levels=unique(Year)))
+  
+  
+  colorz = c('change.bg4'='#d73027','change.bg3'='#fee090','change.bg2'='lightblue','change.bg1'='royalblue')
+  labs=rev(c("< -0.1","-0.1 - 0","0 - 0.1", ">0.1"))
+  legend_order=c('change.bg1', 'change.bg2', 'change.bg3','change.bg4')
+  data_long$p2 <- relevel(data_long$position, 'change.bg1')
+  data_long$position <- factor(data_long$group, levels=c('change.bg1', 'change.bg2', 'change.bg4','change.bg3'))
+  
+  ggplot(data_long, aes(fill=position, y=value, x=Year)) + 
+    geom_bar(position="stack", stat="identity")+
+    scale_fill_manual(values = colorz, breaks = legend_order,name="change in qsp",labels=labs)  + 
+    scale_y_continuous(name="Number of catchments")+
+    scale_x_continuous(name="Years") +
+    # scale_x_discrete(labels= c("< -0.41","-0.41-0.2", "0.2-0.5","0.5-0.7","0.7-0.8", ">0.8"), name="KGE")+
+    theme(axis.title=element_text(size=16, face="bold"),
+          axis.text = element_text(size=13),
+          panel.background = element_rect(fill = "white", colour = "white"),
+          panel.grid = element_blank(),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=12),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey80"),
+          panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  
+  
+  dfquantiles=aggregate(list(change=dfplot$pixel),
+                        by = list(Year=dfplot$year),
+                        FUN = function(x) c(mean=mean(x,na.rm=T),q1=quantile(x, q1, na.rm=T),q3=quantile(x, q2, na.rm=T)))
+  
+  dfquantiles <- do.call(data.frame, dfquantiles)
+  names(dfquantiles)=c("Year", "mean","qlow","qhigh")
+  
+  
+  
+  dtfinal=c()
+  xmm=c(-10,10)
+  for( y in 1:length(seqy)){
+    print(y)
+    yx=seqy[y]
+    dfp1=dfplot[which(dfplot$year==yx),]
+    dfp1=dfp1[which(!is.na(dfp1$pixel)),]
+    merde=kde(dfp1$pixel,bgridsize=1500,xmin=xmm[1],xmax=xmm[2],h=0.1)
+    
+    dfqy=dfquantiles[which(dfquantiles$Year==yx),]
+    ziz=data.frame(ev.points=merde$eval.points,estimates=merde$estimate)
+    ziz$estimates=ziz$estimates/sum(ziz$estimates)
+    sum(ziz$estimates)
+    dtz=cbind(rep(yx,1500),ziz)
+    dtz[,3][which(dtz[,2]<dfqy$qlow)]=NA
+    dtz[,3][which(dtz[,2]>dfqy$qhigh)]=NA
+    dtfinal=rbind(dtfinal,dtz)
+  }
+  
+  dfqplus=seq(period[1],period[2],by=0.1)
+  dfql=interp1(dfquantiles$Year,dfquantiles$qlow,dfqplus)
+  dfqh=interp1(dfquantiles$Year,dfquantiles$qhigh,dfqplus)
+  dfqplus=data.frame(dfqplus,dfql,dfqh)
+  names(dfqplus)=c("Year","qlow","qhigh")
+  
+  #alpha=1+(log(values)))
+  
+  names(dtfinal)=c("Year","Change","values")
+  ptref=data.frame(x=1950,y=0)
+  
+  palet=c(hcl.colors(11, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
+  lims=c(-10,10)
+  plo=ggplot(dtfinal, aes(x = Year, y = Change))+
+    geom_raster(aes(fill=values,alpha=(log(values))),interpolate = T)+
+    scale_fill_gradientn(colours = palet,
+                         n.breaks=10,guide='coloursteps',na.value = "transparent",oob = scales::squish,limits=c(0,0.005))+
+    scale_y_continuous(
+      n.breaks = 10,name= "Change in Return Level",
+      limit=lims,expand = c(0, 0))+
+    scale_x_continuous(
+      n.breaks = 10,name= "Years",
+      limit=c(1949, 2020),expand = c(0, 0))+
+    geom_line(data=dfquantiles,aes(x=Year,y=mean),size=2,col="purple",alpha=0.9)+
+    geom_line(data=dfquantiles,aes(x=Year,y=qlow),size=1,col="grey",linetype="longdash")+
+    geom_line(data=dfquantiles,aes(x=Year,y=qhigh),size=1,col="grey",linetype="longdash")+
+    geom_hline(yintercept=0)+
+    geom_point(data=ptref,aes(x=x, y = y), col="black",fill="white",size=7,pch=21)+
+    theme_bw() +
+    theme(
+      panel.spacing = unit(0.3, "lines"),
+      strip.text.x = element_text(size = 8),
+      legend.position = "none",
+      legend.key.width= unit(2.5, 'cm'),
+      legend.text =element_text(size=14),
+      panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+      legend.title = element_text(size=14),
+      plot.title = element_text(size=20)
+    )+
+    ggtitle(unique(outloc$name))
+  
+  plo
+  return(plo)
+}
+
+FascPlotBiChange<- function(datarD, datarF,outloc,UpArea,period=c(1951,2020),lims=c(-1, 1),q1,q2){
+  
+  catmap$outlets=catmap$pointid
+  data1=right_join(outloc,datarD,by = c("outlets"="unikout"))
+  data2=right_join(outloc,datarF,by = c("outlets"="unikout"))
+  
+  upag=match(data1$outlets,UpArea$outlets )
+  data1$uparea=UpArea$upa[upag]
+  upag=match(data2$outlets,UpArea$outlets )
+  data2$uparea=UpArea$upa[upag]
+  
+  datacol=names(data1)
+  valuenames=paste0("X",seq(period[1],period[2]))
+  valcol=match(valuenames,datacol)
+  
+  datatwin1=data1
+  datatwin2=data2
+  valcol2=valcol-1
+  st_geometry(datatwin2) <- NULL
+  st_geometry(datatwin1) <- NULL
+  datatwin1=as.data.frame(datatwin1)
+  datatwin2=as.data.frame(datatwin2)
+  class(datatwin1)
+  dtc=names(datatwin1)
+  mcor=unique(match(datarD$unikout,parlist$catchment))
+  if (length(which(is.na(mcor)))>0) datar1=datar1[-which(is.na(mcor)),]
+  
+  cref=paste0("X",period[1])
+  crefloc=match(cref,dtc)
+  finalperiod=paste0("X",period[2])
+  colsel=match(finalperiod,datacol)
+  
+  seqy=c(period[1]:period[2])
+  
+  oldata=data1
+  subdata=data1[,valcol]
+  subdata2=data2[,valcol]
+  #datrd=subdata/subdata[,1]*100-100
+  datrd=subdata-subdata[,1]
+  #datrd=subdata
+  datrd=datrd*1000/oldata$uparea
+  
+  datrf=subdata2-subdata2[,1]
+  #datrf=subdata2
+  datrf=datrf*1000/data2$uparea
+  #smooth
+  datrp=data.frame(unikout=data1$outlets,datrd)
+  datrq=data.frame(unikout=data2$outlets,datrf)
+  lwtf=c()
+  yvf=c()
+  for (y in 1:length(seqy)){
+    print(y)
+    yx=seqy[y]
+    daty=datrp[,which(names(datrp)==paste0("X",yx))]
+    datz=datrq[,which(names(datrq)==paste0("X",yx))]
+    blss=which(daty>1000)
+    datrd[blss,which(names(datrd)==paste0("",yx))]=NA
     rmy=datrp$unikout[blss]
     
     #compare with list already existing
@@ -1187,6 +1942,115 @@ FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2
   dfplot= datrd %>% gather("Year","pixel")
   dfplot$year=as.numeric(substr(dfplot$Year,2,5))
   
+  dfplot2=datrf %>% gather("Year","pixel")
+  dfplot2$year=as.numeric(substr(dfplot2$Year,2,5))
+  
+  dfplot$haz="low"
+  dfplot2$haz="high"
+  dfplot2$pixel=dfplot2$pixel/10
+  dfplotH=rbind(dfplot,dfplot2)
+  Dcad=seq(1955,2015,by =10)
+  mb=which(!is.na(match(dfplotH$year,Dcad)))
+  
+  dfplotX=dfplotH[mb,]
+  
+  q1=0.25
+  q2=0.75
+  #plot with curve and confidence interval shaded colors
+  dfquantiles=aggregate(list(change=dfplotX$pixel),
+                        by = list(Year=dfplotX$year,haz=dfplotX$haz),
+                        FUN = function(x) c(median=median(x,na.rm=T),q1=quantile(x, q1, na.rm=T),q3=quantile(x, q2, na.rm=T)))
+  
+  dfquantiles <- do.call(data.frame, dfquantiles)
+  names(dfquantiles)=c("Year","haz", "median","qlow","qhigh")
+  
+  ggplot(dfquantiles, aes(x=Year,y=median, color=haz))+
+    geom_line()+
+    geom_ribbon(aes(ymin=dfquantiles$qlow, ymax=dfquantiles$qhigh,fill=dfquantiles$haz), linetype=2, alpha=0.1)
+  
+  #Change of strategy, I can do violin plots for both with change
+  #first I do the violin for one variable
+  ggplot(dfplotX, aes(x=factor(year), y=pixel, fill=factor(haz))) +
+    geom_boxplot(notch=F,position=position_dodge(.9),alpha=.8,draw_quantiles = c(0.25, 0.5, 0.75),linewidth=0.8,scale="width",outlier.alpha = 0.4,trim=T)+
+    
+    
+    
+    
+    scale_y_continuous(limits = c(-2,2),name="qsp change drought",
+                       sec.axis = sec_axis( trans=~.*10, name="Second Axis"))
+  scale_x_discrete(labels=c("1" = "100-200", "2" = "200-500",
+                            "3" = "500-1000","4" = "1000-10 000",
+                            "5" = "10 000-100 000","6" = ">100 000"),name="Catchment Area (km2)")+
+    scale_fill_gradientn(
+      colors=palet, n.breaks=6,limits=c(0.4,0.8)) +
+    geom_text(data=data.frame(), aes(x=names(meds), y=meds-0.05, label=agUpA$upav), col='black', size=4,fontface="bold")+
+    theme(axis.title=element_text(size=16, face="bold"),
+          axis.text = element_text(size=12),
+          panel.background = element_rect(fill = "white", colour = "white"),
+          panel.grid = element_blank(),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=12),
+          legend.position = "none",
+          panel.grid.major = element_line(colour = "grey60"),
+          panel.grid.minor.y = element_line(colour = "grey80",linetype="dashed"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  
+  
+  
+  
+  if (length(which(is.na(dfplot$pixel)))>0) dfplot=dfplot[-which(is.na(dfplot$pixel)),]
+  if (length(which(is.infinite(dfplot$pixel)))>0) dfplot=dfplot[-which(is.infinite(dfplot$pixel)),]
+  
+  countfunction<-function(values, bounds){
+    l1=length(which(values<bounds & values>0))
+    l2=length(which(values>bounds))
+    l3=length(which(values<(-bounds)))
+    l4=length(which(values>(-bounds) & values<0))
+    return(c(l2,l1,l4,l3))
+  }
+  dfq=aggregate(list(change=dfplot$pixel),
+                by = list(Year=dfplot$year),
+                FUN = function(x,...) c(bg=countfunction(x,0.1)))
+  dfq <- do.call(data.frame, dfq)
+  
+  dfq2=aggregate(list(change=dfplot2$pixel),
+                 by = list(Year=dfplot2$year),
+                 FUN = function(x,...) c(bg=countfunction(x,5)))
+  dfq2 <- do.call(data.frame, dfq2)
+  
+  data_long <- gather(dfq, group, value, change.bg1:change.bg4) %>%
+    arrange(factor(Year)) %>% 
+    mutate(x=factor(Year, levels=unique(Year)))
+  
+  
+  colorz = c('change.bg4'='#d73027','change.bg3'='#fee090','change.bg2'='lightblue','change.bg1'='royalblue')
+  labs=rev(c("< -0.1","-0.1 - 0","0 - 0.1", ">0.1"))
+  legend_order=c('change.bg1', 'change.bg2', 'change.bg3','change.bg4')
+  data_long$p2 <- relevel(data_long$position, 'change.bg1')
+  data_long$position <- factor(data_long$group, levels=c('change.bg1', 'change.bg2', 'change.bg4','change.bg3'))
+  
+  ggplot(data_long, aes(fill=position, y=value, x=Year)) + 
+    geom_bar(position="stack", stat="identity")+
+    scale_fill_manual(values = colorz, breaks = legend_order,name="change in qsp",labels=labs)  + 
+    scale_y_continuous(name="Number of catchments")+
+    scale_x_continuous(name="Years") +
+    # scale_x_discrete(labels= c("< -0.41","-0.41-0.2", "0.2-0.5","0.5-0.7","0.7-0.8", ">0.8"), name="KGE")+
+    theme(axis.title=element_text(size=16, face="bold"),
+          axis.text = element_text(size=13),
+          panel.background = element_rect(fill = "white", colour = "white"),
+          panel.grid = element_blank(),
+          panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+          legend.title = element_text(size=14),
+          legend.text = element_text(size=12),
+          legend.position = "bottom",
+          panel.grid.major = element_line(colour = "grey80"),
+          panel.grid.minor.x = element_line(colour = "grey90",linetype="dashed"),
+          legend.key = element_rect(fill = "transparent", colour = "transparent"),
+          legend.key.size = unit(.8, "cm"))
+  
+  
   dfquantiles=aggregate(list(change=dfplot$pixel),
                         by = list(Year=dfplot$year),
                         FUN = function(x) c(mean=mean(x,na.rm=T),q1=quantile(x, q1, na.rm=T),q3=quantile(x, q2, na.rm=T)))
@@ -1197,12 +2061,13 @@ FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2
   
   
   dtfinal=c()
+  xmm=c(-1,1)
   for( y in 1:length(seqy)){
     print(y)
     yx=seqy[y]
     dfp1=dfplot[which(dfplot$year==yx),]
     dfp1=dfp1[which(!is.na(dfp1$pixel)),]
-    merde=kde(dfp1$pixel,bgridsize=1000,xmin=-100,xmax=100,h=1)
+    merde=kde(dfp1$pixel,bgridsize=1000,xmin=xmm[1],xmax=xmm[2],h=0.02)
     
     dfqy=dfquantiles[which(dfquantiles$Year==yx),]
     ziz=data.frame(ev.points=merde$eval.points,estimates=merde$estimate)
@@ -1228,7 +2093,7 @@ FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2
   palet=c(hcl.colors(11, palette = "YlGnBu", alpha = NULL, rev = T, fixup = TRUE))
   
   plo=ggplot(dtfinal, aes(x = Year, y = Change))+
-    geom_raster(aes(fill=values,interpolate = T))+
+    geom_raster(aes(fill=values),interpolate = T)+
     scale_fill_gradientn(colours = palet,
                          n.breaks=10,guide='coloursteps',na.value = "transparent",oob = scales::squish,limits=c(0,0.005))+
     scale_y_continuous(
@@ -1258,6 +2123,10 @@ FascPlotChange<- function(datar,outloc,period=c(1952,2020),lims=c(-60, 60),q1,q2
   plo
   return(plo)
 }
+
+#Another function that fits sen slope on annual max and annual min (It will be with the peaks but almost the same)
+#find inspiration in other functions
+
 
 #Season computation functions
 seasony=function(x){
@@ -1607,6 +2476,14 @@ plotSeasonFlood=function(seasonP,nco,tsize,osize){
   
 }
 
+get_density <- function(x, y, ...) {
+  dens <- MASS::kde2d(x, y, ...)
+  ix <- findInterval(x, dens$x)
+  iy <- findInterval(y, dens$y)
+  ii <- cbind(ix, iy)
+  return(dens$z[ii])
+}
+
 UpAopen=function(dir,outletname,Sloc_final){
   ncbassin=paste0(dir,outletname)
   ncb=nc_open(ncbassin)
@@ -1637,47 +2514,28 @@ UpAopen=function(dir,outletname,Sloc_final){
   outll$idlo=lonlatloop$Var1
   outll$idla=lonlatloop$Var2
   
-  #outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
-  outll$latlong=paste(round(outll$Var1,4),round(outll$Var2,4),sep=" ")
-  outfinal=inner_join(outll, Sloc_final, by="latlong")
-  return (outfinal)
-}
-
-ReservoirOpen=function(dir,outletname,Sloc_final){
-  ncbassin=paste0(dir,outletname)
-  ncb=nc_open(ncbassin)
-  name.vb=names(ncb[['var']])
-  namev=name.vb[1]
-  #time <- ncvar_get(ncb,"time")
-  
-  #timestamp corretion
-  name.lon="lon"
-  name.lat="lat"
-  londat = ncvar_get(ncb,name.lon) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat)
-  lla=length(latdat)
-  start=c(1,1)
-  count=c(llo,lla)
-  
-  
-  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
-  llo=length(londat)
-  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
-  lla=length(latdat)
-  outlets = ncvar_get(ncb,namev,start = start, count= count) 
-  outlets=as.vector(outlets)/1000000
-  outll=expand.grid(londat,latdat)
-  lonlatloop=expand.grid(c(1:llo),c(1:lla))
-  outll$upa=outlets
-  outll$idlo=lonlatloop$Var1
-  outll$idla=lonlatloop$Var2
-  
-  #outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
-  outll$latlong=paste(round(outll$Var1,4),round(outll$Var2,4),sep=" ")
-  outfinal=inner_join(outll, Sloc_final, by="latlong")
+  outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
+  outfinal=inner_join(outll, Sloc_final, by="idlalo")
   return (outfinal)
 }
 
 
-
+#Spatial smoothing for drought
+RiverDist <- function(river_raster, start_point,rivmask) {
+  # Create a transition matrix (movement only through river cells)
+  tr <- transition(river_raster == 1, transitionFunction = mean, directions = 8)
+  # Correct for geographical distance
+  #tr <- geoCorrection(tr, type = "c", multpl = FALSE)
+  start_xy=as.matrix(as.data.frame(start_point)[-3])
+  #start_xy=start_point
+  # Compute the cost distance
+  cost_dist <- accCost(tr,start_xy)
+  # plot(cost_dist)
+  cost_df <- as.data.frame(cost_dist, xy = TRUE, na.rm = FALSE)
+  cost_df$llcoord=paste(round(cost_df$x,4),round(cost_df$y,4),sep=" ")
+  mriv=match(rivmask$llcoord,cost_df$llcoord)
+  cost_df=cost_df[mriv,]
+  cost_df$layer=cost_df$layer/1000
+  cost_df=cost_df$layer
+  return(cost_df)
+}
