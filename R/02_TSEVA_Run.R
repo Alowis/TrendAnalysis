@@ -11,7 +11,9 @@ hydroDir<-("D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data")
 
 # Arguments importation #############################
 
-haz = "flood"
+#default: tail is high
+tail="high"
+haz = "drought"
 var = "dis"
 outlets="RNetwork"
 outletname <- "/GeoData/efas_rnet_100km_01min"
@@ -19,17 +21,14 @@ season="year"
 Nsq = 42
 sce <- "Histo"
 
-#default: tail is high
-tail="high"
 
 
-
-rspace= read.csv(paste0(hydroDir,"subspace_efas.csv"))
+rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
 rspace=rspace[,-1]
 nrspace=rspace[Nsq,]
 print(nrspace)
 nameout="UCRnet"
-outhybas=outletopen(workDir,outletname,nrspace)
+outhybas=outletopen(hydroDir,outletname,nrspace)
 Idstart=as.numeric(Nsq)*100000
 if (length(outhybas$outlets)>0){
   outhybas$outlets=seq((Idstart+1),(Idstart+length(outhybas$outlets)))
@@ -51,19 +50,12 @@ if (sce=="Histo") code="h"
 if (sce=="SCF") code="scf"
 if (sce=="WStat") code="wcf"
 if (sce=="RWStat") code="rwcf"
-dirout=paste0(workDir,"TSEVA/out/",sce,"/",haz,"/",season)
-fex2=file.exists(dirout)
-if (fex2==TRUE){
-  print("output folder exists")
-}else{
-  print("output folder does not exist")
-}
 
 #Loop on all pixels within squarq
 #Load the file
 #loading the files as netcdf (needs to be checked offline)
 if (code=="h"){
-  filename=paste0("dis_",Nsq,"_1951_2020_",code,"")
+  filename=paste0("dis_",Nsq,"_1951_2020_",code,"_RNetwork")
 }
 if (code=="scf"){
   filename=paste0("dis_",Nsq,"_1951_2020_",code)
@@ -92,12 +84,12 @@ if (haz=="drought"){
   #remove first day
   frostcat=frostcat[-1,]
   Catchmentrivers7=read.csv(paste0(hydroDir,"/GeoData/HYBAS07/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
-  outletname="outletsv8_hybas07_01min"
-  outhyb07=outletopen(workDir,outletname,nrspace)
+  outletname="GeoData/HYBAS07/outletsv8_hybas07_01min"
+  outhyb07=outletopen(hydroDir,outletname,nrspace)
   catmatch=match(outhyb07$outlets,Catchmentrivers7$pointid)
   mycat=Catchmentrivers7[catmatch,]
   
-  hybas07 <- read_sf(dsn = paste0(workDir,"/GeoData/HYBAS07/hybas_eu_lev07_v1c.shp"))
+  hybas07 <- read_sf(dsn = paste0(hydroDir,"/GeoData/HYBAS07/hybas_eu_lev07_v1c.shp"))
   hybasf7=fortify(hybas07) 
   Catamere07=inner_join(hybasf7,Catchmentrivers7,by= "HYBAS_ID")
   Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ") 
@@ -107,7 +99,7 @@ if (haz=="drought"){
   
 }
 
-ThDir<-paste0(hydroDir,"Thresholds")
+ThDir<-paste0(hydroDir,"/Thresholds")
 TH1=read.csv(paste0(ThDir,"/trenTH_Histo_",tail,"_",Nsq,".csv"))
 TH2=read.csv(paste0(ThDir,"/trenTH_SCF_",tail,"_",Nsq,".csv"))
 TH3=inner_join(TH1,TH2,by="cid")
@@ -126,6 +118,7 @@ thresh_vec$cid=thresh_vec$cid+Nsq*100000
 
 startid=1
 endid=length(unikout)
+endid=3
 
 RetPerGPD=c()
 RetPerGEV=c()
@@ -393,9 +386,7 @@ for (idfix in startid:endid){
   
 }
 
-
 Results=list(parameters=parlist,RetLevGEV=RetLevGEV,RetLevGPD=RetLevGPD,RetPerGEV=RetPerGEV,RetPerGPD=RetPerGPD,Peaks=peaklist,catrest=data.frame(catlist,IRES))
-save(Results, file=paste0(workDir,"TSEVA/out/",sce,"/",haz,"/",season,"/ResCat6h_",outlets,haz,"_",Nsq,Quarter,"_1951_2020.Rdata"))
 
 
 

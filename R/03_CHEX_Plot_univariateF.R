@@ -142,9 +142,9 @@ gc()
 ###load results from Res+WU CF run -----
 if (haz == "Drought") namefile="Drought.nonfrost.RWCF"
 if (haz == "Flood") namefile="flood.year.RWCF"
-load(file=paste0(hydroDir,"/data/",haz,"/params.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/data/",haz,"/RL100.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/data/",haz,"/peaks.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
 RLGPDflRWCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
 ParamsflRWCF=data.table(Paramsfl)
@@ -302,6 +302,9 @@ if (haz=="Drought"){
           legend.key.size = unit(1, "cm"))
   
   #ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/IRES_allrunsNew19.jpg"), IRmap, width=20, height=20, units=c("cm"),dpi=1000) 
+}else{
+  IRpoints=UpArea
+  
 }
 
 ##3.3 drought RL corrections ----------------
@@ -488,7 +491,7 @@ RlevErri$S2n="Err > Change"
 RlevErri$S2n[which(RlevErri$ErrVsCh>=0)]="Change > Err"
 RlevErri$S2n[which(is.nan(RlevErri$ErrVsCh))]="Unstable"
 length(which(RlevErri$S2n=="Err > Change"))
-length(which(RlevErri$S2n=="Unstable"))/length(IRpoints$SCF)
+length(which(RlevErri$S2n=="Unstable"))/length(IRpoints$upa)
 ParamPlot=inner_join(RlevErri,UpArea,by=c("catchment"="outl2"))
 max(RlevErri$returnLevelErr,na.rm=T)
 Paraplot <- st_as_sf(ParamPlot, coords = c("Var1.x", "Var2.x"), crs = 4326)
@@ -536,7 +539,7 @@ m1=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
+#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
 
 #### [SPlot] - Supplement map - Comparison of Error and 2015-1955 changes -----
 m2=ggplot(basemap) +
@@ -570,7 +573,7 @@ m2=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_class_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
+#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_class_",haz,".jpg"), m2, width=23, height=20, units=c("cm"),dpi=1000) 
 
 
 
@@ -579,6 +582,7 @@ RlevErrip=inner_join(RlevErri,Shapeparf,by="catchment")
 
 
 ###5.1.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
+#Identification of pixels to be smoothed
 if (haz=="Drought"){
   
   #Spatial smooting of LUAgg
@@ -975,18 +979,6 @@ data=data[-match(rmp2,data$unikout),]
 
 
 ##4.6 Spatial aggregation to desired regions: HydroRegion ----------
-
-
-# DataI=right_join(GHR_riv,data,by = c("outl2"="unikout"))
-# HRM=match(DataI$HydroRegions_raster_WGS84,HydroRsf$Id)
-# DataI$Hid=HydroRsf$Id[HRM]
-# DataI$mdatS=DataI$mdat * 1000 / (DataI$upa)
-# DataI$mdatmaxS=DataI$mdatmax * 1000 / (DataI$upa)
-# mean(DataI$mdatS,na.rm=T)
-# RegioRLi=aggregate(list(RL10=DataI$mdat),
-#                    by = list(HydroR=DataI$Hid),
-#                    FUN = function(x) c(mean=mean(x,na.rm=T),dev=sd(x,na.rm=T),len=length(x),med=median(x,na.rm=T),q1=quantile(x, 0.05, na.rm=T),q3=quantile(x, 0.95, na.rm=T)))
-# RegioRLi <- do.call(data.frame, RegioRLi)
 
 #matching biogeoregions and hybas07
 bio_hybas=inner_join(biogeo_rivers,GNF,by=c("outl2"))

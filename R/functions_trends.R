@@ -170,41 +170,70 @@ outletopen=function(dir,outletname,nrspace=rep(NA,5)){
 
 #compute return levels associated to a RP (not used in this script)
 ComputeReturnLevels<-function(nonStationaryEvaParams, RPgoal, timeIndex){
+  
   #GEV
   epsilonGEV <- nonStationaryEvaParams[[1]]$parameters$epsilon
   sigmaGEV <- mean(nonStationaryEvaParams[[1]]$parameters$sigma[timeIndex])
   muGEV <- mean(nonStationaryEvaParams[[1]]$parameters$mu[timeIndex])
   dtSampleYears <- nonStationaryEvaParams[[1]]$parameters$timeDeltaYears
-  epsilonStdErrGEV <- nonStationaryEvaParams[[1]]$paramErr$epsilonErr
-  sigmaStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$sigmaErr[timeIndex])
-  muStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$muErr[timeIndex])
   
   #GPD
   epsilonGPD <- nonStationaryEvaParams[[2]]$parameters$epsilon
   sigmaGPD <- mean(nonStationaryEvaParams[[2]]$parameters$sigma[timeIndex])
   thresholdGPD <- mean(nonStationaryEvaParams[[2]]$parameters$threshold[timeIndex])
   nPeaks <- nonStationaryEvaParams[[2]]$parameters$nPeaks
-  epsilonStdErrGPD <- nonStationaryEvaParams[[2]]$paramErr$epsilonErr
-  sigmaStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$sigmaErr[timeIndex])
-  thresholdStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$thresholdErr[timeIndex])
   thStart <- nonStationaryEvaParams[[2]]$parameters$timeHorizonStart
   thEnd <- nonStationaryEvaParams[[2]]$parameters$timeHorizonEnd
   sampleTimeHorizon <- as.numeric((thEnd - thStart)/365.2425)
   
-  returnLevelsGEV <- tsEvaComputeReturnLevelsGEV(epsilonGEV, sigmaGEV, muGEV, epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV, RPgoal)
+  if (nonStationaryEvaParams[[1]]$method=="No fit"){
+    print("could not fit EVD to this pixel")
+    ParamGEV=c(epsilonGEV,sigmaGEV,muGEV,NA, NA, NA)
+    names(ParamGEV)=c("epsilonGEV","sigmaGEV","muGEV","epsilonStdErrGEV","sigmaStdErrGEV","muStdErrGEV")
+    
+    ParamGPD=c(epsilonGPD,sigmaGPD,thresholdGPD,NA,NA, NA,nPeaks,sampleTimeHorizon)
+    names(ParamGPD)=c("epsilonGPD","sigmaGPD","thresholdGPD","epsilonStdErrGPD","sigmaStdErrGPD","thresholdStdErrGPD","nPeaks","SampleTimeHorizon")
+    return(list(Fit="No fit",Params=c(ParamGEV,ParamGPD)))
+  }else{
+    #GEV
+    # epsilonGEV <- nonStationaryEvaParams[[1]]$parameters$epsilon
+    # sigmaGEV <- mean(nonStationaryEvaParams[[1]]$parameters$sigma[timeIndex])
+    # muGEV <- mean(nonStationaryEvaParams[[1]]$parameters$mu[timeIndex])
+    # dtSampleYears <- nonStationaryEvaParams[[1]]$parameters$timeDeltaYears
+    epsilonStdErrGEV <- nonStationaryEvaParams[[1]]$paramErr$epsilonErr
+    sigmaStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$sigmaErr[timeIndex])
+    muStdErrGEV <- mean(nonStationaryEvaParams[[1]]$paramErr$muErr[timeIndex])
+    
+    #GPD
+    # epsilonGPD <- nonStationaryEvaParams[[2]]$parameters$epsilon
+    # sigmaGPD <- mean(nonStationaryEvaParams[[2]]$parameters$sigma[timeIndex])
+    # thresholdGPD <- mean(nonStationaryEvaParams[[2]]$parameters$threshold[timeIndex])
+    # nPeaks <- nonStationaryEvaParams[[2]]$parameters$nPeaks
+    epsilonStdErrGPD <- nonStationaryEvaParams[[2]]$paramErr$epsilonErr
+    sigmaStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$sigmaErr[timeIndex])
+    thresholdStdErrGPD <- mean(nonStationaryEvaParams[[2]]$paramErr$thresholdErr[timeIndex])
+    # thStart <- nonStationaryEvaParams[[2]]$parameters$timeHorizonStart
+    # thEnd <- nonStationaryEvaParams[[2]]$parameters$timeHorizonEnd
+    # sampleTimeHorizon <- as.numeric((thEnd - thStart)/365.2425)
+    
+    returnLevelsGEV <- tsEvaComputeReturnLevelsGEV(epsilonGEV, sigmaGEV, muGEV, epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV, RPgoal)
+    
+    returnLevelsGPD <- tsEvaComputeReturnLevelsGPD(epsilonGPD, sigmaGPD, thresholdGPD, epsilonStdErrGPD, sigmaStdErrGPD, thresholdStdErrGPD,
+                                                   nPeaks, sampleTimeHorizon, RPgoal)
+    rlevGEV=returnLevelsGEV$returnLevels
+    rlevGPD=returnLevelsGPD$returnLevels
+    
+    errGEV=returnLevelsGEV$returnLevelsErr
+    errGPD=returnLevelsGPD$returnLevelsErr
+    
+    ParamGEV=c(epsilonGEV,sigmaGEV,muGEV,epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV)
+    names(ParamGEV)=c("epsilonGEV","sigmaGEV","muGEV","epsilonStdErrGEV","sigmaStdErrGEV","muStdErrGEV")
+    
+    ParamGPD=c(epsilonGPD,sigmaGPD,thresholdGPD,epsilonStdErrGPD,sigmaStdErrGPD, thresholdStdErrGPD,nPeaks,sampleTimeHorizon)
+    names(ParamGPD)=c("epsilonGPD","sigmaGPD","thresholdGPD","epsilonStdErrGPD","sigmaStdErrGPD","thresholdStdErrGPD","nPeaks","SampleTimeHorizon")
+    return(list(Fit="Fitted",ReturnLevels=c(ReturnPeriod=RPgoal, GEV=as.numeric(rlevGEV),GPD=as.numeric(rlevGPD),errGEV=as.numeric(errGEV),errGPD=as.numeric(errGPD)),Params=c(ParamGEV,ParamGPD)))
+  }  
   
-  returnLevelsGPD <- tsEvaComputeReturnLevelsGPD(epsilonGPD, sigmaGPD, thresholdGPD, epsilonStdErrGPD, sigmaStdErrGPD, thresholdStdErrGPD,
-                                                 nPeaks, sampleTimeHorizon, RPgoal)
-  rlevGEV=returnLevelsGEV$returnLevels
-  rlevGPD=returnLevelsGPD$returnLevels
-  
-  ParamGEV=c(epsilonGEV,sigmaGEV,muGEV,epsilonStdErrGEV, sigmaStdErrGEV, muStdErrGEV)
-  names(ParamGEV)=c("epsilonGEV","sigmaGEV","muGEV","epsilonStdErrGEV","sigmaStdErrGEV","muStdErrGEV")
-  
-  ParamGPD=c(epsilonGPD,sigmaGPD,thresholdGPD,epsilonStdErrGPD,sigmaStdErrGPD, thresholdStdErrGPD,nPeaks,sampleTimeHorizon)
-  names(ParamGPD)=c("epsilonGPD","sigmaGPD","thresholdGPD","epsilonStdErrGPD","sigmaStdErrGPD","thresholdStdErrGPD","nPeaks","SampleTimeHorizon")
-  
-  return(list(ReturnLevels=c(ReturnPeriod=RPgoal, GEV=as.numeric(rlevGEV),GPD=as.numeric(rlevGPD)),Params=c(ParamGEV,ParamGPD)))
   
 }
 
@@ -404,6 +433,26 @@ disNcopenloc=function(fname,dir,outloc,idc){
   outll=data.frame(outlets,outid,lon,lat,time)
   
   return (outll)
+}
+
+
+
+RPcalc<- function(params,RPiGEV,RPiGPD){
+  paramx=data.frame(t(params))
+  qxV=1-exp(-(1+paramx$epsilonGEV*(RPiGEV-paramx$muGEV)/paramx$sigmaGEV)^(-1/paramx$epsilonGEV))
+  if (is.na(qxV)){
+    returnPeriodGEV=9999
+  }else{
+    returnPeriodGEV=1/qxV
+  }
+  X0 <- paramx$nPeaks/paramx$SampleTimeHorizon
+  qxD=(((1+paramx$epsilonGPD*(RPiGPD-paramx$thresholdGPD)/paramx$sigmaGPD)^(-1/paramx$epsilonGPD)))
+  if (is.na(qxD)){
+    returnPeriodGPD=9999
+  }else{
+    returnPeriodGPD=1/(X0*qxD)
+  }
+  return(c(GEV=returnPeriodGEV,GPD=returnPeriodGPD))
 }
 
 #Function to compute changes in return periods associated to a return level.
