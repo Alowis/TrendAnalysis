@@ -1,0 +1,81 @@
+
+<!-- README.md is generated from README.Rmd. Please edit that file -->
+
+# Code and for “Climatic and socioeconomic drivers of changing hydrological extremes in Europe”
+
+<!-- badges: start -->
+<!-- badges: end -->
+
+This repository contains the codes used to analyse discharge data from
+the HERA hydrological reanalysis and to reproduce the different steps
+and figures in the article: “Climatic and socioeconomic drivers of
+changing hydrological extremes in Europe”.
+
+## Introduction
+
+The HERA high-resolution pan-European hydrological reanalysis
+(1951-2020) dataset
+[10.2905/a605a675-9444-4017-8b34-d66be5b18c95](10.2905/a605a675-9444-4017-8b34-d66be5b18c95)
+is the result of a joint effort between the JRC and PIK to produce a
+long term hydrological reanalysis with downscaled and bias-corrected
+climate reanalysis (ERA5-land) and dynamic socioeconomic inputs. It
+includes maps of climate variables (evaporation, evapotranspiration,
+precipitation, temperature), dynamic socioeconomic inputs (land use,
+water demand, reservoir maps) required for hydrological modelling with
+LISFLOOD (<https://github.com/ec-jrc/lisflood-code>) and river discharge
+with European extent at 1 arc minute (~1.5 km) grid resolution and
+6-hourly time step.
+
+The analysis buids on the HERA dataset and three counterfactual scenarii
+to attribute changes in hydrological extremes to four drivers:
+
+- Climate (change and variability)
+- Reservoir construction
+- Land use changes (six land use categories)
+- Water demand changes
+
+## Content
+
+The repository is composed of R scripts under the /R folder. Inside the
+/R folder, one can find 5 scripts representing the 4 main steps of the
+analysis:
+
+1.  [Thresold definition for non-stationnary
+    analysis](#1-Thresold%20definition)
+2.  [Non-stationnary EVA (TSEVA)](#2-TSEVA)
+3.  [Changing Hydrological Extremes - univariate analysis](#3-CHE-U)
+4.  [Changing Hydrological Extremes - bivariate analysis](#4-CHE-B)
+5.  [functions](#5-functions)
+
+A set of supplementary functions is also provided under
+/Pre-PostProcess, notably functions to determine the frost season of
+European catchments and to maps reservoirs used in HERA.
+
+### 1. Threshold definition
+
+- **01_TSEVA_TrendThresholdSel.R**: identify threshold for extreme trend
+  assessment with TSEVA The method is applied here to a subsample of the
+  282 521 river pixels analysed in the research article.
+
+### 2. Non-stationnary EVA (TSEVA)
+
+- **02_TSEVA_Run.R**: Runs the TSEVA and saves results for the next
+  steps of the analysis. The method is applied here to a subsample of
+  the 282 521 river pixels analysed in the research article.
+
+### 3. Changing Hydrological Extremes - univariate analysis
+
+- **03_CHEX_Plot_univariateF.R**: Loads results from previous step,
+  computes summary statistics and generates maps on:
+  - Intermittent Rivers
+  - Relative error of obtained results
+  - Parameter instability among runs
+  - bound of GPD (for low flows)
+  - Largest drivers of change at pixel and regional level
+  - Change attributed to each driver in time
+  - Change attributed to each driver in space
+
+### 4. Changing Hydrological Extremes - bivariate analysis
+
+- **03_CHEX_Plot_univariateF.R** Script comparing performances of HERA
+  and mHM across Europe ( article Supplement)
