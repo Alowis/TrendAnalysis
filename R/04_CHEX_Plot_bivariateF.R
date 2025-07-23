@@ -6,7 +6,7 @@ source("functions_trends.R")
 # Pre-loaded results -----------
 
 #Set data directory
-hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
+hydroDir<-("D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data")
 
 ###create the outlets file outf ----
 if (!exists("outf")){
@@ -18,7 +18,7 @@ if (!exists("outf")){
     nrspace=rspace[Nsq,]
     #outletname="outletsv8_hybas07_01min"
     #outletname="outlets_hybas09_01min"
-    outletname="efas_rnet_100km_01min"
+    outletname="GeoData/efas_rnet_100km_01min"
     
     outhybas=outletopen(hydroDir,outletname,nrspace)
     Idstart=as.numeric(Nsq)*10000
@@ -39,9 +39,9 @@ if (!exists("outf")){
 ###load results from previous script ----
 
 #### floods ----
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_flood_year_relxHR_8.Rdata"))
+load(file=paste0(hydroDir,"/Flood/outputs_flood_year_relxHR.Rdata"))
 #### droughts ----
-load(file=paste0(hydroDir,"/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_9.Rdata"))
+load(file=paste0(hydroDir,"/Drought/outputs_drought_nonfrost_relxHR.Rdata"))
 
 #Trend at regional level
 FloodTrends=Output_fl_year$TrendRegio
@@ -1483,7 +1483,7 @@ shapex=c("Alpine"=0,"Atlantic"=1,"Boreal"=2, "Continental"=3,"Mediterranean"=4)
 tsize=osize=20
 lalim=70
 
-## [Plot] - Figure 5 - Bivariate plot of diver contribution to hydroextreme changes ---- 
+## [Plot] - Figure 5 - Bivariate plot of driver contribution to hydro extreme changes ---- 
 bpc=ggplot() +
   geom_vline(xintercept = 0, 
   color = "black", size = 1.5) +
