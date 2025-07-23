@@ -39,17 +39,16 @@ to four drivers:
 The repository is composed of R scripts under the /R folder.
 Inside the /R folder, one can find 5 scripts representing the 4 main steps of the analysis:
 
-
-1. [Thresold definition for non-stationnary analysis](#thresold-definition-for-non-stationnary-analysis)
-2. [Non-stationnary EVA (TSEVA)](#non-stationnary-eva-tseva)
-3. [Changing Hydrological Extremes - univariate analysis](#changing-hydrological-extremes---univariate-analysis)
-4. [Changing Hydrological Extremes - bivariate analysis](#changing-hydrological-extremes---bivariate-analysis)
+1. [Thresold definition for non-stationnary analysis](#thresold-definition)
+2. [Non-stationnary EVA (TSEVA)](#tseva)
+3. [Changing Hydrological Extremes - univariate analysis](#che-u)
+4. [Changing Hydrological Extremes - bivariate analysis](#che-b)
 5. [Functions](#functions)
 
 A set of supplementary functions is also provided under /Pre-PostProcess, 
 notably functions to determine the frost season of European catchments and to maps reservoirs used in HERA.
 
-### 1. Threshold definition 
+### 1. Threshold definition <a id="thresold-definition"></a>
 
 #### Script: *01_TSEVA_TrendThresholdSel.R*
 
@@ -96,7 +95,7 @@ This script identifies thresholds for extreme trend assessment using the TSEVA (
 The script outputs a CSV file containing the trend thresholds for the specified scenarios and tail types.
 
 
-### 2. Non-stationnary EVA (TSEVA)
+### 2. Non-stationnary EVA (TSEVA) <a id="tseva"></a>
 
 #### Script: *01_TSEVA_Run.R*
 
@@ -150,7 +149,7 @@ This script is designed to run one square of the HERA (Hydrological Ensemble Pre
 
 The script outputs a list containing parameters, return levels, return periods, peaks, and catchment rest data for further analysis.
 
-### 3. Changing Hydrological Extremes - univariate analysis
+### 3. Changing Hydrological Extremes - univariate analysis <a id="che-u"></a>
 
 #### Script: *03_CHEX_Plot_univariateF.R* 
 
@@ -289,7 +288,7 @@ The script performs a comprehensive analysis of river discharge data and generat
    - `Output_fl_year` and `Output_dr_nonfrost`: Saved lists containing trend data at the pixel and regional levels, output for 2020, and initial data for flood and drought scenarios, respectively.
 
 
-### 4. Changing Hydrological Extremes - bivariate analysis
+### 4. Changing Hydrological Extremes - bivariate analysis <a id="che-b"></a>
 
 #### Script: *04_CHEX_Plot_bivariateF.R* 
 
@@ -364,7 +363,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
    - `mbfX`: Data frame containing aggregated changes by HydroRegions for different drivers and `mbfH`: Data frame containing historical changes by HydroRegions.
   
 
-### 5. Functions:
+### 5. Functions <a id="functions"></a>
 
 #### 5.1 Miscellaneous Functions
 
