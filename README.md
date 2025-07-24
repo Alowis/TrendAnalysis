@@ -1,7 +1,7 @@
 
 <!-- README.md is generated from README.Rmd. Please edit that file -->
 
-# Code and for “Climatic and socioeconomic drivers of changing hydrological extremes in Europe”
+# Codes of “Climatic and socioeconomic drivers of changing hydrological extremes in Europe”
 
 <!-- badges: start -->
 <!-- badges: end -->
