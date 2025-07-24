@@ -97,7 +97,7 @@ The script outputs a CSV file containing the trend thresholds for the specified 
 
 ### 2. Non-stationnary EVA (TSEVA) <a id="tseva"></a>
 
-#### Script: *01_TSEVA_Run.R*
+#### Script: *02_TSEVA_Run.R*
 
 #### Script Description
 This script is designed to run one square of the HERA (Hydrological Ensemble Prediction System) domain on a High-Performance Computing (HPC) cluster. It performs extreme trend assessment for either drought or flood hazards using the TSEVA (Time Series Extreme Value Analysis) method.
