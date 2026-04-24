@@ -269,18 +269,19 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/bxplot_fldr
 driver=unique(DroughtTrends$driver)
 
 ## load Biogeographic regions ----
-biogeo <- read_sf(dsn = paste0(hydroDir,"/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
+biogeo <- read_sf(dsn = paste0(hydroDir,"/GeoData/eea_3035_biogeo-regions_2016/BiogeoRegions2016_wag84.shp"))
 biogeof=fortify(biogeo)
+head(biogeof)
 st_geometry(biogeof)<-NULL
-biogeoregions=raster( paste0(hydroDir,"/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
+biogeoregions=raster( paste0(hydroDir,"/GeoData/eea_3035_biogeo-regions_2016/Biogeo_rasterized_wsg84.tif"))
 Gbiogeoregions=as.data.frame(biogeoregions,xy=T)
 biogeomatch=inner_join(biogeof,Gbiogeoregions,by= c("PK_UID"="Biogeo_rasterized_wsg84"))
 biogeomatch$latlong=paste(round(biogeomatch$x,4),round(biogeomatch$y,4),sep=" ")
 biogeo_rivers=right_join(biogeomatch,outf, by="latlong")
 
 ### load Hybas07 ----
-Catchmentrivers7=read.csv(paste0(hydroDir,"/Catchments/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
-hybas07 <- read_sf(dsn = paste0(hydroDir,"/Catchments/hydrosheds/hybas_eu_lev07_v1c.shp"))
+Catchmentrivers7=read.csv(paste0(hydroDir,"/GeoData/HYBAS07/from_hybas_eu_onlyid.csv"),encoding = "UTF-8", header = T, stringsAsFactors = F)
+hybas07 <- read_sf(dsn = paste0(hydroDir,"/GeoData/HYBAS07/hybas_eu_lev07_v1c.shp"))
 hybasf7=fortify(hybas07)
 Catamere07=inner_join(hybasf7,Catchmentrivers7,by= "HYBAS_ID")
 Catamere07$llcoord=paste(round(Catamere07$POINT_X,4),round(Catamere07$POINT_Y,4),sep=" ")
@@ -291,7 +292,7 @@ UnHY=unique(GNF$HYBAS_ID)
 
 ### load HydroRegions ----
 
-GridHR=raster( paste0(hydroDir,"/HydroRegions_raster_WGS84.tif"))
+GridHR=raster( paste0(hydroDir,"/GeoData/HER/HydroRegions_raster_WGS84.tif"))
 GHR=as.data.frame(GridHR,xy=T)
 GHR=GHR[which(!is.na(GHR[,3])),]
 a1=(unique(GHR$HydroRegions_raster_WGS84))
@@ -307,7 +308,7 @@ length(unique(GHshpp$IRST_NAMEB))
 
 ### Plot parameters ----
 palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
-outletname="efas_rnet_100km_01min"
+outletname="GeoData/efas_rnet_100km_01min"
 outll=outletopen(hydroDir,outletname)
 cord.dec=outll[,c(2,3)]
 cord.dec = SpatialPoints(cord.dec, proj4string=CRS("+proj=longlat"))
@@ -920,6 +921,205 @@ pl=ggarrange(map, legend,
 
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/climchange_HR_9.jpg"), pl, width=20, height=20, units=c("cm"),dpi=800)
+
+#save climate only signal:
+save(databipic,file=paste0(hydroDir,"bivar_clim.Rdata"))
+
+
+#1.4 Aggregation by Biogeoregion ----
+
+#Color scale
+colord <- c(
+  "1-1" = 12,  # high x, low y
+  "2-1" = 11,  # medium-high x, low y
+  "3-1" = 10,  # medium-low x, low y
+  "4-1" = 9,  # low x, low y
+  
+  "1-2" = 13,  # high x, medium-low y
+  "2-2" = 4,  # medium-high x, medium-low y
+  "3-2" = 3,  # medium-low x, medium-low y
+  "4-2" = 8,  # low x, medium-low y
+  
+  "1-3" = 14,  # high x, medium-high y
+  "2-3" = 1,  # medium-high x, medium-high y
+  "3-3" = 2,  # medium-low x, medium-high y
+  "4-3" = 7,  # low x, medium-high y
+  
+  "1-4" = 15,  # high x, high y
+  "2-4" = 16,  # medium-high x, high y
+  "3-4" = 5,  # medium-low x, high y
+  "4-4" = 6  # low x, high y
+  
+)
+
+zob=unique(databipise$bi_class)
+zob=zob[-which(is.na(zob))]
+
+databipi2=databipic
+#removal of pixel with NA direction
+databipi2$bi_class[which(databipi2$bi_class=="NA-NA")]=NA
+databipi2$bi_class[which(is.na(databipi2$Y2015))]=NA
+databipi2$bi_class[which(is.na(databipi2$d2015))]=NA
+
+
+databipi2$trcat="Wetting"
+databipi2$trcat[which(databipi2$bi_class=="2-2" | databipi2$bi_class=="3-2" |
+                        databipi2$bi_class=="2-3" | databipi2$bi_class=="3-3")]="Stable"
+databipi2$trcat[which(databipi2$bi_class=="1-1" | databipi2$bi_class=="1-2" |
+                        databipi2$bi_class=="2-1")]="Drying"
+databipi2$trcat[which(databipi2$bi_class=="1-4" | databipi2$bi_class=="2-4" |
+                        databipi2$bi_class=="1-3")]="Accelerating"
+databipi2$trcat[which(databipi2$bi_class=="4-1" | databipi2$bi_class=="4-2" |
+                        databipi2$bi_class=="3-1")]="Decelerating"
+
+databipi2$Biogeo_id[which(databipi2$Biogeo_id=="Pannonian")]="Continental"
+
+if (length(which(is.na(databipi2$bi_class)))>0){
+  databipi3=databipi2[-which(is.na(databipi2$bi_class)),]
+}else{
+  databipi3=databipi2
+}
+
+
+#Aggregation over each change trajectory subclasses
+EuAgg = aggregate(list(val=databipi2$upa),
+                  by = list(traj=databipi2$bi_class),
+                  FUN = function(x) c(len=length(x)))
+EuAgg$trcat="Wetting"
+EuAgg$trcat[which(EuAgg$traj=="2-2" | EuAgg$traj=="3-2" |
+                    EuAgg$traj=="2-3" | EuAgg$traj=="3-3")]="Stable"
+EuAgg$trcat[which(EuAgg$traj=="1-1" | EuAgg$traj=="1-2" |
+                    EuAgg$traj=="2-1")]="Drying"
+EuAgg$trcat[which(EuAgg$traj=="1-4" | EuAgg$traj=="2-4" |
+                    EuAgg$traj=="1-3")]="Accelerating"
+EuAgg$trcat[which(EuAgg$traj=="4-1" | EuAgg$traj=="4-2" |
+                    EuAgg$traj=="3-1")]="Decelerating"
+
+#Aggregation over each change trajectory
+EuAgg2 = aggregate(list(val=EuAgg$val),
+                   by = list(traj=EuAgg$trcat),
+                   FUN = function(x) c(sum=sum(x)))
+SumEuPix=sum(EuAgg2$val)
+EuAgg2$rel.val=EuAgg2$val/SumEuPix*100
+
+
+RegioSize = aggregate(list(val=databipi3$upa),
+                      by = list(region=databipi3$Biogeo_id),
+                      FUN = function(x) c(len=length(x)))
+
+sum(RegioSize$val)
+
+#Aggregate by region and trajectory
+magg = aggregate(list(val=databipi2$upa),
+                 by = list(reg=databipi2$Biogeo_id ,traj=databipi2$bi_class),
+                 FUN = function(x) c(len=length(x)))
+magg <- do.call(data.frame, magg)
+
+#Remove peripheral regions
+magg=magg[-which(magg$reg=="Steppic" | magg$reg=="BlackSea" | magg$reg=="Arctic"),]
+magg$trcat="Wetting"
+magg$trcat[which(magg$traj=="2-2" | magg$traj=="3-2" |
+                   magg$traj=="2-3" | magg$traj=="3-3")]="Stable"
+magg$trcat[which(magg$traj=="1-1" | magg$traj=="1-2" |
+                   magg$traj=="2-1")]="Drying"
+magg$trcat[which(magg$traj=="1-4" | magg$traj=="2-4" |
+                   magg$traj=="1-3")]="Accelerating"
+magg$trcat[which(magg$traj=="4-1" | magg$traj=="4-2" |
+                   magg$traj=="3-1")]="Decelerating"
+
+#Plot preparation
+magg$order=1
+magg$order[which(magg$trcat=="Wetting")]=2
+magg$order[which(magg$trcat=="Decelerating")]=3
+magg$order[which(magg$trcat=="Drying")]=4
+magg$order[which(magg$trcat=="Accelerating")]=5
+
+matm=match(magg$traj,names(colord))
+magg$ordf=colord[matm]
+magg <- magg %>% 
+  mutate(traj = reorder(traj, ordf, FUN = mean))
+
+
+magg2c = aggregate(list(val=magclim$val),
+                  by = list(traj=magclim$trcat,regio=magclim$reg),
+                  FUN = function(x) c(sum=sum(x)))
+
+magg3c = aggregate(list(val=magclim$val),
+                   by = list(traj=magclim$trcat),
+                   FUN = function(x) c(sum=sum(x)))
+magg3c$rval=magg3c$val/sum(RegioSize$val)*100
+rsize=(match(magg2c$reg,RegioSize$region))
+magg2c$rsize=NA
+magg2c$rsize=RegioSize$val[rsize]
+magg2c$ratio=magg2c$val/magg2c$rsize*100
+sum(magg$val[which(magg$reg=="Mediterranean")])
+
+
+### [Plot] - Figure 4 - Stacked barplot of change trajectory by Biogeoregion ----
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray80","Wetting" = "#169dd0","Decelerating" = "burlywood")
+sum(magg$val[which(magg$trcat=="Stable")])/sum(magg$val)
+
+magclim=magg
+tsize=22
+osize=28
+
+ggplot(magg, aes(x = reg, y = val, fill = traj)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = colorp) +
+  scale_x_discrete(name="Biogeoregions")+
+  scale_y_continuous(breaks=c(0,.25,.50,.75,1),label=c(0,25,50,75,100),name="River pixels (%)",expand = c(0.005, .0))+
+  theme(axis.title=element_text(size=tsize),
+        axis.text=element_text(size=tsize),
+        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+# 1. Define the mapping (Full Name = Abbreviation)
+# Adjust these strings to match the exact spelling in your 'reg' column
+reg_labels <- c(
+  "Alpine" = "ALP",
+  "Atlantic" = "ATL",
+  "Boreal" = "BOR",
+  "Continental" = "CON",
+  "Mediterranean" = "MED",
+  "Arctic" = "ARC",
+  "BlackSea" = "BLS"
+)
+
+# 2. Your Plot
+ggplot(magg, aes(x = reg, y = val, fill = traj)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = colorp) +
+  
+  # Update labels here
+  scale_x_discrete(name = "Biogeoregions", labels = reg_labels) +
+  
+  scale_y_continuous(breaks = c(0, .25, .50, .75, 1),
+                     labels = c(0, 25, 50, 75, 100),
+                     name = "River pixels (%)",
+                     expand = c(0.005, .0)) +
+  theme(axis.title = element_text(size = tsize),
+        axis.text = element_text(size = tsize),
+        axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 1),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+        legend.title = element_text(size = tsize),
+        legend.text = element_text(size = osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Regional_trajectories_cli.jpg"), width=20, height=20, units=c("cm"),dpi=800)
+
+
+
 
 
 #3. LAND USE TREND --------------
@@ -1641,6 +1841,172 @@ ggplot(basemap) +
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Map_HRxBG2.jpg"), width=25, height=20, units=c("cm"),dpi=300) 
 
+
+
+# 1. Calculate centroids for EVERY segment using your dataframe
+# We use st_point_on_surface so labels stay inside the polygon lines
+library(sf)
+library(tidyverse)
+
+library(sf)
+library(tidyverse)
+
+# 1. Reclassify and Dissolve
+biogeof_merged <- biogeo %>%
+  # Update names and codes to merge Pannonia/Steppe into Continental
+  mutate(
+    name = case_when(
+      name %in% c("Pannonian", "Steppic") ~ "Continental",
+      TRUE ~ name
+    ),
+    pre_2012 = case_when(
+      pre_2012 %in% c("PAN", "STE") ~ "CON",
+      TRUE ~ pre_2012
+    )
+  ) %>%
+  # Dissolve the boundaries between the newly merged regions
+  group_by(name, pre_2012) %>%
+  summarize(geometry = st_union(geometry)) %>%
+  ungroup() %>%
+  st_make_valid()
+
+# 2. Clip to your domain (as before)
+domain_union <- st_union(st_make_valid(HydroRsf_dom))
+biogeof_clipped <- st_intersection(biogeof_merged, domain_union)
+
+# 1. Cast to MULTIPOLYGON then to POLYGON to separate all disjoint segments
+biogeof_segments <- st_cast(st_cast(biogeof_clipped, "MULTIPOLYGON"), "POLYGON")
+
+# 2. Add Area column to filter tiny segments
+biogeof_segments$area <- st_area(biogeof_segments)
+
+# 3. Create centroids
+# We keep labels for:
+# - All non-alpine regions (subject to check_overlap)
+# - Only the largest Alpine segments (Alps, Pyrenees, Scandes)
+label_points <- biogeof_segments %>%
+  filter(
+    (pre_2012 != "ALP" & pre_2012 != "MED" & area > units::set_units(250000, km^2)) | 
+      (pre_2012 == "ALP" & area > units::set_units(16000, km^2)) |
+       (pre_2012 == "MED" & area > units::set_units(50000, km^2))
+  ) %>%
+  st_point_on_surface()
+
+# 1. Ensure both datasets have the exact same Coordinate Reference System (CRS)
+biogeo<- st_transform(biogeo, st_crs(HydroRsf_dom))
+
+ggplot() +
+  # geom_sf(fill = "gray95", color = "white") + 
+  
+  # Contours for the merged regions
+  geom_sf(data = biogeof_clipped, fill = NA, color = "black", size = 0.9) + 
+  
+  # Labels on centroids
+  geom_sf_text(data = label_points, 
+               aes(label = pre_2012), 
+               size = 3.5, 
+               fontface = "bold", 
+               color = "black",
+               check_overlap = TRUE, 
+               inherit.aes = FALSE) +
+  
+  coord_sf(xlim = c(min(nco[,1]), max(nco[,1])), 
+           ylim = c(min(nco[,2]), max(nco[,2]))) +
+  
+  #labs(x = "Longitude", y = "Latitude") +
+  theme_bw()  # Or your custom theme
+
+# 1. Define a buffer (e.g., 2 degrees) to make the bounding box larger
+buffer <- 2 
+
+ggplot() +
+  # Contours for the merged regions
+  geom_sf(data = biogeof_clipped, fill = NA, color = "black", size = 0.7) + 
+  
+  # Labels on centroids
+  geom_label_repel(
+    data = label_points, 
+    aes(label = pre_2012, geometry = geometry),
+    stat = "sf_coordinates",      # This tells it to use the sf points
+    size = 7.5, 
+    fontface = "bold", 
+    color = "black",
+    fill = alpha("white", 0.6),   # Semi-transparent white box
+    label.size = 0.2,             # Removes the box border
+    #segment.color = "grey50",     # Optional: adds a line if the label moves far
+    #min.segment.length = 0,       # Always show lines (set to Inf to hide them)
+    inherit.aes = FALSE
+  ) +
+  # geom_sf_label(data = label_points, 
+  #               aes(label = pre_2012), 
+  #               size = 3.5, 
+  #               fontface = "bold", 
+  #               color = "black",
+  #               fill = "white",     # Color of the box
+  #               alpha = 0.5,        # 0 is invisible, 1 is solid
+  #               label.size = NA,    # Removes the border of the box
+  #               inherit.aes = FALSE) +
+  
+  # 2. Expand the limits by subtracting/adding the buffer
+  coord_sf(xlim = c(min(nco[,1]) - buffer, max(nco[,1]) + buffer), 
+           ylim = c(min(nco[,2]) - buffer, max(nco[,2]) + buffer),
+           expand = FALSE) + # expand = FALSE keeps the box exactly to your coordinates
+  
+  # 3. Clean the theme
+  theme_bw() + 
+  theme(
+    axis.text = element_blank(),     # Removes x and y numbers
+    axis.ticks = element_blank(),    # Removes the little tick marks
+    axis.title = element_blank(),    # Removes "Longitude/Latitude" labels
+    panel.grid.major = element_blank(), # Removes major grid lines
+    panel.grid.minor = element_blank(), # Removes minor grid lines
+    panel.border = element_rect(colour = "black", fill=NA, linewidth =1) # Keeps the outer box
+  )
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Map_BG.jpg"), width=25, height=20, units=c("cm"),dpi=300) 
+
+
+
+
+# 2. Intersect biogeof with hydrorsf (The "Clipping" step)
+# This keeps only the parts of bioregions that fall inside your domain
+biogeof_clipped <- st_intersection(st_make_valid(biogeo), st_union(st_make_valid(HydroRsf_dom)))
+
+# 3. Calculate centroids for the labels on the clipped segments
+# Using the clipped geometry ensures labels are centered in the visible parts
+biogeof_centroids <- biogeof_clipped %>%
+  st_point_on_surface()
+
+ggplot(basemap) +
+  # --- Background Layers ---
+  geom_sf(fill = "gray95", color = "white") + 
+  
+  # --- Bioregion Contours Only ---
+  # 'biogeof' is used here for the lines
+  geom_sf(data = biogeof_clipped, 
+          fill = NA, 
+          color = "black", 
+          size = 0.4) + 
+  # --- Labels using your 'pre_2012' column ---
+  geom_sf_text(data = biogeof_centroids, 
+               aes(label = pre_2012), 
+               size = 3.2,           # Size of the text
+               fontface = "bold", 
+               color = "black",
+               check_overlap = TRUE,  # Hides overlapping text in crowded areas
+               inherit.aes = FALSE) +
+  
+  # --- Map View & Theme ---
+  coord_sf(xlim = c(min(nco[,1]), max(nco[,1])), 
+           ylim = c(min(nco[,2]), max(nco[,2]))) +
+  
+  labs(x = "Longitude", y = "Latitude") +
+  
+  theme(axis.title = element_text(size = tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"))
+
 h2p=match(mbfH$HR,bioplot$IRST_NAMEB)
 mbfH$biogeo=bioplot$BR[h2p]
 mbfH$CODEB=bioplot$CODEB[h2p]
@@ -1908,10 +2274,10 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapreg_HR.j
 
 ##7.1 HER Level ----
 
-###7.1.1 clim+reservoirs ----
+###7.1.1 clim+landuse ----
 databicr=databiclim
-databicr$x= databire$x + databiclim$x
-databicr$y= databire$y + databiclim$y
+databicr$x= databilu$x + databiclim$x
+databicr$y= databilu$y + databiclim$y
 
 breaker1=0
 breaker2=5
@@ -1996,10 +2362,10 @@ databicrlw$combined_category <-databicrlw$bi_class
 
 ##7.2 Pixel level -----------
 
-###7.2.1 clim+reservoirs ----
+###7.2.1 clim+landuse ----
 databipicr=databipic
-databipicr$x= databipire$x + databipic$x
-databipicr$y= databipire$y + databipic$y
+databipicr$x= databipilu$x + databipic$x
+databipicr$y= databipilu$y + databipic$y
 
 alterclass=data.frame(databipicr$x)
 alterclass$class=NA
@@ -2075,6 +2441,398 @@ databipicrlw$bi_class=cx
 # Combine the main category and subcategory to make a label
 databipicrlw$combined_category <-databipicrlw$bi_class
 
+# Here add another map of just the scoioeconomic drivers
+
+
+#7 Combination of socioecodrivers -----
+
+##7.1 HER Level ----
+
+databise=databire
+databise$x= databire$x + databilu$x + databiwd$x
+databise$y= databire$y + databilu$y + databiwd$y
+
+breaker1=0
+breaker2=5
+
+alterclass=data.frame(databise$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databise$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databise$bi_class=cx
+
+# Combine the main category and subcategory to make a label
+databise$combined_category <-databise$bi_class
+
+points <- st_as_sf(TotalFloodTrendPix, coords = c("Var1", "Var2"), crs = 4326)
+points <- st_transform(points, crs = 3035)
+Flpixplot=points
+Flpixplot$d2015=TotalDroughtTrendPix$Y2015
+
+a=b=1
+databipi=Flpixplot
+databipi$x=databipi$Y2015/a
+databipi$y=databipi$d2015/b
+
+
+###7.1.3 clim+reservoirs+lu+wd ----
+databicrlw=databiclim
+
+databicrlw$x=databilu$x + databire$x + databiclim$x + databiwd$x
+databicrlw$y=databilu$y + databire$y + databiclim$y + databiwd$y
+
+
+alterclass=data.frame(databicrlw$x)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databicrlw$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+cx=paste(c2,c1,sep="-")
+databicrlw$bi_class=cx
+# Combine the main category and subcategory to make a label
+databicrlw$combined_category <-databicrlw$bi_class
+
+#databicrlw=databicrlw[-which(is.na(databicrlw$d2015)),]
+#plot(databicrlw$y,databitot$y)
+
+##7.2 Pixel level -----------
+
+###7.2.1 clim+reservoirs ----
+databipise=databipire
+databipise$x= databipire$x + databipilu$x + databipiwd$x
+databipise$y= databipire$y + databipilu$y + databipiwd$x
+
+alterclass=data.frame(databipise$x)
+length(which(is.na(databipise$y)))
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c1=alterclass$class
+
+alterclass=data.frame(databipise$y)
+alterclass$class=NA
+alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
+alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
+alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
+alterclass$class[which(alterclass[,1]>=breaker2)]=4
+c2=alterclass$class
+
+cx=paste(c2,c1,sep="-")
+databipise$bi_class=cx
+# Combine the main category and subcategory to make a label
+databipise$combined_category <-databipise$bi_class
+unique(databipise$combined_category)
+
+
+colors <- c(
+  "1-1" = "#dd6a29",  # high x, low y
+  "2-1" = "#d9926a",  # medium-high x, low y
+  "3-1" = "#d6b3a0",  # medium-low x, low y
+  "4-1" = "#d3d3d3",  # low x, low y
+  
+  "1-2" = "#a36229",  # high x, medium-low y
+  "2-2" = "#a08769",  # medium-high x, medium-low y
+  "3-2" = "#9ea69f",  # medium-low x, medium-low y
+  "4-2" = "#9cc4d2",  # low x, medium-low y
+  
+  "1-3" = "#635929",  # high x, medium-high y
+  "2-3" = "#617b69",  # medium-high x, medium-high y
+  "3-3" = "#60979f",  # medium-low x, medium-high y
+  "4-3" = "#5fb2d1",  # low x, medium-high y
+  
+  "1-4" = "#174f28",  # high x, high y
+  "2-4" = "#166d68",  # medium-high x, high y
+  "3-4" = "#16869e",  # medium-low x, high y
+  "4-4" = "#169dd0"  # low x, high y
+  
+)
+
+colorp <- c(
+  "1-1" = "#dd6a40",  # high x, low y
+  "2-1" = "#d9926a",  # medium-high x, low y
+  "3-1" = "#DEB887",  # medium-low x, low y
+  "4-1" = "#FFD39B",  # low x, low y
+  
+  "1-2" = "#a36229",  # high x, medium-low y
+  "2-2" = "#999999",  # medium-high x, medium-low y
+  "3-2" = "#999999",  # medium-low x, medium-low y
+  "4-2" = "#9cc4d2",  # low x, medium-low y
+  
+  "1-3" = "#635929",  # high x, medium-high y
+  "2-3" = "#999999",  # medium-high x, medium-high y
+  "3-3" = "#999999",  # medium-low x, medium-high y
+  "4-3" = "#5fb2d1",  # low x, medium-high y
+  
+  "1-4" = "#174f28",  # high x, high y
+  "2-4" = "#166d68",  # medium-high x, high y
+  "3-4" = "#16869e",  # medium-low x, high y
+  "4-4" = "#169dd0"  # low x, high y
+  
+)
+
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
+
+bi_pal(pal = colors, dim = 4)
+
+#removal of pixel with NA direction
+databipi$bi_class[which(databipi$bi_class=="NA-NA")]=NA
+databipi$bi_class[which(is.na(databipi$Y2015))]=NA
+databipi$bi_class[which(is.na(databipi$d2015))]=NA
+
+map <- ggplot(basemap) +
+  geom_sf(fill="white")+
+  geom_sf(data = databise, mapping = aes(fill = combined_category), alpha=0.7, color = "transparent", size = 0.01,show.legend = F) +
+  geom_sf(data = databipise, mapping = aes(col = bi_class,geometry=geometry,size=upa), alpha=1,stroke=0,shape=15, show.legend = FALSE) +
+  geom_sf(fill=NA, color="gray42") +
+  scale_fill_manual(values = colorp) +
+  coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+  scale_size(range = c(0.08, 0.4), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                       sep = " ")),
+             breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+             guide = "none")+
+  scale_color_manual(values = colorp,na.value=NA) +
+  labs()+
+  theme(axis.title=element_text(size=tsize),
+        panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "bottom",
+        panel.grid.major = element_line(colour = "grey70"),
+        panel.grid.minor = element_line(colour = "grey90"),
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+
+
+legend <- bi_legend(pal = colorp,
+                    dim = 4,
+                    xlab = "  +  Drought intensity  -  ",
+                    ylab = "  -  Flood intensity  +  ",
+                    size = 16,
+                    arrows = FALSE)
+
+pl=ggarrange(map, legend,
+             labels = c("Map", "Key"),
+             ncol = 2, nrow = 1,widths = c(2,1), heights=c(1,1), vjust=-1)
+
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/sechange_bvPIX_HR_n10.jpg"), pl, width=20, height=20, units=c("cm"),dpi=500)
+
+save(databipise, file=paste0(hydroDir,"SEchanges_bivariate.Rdata"))
+
+#1.4 Aggregation by Biogeoregion ----
+
+#Color scale
+colord <- c(
+  "1-1" = 12,  # high x, low y
+  "2-1" = 11,  # medium-high x, low y
+  "3-1" = 10,  # medium-low x, low y
+  "4-1" = 9,  # low x, low y
+  
+  "1-2" = 13,  # high x, medium-low y
+  "2-2" = 4,  # medium-high x, medium-low y
+  "3-2" = 3,  # medium-low x, medium-low y
+  "4-2" = 8,  # low x, medium-low y
+  
+  "1-3" = 14,  # high x, medium-high y
+  "2-3" = 1,  # medium-high x, medium-high y
+  "3-3" = 2,  # medium-low x, medium-high y
+  "4-3" = 7,  # low x, medium-high y
+  
+  "1-4" = 15,  # high x, high y
+  "2-4" = 16,  # medium-high x, high y
+  "3-4" = 5,  # medium-low x, high y
+  "4-4" = 6  # low x, high y
+  
+)
+
+zob=unique(databipise$bi_class)
+zob=zob[-which(is.na(zob))]
+
+databipi2=databipise
+#removal of pixel with NA direction
+databipi2$bi_class[which(databipi2$bi_class=="NA-NA")]=NA
+databipi2$bi_class[which(is.na(databipi2$Y2015))]=NA
+databipi2$bi_class[which(is.na(databipi2$d2015))]=NA
+
+
+databipi2$trcat="Wetting"
+databipi2$trcat[which(databipi2$bi_class=="2-2" | databipi2$bi_class=="3-2" |
+                        databipi2$bi_class=="2-3" | databipi2$bi_class=="3-3")]="Stable"
+databipi2$trcat[which(databipi2$bi_class=="1-1" | databipi2$bi_class=="1-2" |
+                        databipi2$bi_class=="2-1")]="Drying"
+databipi2$trcat[which(databipi2$bi_class=="1-4" | databipi2$bi_class=="2-4" |
+                        databipi2$bi_class=="1-3")]="Accelerating"
+databipi2$trcat[which(databipi2$bi_class=="4-1" | databipi2$bi_class=="4-2" |
+                        databipi2$bi_class=="3-1")]="Decelerating"
+
+databipi2$Biogeo_id[which(databipi2$Biogeo_id=="Pannonian")]="Continental"
+
+if (length(which(is.na(databipi2$bi_class)))>0){
+  databipi3=databipi2[-which(is.na(databipi2$bi_class)),]
+}else{
+  databipi3=databipi2
+}
+
+
+#Aggregation over each change trajectory subclasses
+EuAgg = aggregate(list(val=databipi2$upa),
+                  by = list(traj=databipi2$bi_class),
+                  FUN = function(x) c(len=length(x)))
+EuAgg$trcat="Wetting"
+EuAgg$trcat[which(EuAgg$traj=="2-2" | EuAgg$traj=="3-2" |
+                    EuAgg$traj=="2-3" | EuAgg$traj=="3-3")]="Stable"
+EuAgg$trcat[which(EuAgg$traj=="1-1" | EuAgg$traj=="1-2" |
+                    EuAgg$traj=="2-1")]="Drying"
+EuAgg$trcat[which(EuAgg$traj=="1-4" | EuAgg$traj=="2-4" |
+                    EuAgg$traj=="1-3")]="Accelerating"
+EuAgg$trcat[which(EuAgg$traj=="4-1" | EuAgg$traj=="4-2" |
+                    EuAgg$traj=="3-1")]="Decelerating"
+
+#Aggregation over each change trajectory
+EuAgg2 = aggregate(list(val=EuAgg$val),
+                   by = list(traj=EuAgg$trcat),
+                   FUN = function(x) c(sum=sum(x)))
+SumEuPix=sum(EuAgg2$val)
+EuAgg2$rel.val=EuAgg2$val/SumEuPix*100
+
+
+RegioSize = aggregate(list(val=databipi3$upa),
+                      by = list(region=databipi3$Biogeo_id),
+                      FUN = function(x) c(len=length(x)))
+
+sum(RegioSize$val)
+
+#Aggregate by region and trajectory
+magg = aggregate(list(val=databipi2$upa),
+                 by = list(reg=databipi2$Biogeo_id ,traj=databipi2$bi_class),
+                 FUN = function(x) c(len=length(x)))
+magg <- do.call(data.frame, magg)
+
+#Remove peripheral regions
+magg=magg[-which(magg$reg=="Steppic" | magg$reg=="BlackSea" | magg$reg=="Arctic"),]
+magg$trcat="Wetting"
+magg$trcat[which(magg$traj=="2-2" | magg$traj=="3-2" |
+                   magg$traj=="2-3" | magg$traj=="3-3")]="Stable"
+magg$trcat[which(magg$traj=="1-1" | magg$traj=="1-2" |
+                   magg$traj=="2-1")]="Drying"
+magg$trcat[which(magg$traj=="1-4" | magg$traj=="2-4" |
+                   magg$traj=="1-3")]="Accelerating"
+magg$trcat[which(magg$traj=="4-1" | magg$traj=="4-2" |
+                   magg$traj=="3-1")]="Decelerating"
+
+#Plot preparation
+magg$order=1
+magg$order[which(magg$trcat=="Wetting")]=2
+magg$order[which(magg$trcat=="Decelerating")]=3
+magg$order[which(magg$trcat=="Drying")]=4
+magg$order[which(magg$trcat=="Accelerating")]=5
+
+matm=match(magg$traj,names(colord))
+magg$ordf=colord[matm]
+magg <- magg %>% 
+  mutate(traj = reorder(traj, ordf, FUN = mean))
+
+
+magg2 = aggregate(list(val=magg$val),
+                  by = list(traj=magg$trcat,regio=magg$reg),
+                  FUN = function(x) c(sum=sum(x)))
+
+magg3s = aggregate(list(val=magg$val),
+                  by = list(traj=magg$trcat),
+                  FUN = function(x) c(sum=sum(x)))
+
+magg3s$rval=magg3s$val/sum(RegioSize$val)
+rsize=(match(magg2$reg,RegioSize$region))
+magg2$rsize=NA
+magg2$rsize=RegioSize$val[rsize]
+magg2$ratio=magg2$val/magg2$rsize*100
+sum(magg$val[which(magg$reg=="Mediterranean")])
+
+
+### [Plot] - Figure 4 - Stacked barplot of change trajectory by Biogeoregion ----
+loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray80","Wetting" = "#169dd0","Decelerating" = "burlywood")
+
+tsize=22
+osize=28
+ggplot(magg, aes(x = reg, y = val, fill = traj)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = colorp) +
+  scale_x_discrete(name="Biogeoregions")+
+  scale_y_continuous(breaks=c(0,.25,.50,.75,1),label=c(0,25,50,75,100),name="River pixels (%)",expand = c(0.005, .0))+
+  theme(axis.title=element_text(size=tsize),
+        axis.text=element_text(size=tsize),
+        axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+        legend.title = element_text(size=tsize),
+        legend.text = element_text(size=osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+# 1. Define the mapping (Full Name = Abbreviation)
+# Adjust these strings to match the exact spelling in your 'reg' column
+reg_labels <- c(
+  "Alpine" = "ALP",
+  "Atlantic" = "ATL",
+  "Boreal" = "BOR",
+  "Continental" = "CON",
+  "Mediterranean" = "MED",
+  "Arctic" = "ARC",
+  "BlackSea" = "BLS"
+)
+
+# 2. Your Plot
+ggplot(magg, aes(x = reg, y = val, fill = traj)) +
+  geom_bar(stat = "identity", position = "fill") +
+  scale_fill_manual(values = colorp) +
+  
+  # Update labels here
+  scale_x_discrete(name = "Biogeoregions", labels = reg_labels) +
+  
+  scale_y_continuous(breaks = c(0, .25, .50, .75, 1),
+                     labels = c(0, 25, 50, 75, 100),
+                     name = "River pixels (%)",
+                     expand = c(0.005, .0)) +
+  theme(axis.title = element_text(size = tsize),
+        axis.text = element_text(size = tsize),
+        axis.text.x = element_text(angle = 0, hjust = 0.5, vjust = 1),
+        panel.background = element_rect(fill = "white", colour = "grey1"),
+        panel.border = element_rect(linetype = "solid", fill = NA, colour = "black"),
+        legend.title = element_text(size = tsize),
+        legend.text = element_text(size = osize),
+        legend.position = "none",
+        legend.key = element_rect(fill = "transparent", colour = "transparent"),
+        legend.key.size = unit(.8, "cm"))
+
+ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Regional_trajectories_se.jpg"), width=20, height=20, units=c("cm"),dpi=800)
 
 
 # 7.3 SANKEY AT HER LEVEL ------------
@@ -2169,14 +2927,14 @@ library(ggsankey)
 
 d <- data.frame(cbind(class1,class2,class3,class4))
 names(d) <- c('OnlyClimate',
-              'ClimateReservoirs',
-              'ClimateReservoirLanduse',
+              'ClimateLanduse',
+              'ClimateLanduseReservoir',
               'AllDrivers')
 
 df <- d%>%
   make_long(OnlyClimate, 
-            ClimateReservoirs,
-            ClimateReservoirLanduse,
+            ClimateLanduse,
+            ClimateLanduseReservoir,
             AllDrivers)
 
 
@@ -2279,13 +3037,16 @@ median(databipicrlw$y,na.rm=T)
 
 cor.test(databipi$y,databipicrlw$y,na.rm=T)
 #Sankey diagram of transers between classes
-databipi=databipi[-which(is.na(databipicrl$x)),]
-databipic=databipic[-which(is.na(databipicrl$x)),]
-databipicr=databipicr[-which(is.na(databipicrl$x)),]
-databipicrlw=databipicrlw[-which(is.na(databipicrl$x)),]
-databipicrl=databipicrl[-which(is.na(databipicrl$x)),]
+# databipi=databipi[-which(is.na(databipicrl$x)),]
+# databipic=databipic[-which(is.na(databipicrl$x)),]
+# databipicr=databipicr[-which(is.na(databipicrl$x)),]
+# databipicrlw=databipicrlw[-which(is.na(databipicrl$x)),]
+# databipicrl=databipicrl[-which(is.na(databipicrl$x)),]
 
-databipic$maxicat="Wetting"
+databipic$maxicat=NA
+databipic$maxicat[which(databipic$bi_class == "4-4" |
+                          databipic$bi_class == "4-3" |
+                          databipic$bi_class == "3-4" )]="Wetting"
 databipic$maxicat[which(databipic$bi_class == "1-1" |
                            databipic$bi_class == "1-2" |
                            databipic$bi_class == "2-1" )]="Drying"
@@ -2303,7 +3064,10 @@ databipic$maxicat[which(databipic$bi_class == "3-3" |
                            databipic$bi_class == "2-3" |
                            databipic$bi_class == "2-2" )]="Stable"
 
-databipicr$maxicat="Wetting"
+databipicr$maxicat=NA
+databipicr$maxicat[which(databipicr$bi_class == "4-4" |
+                          databipicr$bi_class == "4-3" |
+                          databipicr$bi_class == "3-4" )]="Wetting"
 databipicr$maxicat[which(databipicr$bi_class == "1-1" |
                           databipicr$bi_class == "1-2" |
                           databipicr$bi_class == "2-1")]="Drying"
@@ -2321,7 +3085,11 @@ databipicr$maxicat[which(databipicr$bi_class == "3-3" |
                           databipicr$bi_class == "2-3" |
                           databipicr$bi_class == "2-2" )]="Stable"
 
-databipicrl$maxicat="Wetting"
+databipicrl$maxicat=NA
+databipicrl$maxicat[which(databipicrl$bi_class == "4-4" |
+                          databipicrl$bi_class == "4-3" |
+                          databipicrl$bi_class == "3-4" )]="Wetting"
+
 databipicrl$maxicat[which(databipicrl$bi_class == "1-1" |
                            databipicrl$bi_class == "1-2" |
                            databipicrl$bi_class == "2-1" )]="Drying"
@@ -2339,7 +3107,11 @@ databipicrl$maxicat[which(databipicrl$bi_class == "3-3" |
                            databipicrl$bi_class == "2-3" |
                            databipicrl$bi_class == "2-2" )]="Stable"
 
-databipicrlw$maxicat="Wetting"
+databipicrlw$maxicat=NA
+databipicrlw$maxicat[which(databipicrlw$bi_class == "4-4" |
+                          databipicrlw$bi_class == "4-3" |
+                          databipicrlw$bi_class == "3-4" )]="Wetting"
+
 databipicrlw$maxicat[which(databipicrlw$bi_class == "1-1" |
                             databipicrlw$bi_class == "1-2" |
                             databipicrlw$bi_class == "2-1" )]="Drying"
@@ -2358,7 +3130,11 @@ databipicrlw$maxicat[which(databipicrlw$bi_class == "3-3" |
                             databipicrlw$bi_class == "2-2" )]="Stable"
 
 
-databipi$maxicat="Wetting"
+databipi$maxicat=NA
+databipi$maxicat[which(databipi$bi_class == "4-4" |
+                          databipi$bi_class == "4-3" |
+                          databipi$bi_class == "3-4" )]="Wetting"
+
 databipi$maxicat[which(databipi$bi_class == "1-1" |
                           databipi$bi_class == "1-2" |
                           databipi$bi_class == "2-1" )]="Drying"
@@ -2438,7 +3214,7 @@ for (cat in categorix) {
 }
 
 # Print the results as a table
-print(results_eu)
+sum(results_eu)
 
 
 ####[SPlot] - Sankey diagram at pixel level ----
@@ -2447,7 +3223,7 @@ class2=databipicr$maxicat
 class3=databipicrl$maxicat
 class4=databipicrlw$maxicat
 
-ltot=length(databipi$bi_class)
+ltot=length(databipi$driver)
 
 loscolors=c("Accelerating" = "#174f28","Drying" = "#dd6a29","Stable"="gray60","Wetting" = "#169dd0","Decelerating" = "burlywood")
 #8 categories 
@@ -2457,14 +3233,14 @@ brk=unique(class1)
 
 d <- data.frame(cbind(class1,class2,class3,class4))
 names(d) <- c('OnlyClimate',
-              'ClimateReservoirs',
-              'ClimateReservoirLanduse',
+              'ClimateLanduse',
+              'ClimateLanduseReservoir',
               'AllDrivers')
 
 df <- d%>%
   make_long(OnlyClimate, 
-            ClimateReservoirs,
-            ClimateReservoirLanduse,
+            ClimateLanduse,
+            ClimateLanduseReservoir,
             AllDrivers)
 
 
@@ -2516,3 +3292,7 @@ pl
 
 
 ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Sankey_changes_pixels5.jpg"), pl, width=30, height=10, units=c("cm"),dpi=300) 
+
+length(which(df2$x.x=="OnlyClimate" & df2$node!=df2$next_node))/length(which(df2$x.x=="OnlyClimate"))*100
+length(which(df2$x.x=="ClimateLanduse" & df2$node!=df2$next_node))/length(which(df2$x.x=="ClimateLanduse"))*100
+length(which(df2$x.x=="ClimateLanduseReservoir" & df2$node!=df2$next_node))/length(which(df2$x.x=="ClimateLanduse"))*100

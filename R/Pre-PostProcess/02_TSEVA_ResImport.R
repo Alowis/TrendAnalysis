@@ -19,7 +19,7 @@ Peaksave=c()
 outf=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
-scenario="Histo"
+scenario="SocCF2"
 hazard="Flood"
 season="year"
 mmx=""
@@ -124,9 +124,9 @@ print(paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,".
 saveout=T
 if (saveout==T){
   
-  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
-  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
-  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"2.Rdata"))
+  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
+  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
+  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
 }
 
 gc()

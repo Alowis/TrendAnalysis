@@ -328,6 +328,41 @@ UpAopen=function(dir,outletname,Sloc_final){
   return (outfinal)
 }
 
+#Import reservoir locations from netcdf
+resOpen=function(dir,outletname){
+  ncbassin=paste0(dir,outletname)
+  ncb=nc_open(ncbassin)
+  name.vb=names(ncb[['var']])
+  namev=name.vb[1]
+  #time <- ncvar_get(ncb,"time")
+  
+  #timestamp corretion
+  name.lon="lon"
+  name.lat="lat"
+  londat = ncvar_get(ncb,name.lon) 
+  llo=length(londat)
+  latdat = ncvar_get(ncb,name.lat)
+  lla=length(latdat)
+  start=c(1,1)
+  count=c(llo,lla)
+  
+  
+  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
+  llo=length(londat)
+  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
+  lla=length(latdat)
+  outlets = ncvar_get(ncb,namev,start = start, count= count) 
+  outlets=as.vector(outlets)
+  outll=expand.grid(londat,latdat)
+  lonlatloop=expand.grid(c(1:llo),c(1:lla))
+  outll$res=outlets
+  outll$idlo=lonlatloop$Var1
+  outll$idla=lonlatloop$Var2
+  
+  outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
+  outfinal=outll[which(!is.na(outll$res)),]
+  return (outfinal)
+}
 #Open reservoir location file
 ReservoirOpen=function(dir,outletname,Sloc_final){
   ncbassin=paste0(dir,outletname)
@@ -619,14 +654,14 @@ neighbour_finder <- function(point, points, max_distance) {
 }
 
 ComputeChange<- function(Drivertrend, unikout, DataI, outhybas07, 
-                         parameters, rmpixels, UpAvec, GNF, Regio, yrname, change, eps=0.1) {
+                          rmpixels, UpAvec, GNF, Regio, yrname, change, eps=0.1) {
   
   # Data preparation
   data <- data.frame(Drivertrend, unikout = unikout)
-  rmp2 <- na.omit(unique(parameters$catchment[rmpixels]))
-  data <- data[-match(rmp2, data$unikout), ]
+  # rmp2 <- na.omit(unique(parameters$catchment[rmpixels]))
+  # data <- data[-match(rmp2, data$unikout), ]
   check=rowMeans(data[,-71])
-  pb=which(abs(check)>10000)
+  pb=which(abs(check)>20000)
   ouy=data[c(pb[1:length(pb)]),]
   data[pb,]=NA
   

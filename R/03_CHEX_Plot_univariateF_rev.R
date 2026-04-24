@@ -92,6 +92,28 @@ catmap=cst7
 rm(cst7)
 basemap=w2
 
+
+#Reservoirs
+hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
+#comparison file between 2020 and 1951
+
+res2020=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_2020_Domain2.nc")
+res2020$idla=2970-res2020$idla+1
+res2020$idlalo=paste(res2020$idlo,res2020$idla,sep=" ")
+res1951=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_1951.nc")
+
+max(res2020$res)
+matres=na.omit(match(res1951$idlalo,res2020$idlalo))
+res_old=res2020[matres,]
+res_new=res2020[-matres,]
+res_new$status="new"
+res_old$status="old"
+res_comp=left_join(res_old,res1951,by="idlalo")
+res_f=rbind(res_new,res_old)
+
+pointout <- st_as_sf(res_new, coords = c("Var1", "Var2"), crs = 4326)
+pointout <- st_transform(pointout, crs = 3035)
+
 ##2.2 Loading saved results in .Rdata ---------------------------
 
 ###load UpArea -----
@@ -107,22 +129,34 @@ head(UpArea)
 
 #Loading fitting results from the 4 runs and for all 282 000 river pixels in
 # in the domain. Requires at least 20 GB of free RAM.
-
+rl100=TRUE
 ###load historical run -----
 haz="Flood"
 if (haz == "Drought") namefile="Drought.nonfrost.Histo"
 if (haz == "Flood") namefile="flood.year.Histo"
 
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+if (rl100==TRUE) {
+  load(file=paste0(hydroDir,"/",haz,"/RL100x.",namefile,".Rdata"))
+  RL100mat=cbind(RL100mat[,1],RL100mat)
+  colnames(RL100mat)[1]="1951"
+  RL100mat=cbind(RL100mat,Paramsfl$catch[which(Paramsfl$Year=="1955")])
+  colnames(RL100mat) <- paste0("Y", colnames(RL100mat))
+  colnames(RL100mat)[71]="unikout"
+  RLGPDflH=RL100mat
+  rm(RL100mat)
+}else{
+  load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+  RLGPDflH=RLGPDfl
+  rm(RLGPDfl)
+}
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
 gc()
 
 Paramsfl=(Paramsfl[,-c(4:9,17)])
 ParamsflH=Paramsfl
 PeakH=Peaksave
-RLGPDflH=RLGPDfl
-rm(Paramsfl,RLGPDfl)
+rm(Paramsfl)
 gc()
 
 ###load Socio-CF run -----
@@ -130,41 +164,77 @@ if (haz == "Drought") namefile="Drought.nonfrost.SocCF"
 if (haz == "Flood") namefile="Flood.year.socCF"
 
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+if (rl100==TRUE) {
+  load(file=paste0(hydroDir,"/",haz,"/RL100x.",namefile,".Rdata"))
+  RL100mat=cbind(RL100mat[,1],RL100mat)
+  colnames(RL100mat)[1]="1951"
+  colnames(RL100mat) <- paste0("Y", colnames(RL100mat))
+  RL100mat=cbind(RL100mat,Paramsfl$catch[which(Paramsfl$Year=="1955")])
+  colnames(RL100mat)[71]="unikout"
+  RLGPDflSCF=RL100mat
+  rm(RL100mat)
+}else{
+  load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+  RLGPDflSCF=RLGPDfl
+  rm(RLGPDfl)
+}
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
 
-RLGPDflSCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
 ParamsflSCF=data.table(Paramsfl)
 PeakSCF=Peaksave
-rm(Paramsfl,RLGPDfl)
+rm(Paramsfl)
 gc()
 
 ###load results from Res+WU CF run -----
 if (haz == "Drought") namefile="Drought.nonfrost.RWCF"
 if (haz == "Flood") namefile="flood.year.RWCF"
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+if (rl100==TRUE) {
+  load(file=paste0(hydroDir,"/",haz,"/RL100x.",namefile,".Rdata"))
+  RL100mat=cbind(RL100mat[,1],RL100mat)
+  colnames(RL100mat)[1]="1951"
+  RL100mat=cbind(RL100mat,Paramsfl$catch[which(Paramsfl$Year=="1955")])
+  colnames(RL100mat) <- paste0("Y", colnames(RL100mat))
+  colnames(RL100mat)[71]="unikout"
+  RLGPDflRWCF=RL100mat
+  rm(RL100mat)
+}else{
+  load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+  RLGPDflRWCF=RLGPDfl
+  rm(RLGPDfl)
+}
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
-RLGPDflRWCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
 ParamsflRWCF=data.table(Paramsfl)
 PeakRWCF=Peaksave
-rm(Paramsfl,RLGPDfl)
+rm(Paramsfl)
 gc()
 
 ###load results from Water CF run -----
 if (haz == "Drought") namefile="Drought.nonfrost.WCF"
 if (haz == "Flood") namefile="flood.year.WCF"
 load(file=paste0(hydroDir,"/",haz,"/params.",namefile,".Rdata"))
-load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+if (rl100==TRUE) {
+  load(file=paste0(hydroDir,"/",haz,"/RL100x.",namefile,".Rdata"))
+  RL100mat=cbind(RL100mat[,1],RL100mat)
+  colnames(RL100mat)[1]="1951"
+  RL100mat=cbind(RL100mat,Paramsfl$catch[which(Paramsfl$Year=="1955")])
+  colnames(RL100mat) <- paste0("Y", colnames(RL100mat))
+  colnames(RL100mat)[71]="unikout"
+  RLGPDflWCF=RL100mat
+  rm(RL100mat)
+}else{
+  load(file=paste0(hydroDir,"/",haz,"/RL100.",namefile,".Rdata"))
+  RLGPDflWCF=RLGPDfl
+  rm(RLGPDfl)
+}
 load(file=paste0(hydroDir,"/",haz,"/peaks.",namefile,".Rdata"))
 
-RLGPDflWCF=RLGPDfl
 Paramsfl=Paramsfl[,-c(4:9,17)]
 ParamsflWCF=data.table(Paramsfl)
 PeakWCF=Peaksave
-rm(Paramsfl,RLGPDfl)
+rm(Paramsfl)
 gc()
 
 rm(catmap)
@@ -178,9 +248,16 @@ quantile(ParamsflH$epsilonGPD,0.5,na.rm=T)
 
 #3 Data cleaning -----
 RLGPDflSCF=as.data.frame(RLGPDflSCF)
+head(RLGPDflSCF)
 RLGPDflH=as.data.frame(RLGPDflH)
+woooow=RLGPDflH-RLGPDflSCF
+mierda=rowMeans(RLGPDflH-RLGPDflSCF)
+mean(mierda,na.rm=T)
+mierda[100000]
 RLGPDflWCF=as.data.frame(RLGPDflWCF)
 RLGPDflRWCF=as.data.frame(RLGPDflRWCF)
+
+
 
 ##3.1 Identify locations where last years RL were not computed -----
 for (run in c(1,2,3,4)){
@@ -385,10 +462,12 @@ length(rmpixs)/length(Shapepar1$catchment)*100
 rmp2=na.omit(unique(ParamsflSCF$catchment[rmpixs]))
 ShapeparRM=Shapeparf[(match(rmp2,Shapeparf$catchment)),]
 Shapeparf=Shapeparf[-(match(rmp2,Shapeparf$catchment)),]
-
+max(Shapeparf$epsilonGPD)
 Shapeparf$mean=(Shapeparf$epsilonGPD+Shapeparf$V2+Shapeparf$V3+Shapeparf$V4)/4
 Shapeparf$sd=sqrt(((Shapeparf$epsilonGPD-Shapeparf$mean)^2+(Shapeparf$V2-Shapeparf$mean)^2+
   (Shapeparf$V3-Shapeparf$mean)^2+(Shapeparf$V4-Shapeparf$mean)^2)/4)
+hist(Shapeparf$mean,breaks=100)
+mean(Shapeparf$sd)
 ##3.4 Large scale error computation --------------
 
 RlevErrtH=c()
@@ -464,7 +543,12 @@ ParamSpecial<-paraU[-match(rmp2,paraU$catchment),]
 Paramf=ParamsflH[which(ParamsflH$Year==2015),]
 Paramf<-Paramf[-match(rmp2,Paramf$catchment),]
 #Paramf<-Paramf[-which(is.na(ParamSpecial$epsilonGPD)),]
-RlevErrf <- calculate_return_levels(Paramf,ci=1)
+
+RLd=100
+X0 <- Paramf$nPeaks / 70
+XX <- X0 * RLd
+
+RlevErrf <- calculate_return_levels(Paramf,XX,ci=1)
 RlevErrf$year=2015
 
 #ParamSpecial<-ParamSpecial[-which(is.na(ParamSpecial$epsilonGPD)),]
@@ -494,6 +578,7 @@ RlevErri$S2n[which(is.nan(RlevErri$ErrVsCh))]="Unstable"
 length(which(RlevErri$S2n=="Err > Change"))
 length(which(RlevErri$S2n=="Unstable"))/length(IRpoints$upa)
 ParamPlot=inner_join(RlevErri,UpArea,by=c("catchment"="outl2"))
+max(ParamPlot$returnLevels)
 max(RlevErri$returnLevelErr,na.rm=T)
 Paraplot <- st_as_sf(ParamPlot, coords = c("Var1.x", "Var2.x"), crs = 4326)
 Paraplot <- st_transform(Paraplot, crs = 3035)
@@ -540,7 +625,7 @@ m1=ggplot(basemap) +
         legend.key = element_rect(fill = "transparent", colour = "transparent"),
         legend.key.size = unit(1, "cm"))
 
-#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,".jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
+#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/Error_relative_",haz,"_RL100.jpg"), m1, width=23, height=20, units=c("cm"),dpi=1000) 
 
 #### [SPlot] - Supplement map - Comparison of Error and 2015-1955 changes -----
 m2=ggplot(basemap) +
@@ -707,11 +792,11 @@ if (plotmean==T){
   
   mdat[(which(mdat==0))]=1
   hist(mdat,xlim=c(0,1000),breaks=10)
-  
+  #RLGPDflH$unikout=ParamsflH$catchment[which(ParamsflH$Year==1955)]
   RLev1=inner_join(RLGPDflH,UpArea,by=c("unikout"="outl2"))
   RLev1 <- st_as_sf(RLev1, coords = c("Var1.x", "Var2.x"), crs = 4326)
   RLev1 <- st_transform(RLev1, crs = 3035)
-  RLev1$Y1951=RLev1$Y1951+1e-4
+  #RLev1$Y1951=RLev1$Y1951+1e-4
   RLev1$mq=mdat+1e-4
   
   rmp2=na.omit(unique(ParamsflSCF$catchment[rmpixs]))
@@ -766,7 +851,7 @@ if (plotmean==T){
           legend.key = element_rect(fill = "transparent", colour = "transparent"),
           legend.key.size = unit(1, "cm"))
   
-  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/RL10_",haz,"_mean_scfxNew2.jpg"), m0, width=23, height=20, units=c("cm"),dpi=1000) 
+  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/RL100_",haz,"_mean_scfxNew2.jpg"), m0, width=23, height=20, units=c("cm"),dpi=1000) 
  
   ####[SPlot] - Supplement - Bound on the GPD in 1955 -----
   # SocCF scenario
@@ -820,7 +905,7 @@ if (plotmean==T){
           legend.key = element_rect(fill = "transparent", colour = "transparent"),
           legend.key.size = unit(1, "cm"))
   
-  ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/lowerbound_",haz,".jpg"), m3, width=23, height=20, units=c("cm"),dpi=1000) 
+  #ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/lowerbound_",haz,".jpg"), m3, width=23, height=20, units=c("cm"),dpi=1000) 
   
   ####[SPlot] - Supplement - Shape parameter instability check at regional level----
   #regional plot comparing shape parameters between runs
@@ -940,15 +1025,27 @@ if (plotmean==T){
   
 }  
 
+rm(ParamsflH)
+rm(ParamsflSCF)
+rm(ParamsflRWCF)
+rm(ParamsflWCF)
+gc()
 #4 Change attribution-----
-RLGPDflSCF=as.data.frame(RLGPDflSCF)
-RLGPDflH=as.data.frame(RLGPDflH)
-RLGPDflWCF=as.data.frame(RLGPDflWCF)
-RLGPDflRWCF=as.data.frame(RLGPDflRWCF)
+# RLGPDflSCF=as.data.frame(RLGPDflSCF)
+# RLGPDflH=as.data.frame(RLGPDflH)
+# RLGPDflWCF=as.data.frame(RLGPDflWCF)
+# RLGPDflRWCF=as.data.frame(RLGPDflRWCF)
 
 #Before change attribution, I compute total change to compare with final results
 #mato=match(RLGPDflSCF[,71],RLGPDflH[,71])
 colnames(RLGPDflSCF)
+
+#remove pixels with crazy shape parameter
+RLGPDflSCF=RLGPDflSCF[-match(rmp2,RLGPDflSCF$unikout),]
+RLGPDflWCF=RLGPDflWCF[-match(rmp2,RLGPDflWCF$unikout),]
+RLGPDflRWCF=RLGPDflRWCF[-match(rmp2,RLGPDflRWCF$unikout),]
+RLGPDflH=RLGPDflH[-match(rmp2,RLGPDflH$unikout),]
+
 cd=as.numeric(which(colnames(RLGPDflSCF)=="Y1955"))
 
 ##4.1 change from climate--------------------
@@ -975,8 +1072,8 @@ UpAvec=UpArea[,c(12,3)]
 
 ##4.5 remove pixels with crazy shape parameter --------
 #Aggregation by Regions of initial RL
-data = data.frame(RLGPDflSCF)
-data=data[-match(rmp2,data$unikout),]
+# data = data.frame(RLGPDflSCF)
+# data=data[-match(rmp2,data$unikout),]
 
 
 ##4.6 Spatial aggregation to desired regions: HydroRegion ----------
@@ -1020,7 +1117,7 @@ DataI[,irange]=(DataI$Init+DataI[,irange])/2
 ##5.1 Land use change data processing -----------
 change="socio"
 DataL=ComputeChange(Drivertrend=Soctrend, unikout, DataI,
-                      outhybas07,parameters, rmpixels, UpAvec, GHR_riv, HydroRsf, 
+                      outhybas07, rmpixels, UpAvec, GHR_riv, HydroRsf, 
                     yrname,change="socio",eps=0.1)
 skw=which.min(DataL$Y1985)
 yrange=match(yrname,colnames(DataL))
@@ -1163,7 +1260,7 @@ trendSoc <- do.call(data.frame, trendagg)
 
 ##5.2 Water demand change data processing ------
 DataW=ComputeChange(Drivertrend=Wutrend, unikout,DataI,
-                    outhybas07,parameters, rmpixels, UpAvec, GHR_riv, HydroRsf, 
+                    outhybas07, rmpixels, UpAvec, GHR_riv, HydroRsf, 
                     yrname,change="socio",eps=0.1)
 
 ###5.2.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
@@ -1277,7 +1374,7 @@ trendWu <- do.call(data.frame, trendagg)
 
 change="total"
 DataT=ComputeChange(Drivertrend=Totaltrend, unikout, DataI,
-                    outhybas07,parameters, rmpixels, UpAvec, GHR_riv, HydroRsf,
+                    outhybas07, rmpixels, UpAvec, GHR_riv, HydroRsf,
                     yrname,change,eps=0.1)
 
 ###5.3.1 Spatial smoothing for drought to remove noise from unstable GPD fits ----
@@ -1399,7 +1496,7 @@ trendTot <- do.call(data.frame, trendagg)
 ##5.4 Clim change----
 change="clim"
 DataC=ComputeChange(Drivertrend=Climtrend, unikout, DataI,
-                    outhybas07,parameters, rmpixels, UpAvec, GHR_riv, HydroRsf, 
+                    outhybas07, rmpixels, UpAvec, GHR_riv, HydroRsf, 
                     yrname,change, eps=0.1)
 
 
@@ -1425,7 +1522,7 @@ trendClim <- do.call(data.frame, trendagg)
 ## 5.5 Reservoir change------
 
 DataR=ComputeChange(Drivertrend=Restrend, unikout, DataI, outhybas07,
-                    parameters, rmpixels, UpAvec, GHR_riv, HydroRsf,
+                   rmpixels, UpAvec, GHR_riv, HydroRsf,
                     yrname,change="socio",eps=0.1)
 
 ###5.5.1 Aggregation of relative changes ----
@@ -1465,13 +1562,64 @@ Rcrap=Rcrap[which(abs(Rcrap$Y2015)>2),]
 Rcrap=Rcrap[-which(is.na(Rcrap$x)),]
 
 
+
+###5.5.3 Importation of new reservoir location
+resOpen=function(dir,outletname){
+  ncbassin=paste0(dir,outletname)
+  ncb=nc_open(ncbassin)
+  name.vb=names(ncb[['var']])
+  namev=name.vb[1]
+  #time <- ncvar_get(ncb,"time")
+  
+  #timestamp corretion
+  name.lon="lon"
+  name.lat="lat"
+  londat = ncvar_get(ncb,name.lon) 
+  llo=length(londat)
+  latdat = ncvar_get(ncb,name.lat)
+  lla=length(latdat)
+  start=c(1,1)
+  count=c(llo,lla)
+  
+  
+  londat = ncvar_get(ncb,name.lon,start=start[1],count=count[1]) 
+  llo=length(londat)
+  latdat = ncvar_get(ncb,name.lat,start=start[2],count=count[2])
+  lla=length(latdat)
+  outlets = ncvar_get(ncb,namev,start = start, count= count) 
+  outlets=as.vector(outlets)
+  outll=expand.grid(londat,latdat)
+  lonlatloop=expand.grid(c(1:llo),c(1:lla))
+  outll$res=outlets
+  outll$idlo=lonlatloop$Var1
+  outll$idla=lonlatloop$Var2
+  
+  outll$idlalo=paste(outll$idlo,outll$idla,sep=" ")
+  outfinal=outll[which(!is.na(outll$res)),]
+  return (outfinal)
+}
+
+hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
+#comparison file between 2020 and 1951
+
+res2020=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_2020_Domain2.nc")
+res2020$idla=2970-res2020$idla+1
+res2020$idlalo=paste(res2020$idlo,res2020$idla,sep=" ")
+res1951=resOpen(hydroDir,"/reservoirs/reservoirs_volumes_1951.nc")
+
+max(res2020$res)
+matres=na.omit(match(res1951$idlalo,res2020$idlalo))
+res_old=res2020[matres,]
+res_new=res2020[-matres,]
+
+res_comp=left_join(res_old,res1951,by="idlalo")
 ##5.6 Extra analysis ----
 
 #save the data 
 savedat=FALSE
 if (savedat==TRUE){
  DataSave=list("Total"=DataT,"Climate"=DataC,"LandUse"=DataL,"Reservoirs"=DataR,"WaterDemand"=DataW)
- save(DataSave,file=paste0(hydroDir,"/TSEVA/output_plots/Drought_pixChange_v4.Rdata"))
+ save(DataSave,file=paste0(hydroDir,"/TSEVA/output_plots/Flood_pixChange_RL100_v1.Rdata"))
 }
 
 #Suorva Dam example
@@ -1676,15 +1824,15 @@ ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/largestdriv
 
 # values for plot saving
 #method for trend computation (th is thresold or trendPeaks)
-mmx="th"
+mmx="RL100"
 #iteration for plot ID
-it=27
+it=30
 ###6.1 large loop for change from different drivers ----
 
 ###6.1 [Plot] - Figure 2 and Figure 3 ----
 yrlist=c(1951:2020)
 driverlist=c("climate","landuse","reservoirs","wateruse","all")
-driver=driverlist[2]
+driver=driverlist[1]
 Dchangelist=list()
 for (driver in driverlist){
   print(driver)
@@ -1769,7 +1917,7 @@ for (driver in driverlist){
               legend.key = element_rect(fill = "transparent", colour = "transparent"),
               legend.key.size = unit(.8, "cm"))
       
-      ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/ordered_HR",it,"_",haz,".jpg"),width=40, height=8, units=c("cm"),dpi=400) 
+      ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/ordered_HR_RL100",it,"_",haz,".jpg"),width=40, height=8, units=c("cm"),dpi=400) 
       
     }
     
@@ -1789,7 +1937,7 @@ for (driver in driverlist){
       ####[Plot] - Figure 2b - Map of changes in flood 10-Y RL driven by climatic changes ----
       if (driver=="climate" | driver=="all"){
         
-        titleX=paste0("Change in 10-year ",haz," attributed \nto ",driver," changes (% of  10y flood) -  1955-2015")
+        titleX=paste0("Change in 10-year ",haz," attributed \nto ",driver," changes (% of  100y flood) -  1955-2015")
         fmap<-ggplot(basemap) +
           geom_sf(fill="white",color="darkgrey",size=0.5)+
           geom_sf(data=pag,aes(fill=Rchange_rel.mean,geometry=geometry),alpha=0.2,color="transparent")+
@@ -1838,9 +1986,11 @@ for (driver in driverlist){
         lx=length(pag$Id)
         lsp/lx
         lsn/lx
-        ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapF_",driver,"_",haz,mmx,"rel_New2",it,".jpg"), fmap, width=22, height=20, units=c("cm"),dpi=1000) 
+        ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapF_",
+                      driver,"_",haz,mmx,"rel_New2",it,".jpg"), fmap,
+               width=22, height=20, units=c("cm"),dpi=800) 
         
-      }else{
+      }else if (driver=="reservoirs"){
           ####[Plot] - Figure 3 - Map of changes in flood 10-Y RL driven by socioeconomic changes ----
           titleX=paste0("Change in 10-year ",haz," attributed \nto ",driver," changes (% of 10y flood) -  1955-2015")
           legend2="Change (%)"
@@ -1848,6 +1998,7 @@ for (driver in driverlist){
             geom_sf(fill="white",color="darkgrey",size=0.5)+
             geom_sf(data=pag,aes(fill=Rchange_rel.mean,geometry=geometry),alpha=0.6,color="transparent")+
             geom_sf(data=points,aes(col=Y2015,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
+            geom_sf(data=pointout,aes(geometry=geometry,size=res),alpha=.9,stroke=0,shape=16)+
             
             scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
                                                                                  sep = " ")),
@@ -1873,7 +2024,7 @@ for (driver in driverlist){
                   legend.text = element_text(size=8),
                   legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
                   legend.spacing.x = unit(0.2, "cm"),
-                  legend.position = "bottom",
+                  legend.position = "right",
                   legend.box = "vertical",  # Stack legends vertically
                   panel.grid.major = element_line(colour = "grey70"),
                   panel.grid.minor = element_line(colour = "grey90"),
@@ -1881,9 +2032,55 @@ for (driver in driverlist){
                   legend.key.size = unit(1, "cm"))+
             ggtitle(titleX)
           
-          ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/maF_",driver,"_",haz,"_",it,".jpg"), ocrap, width=23, height=20, units=c("cm"),dpi=1000) 
+          ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/maF_",
+                        driver,"_",haz,"_",it,".jpg"), 
+                 ocrap, width=23, height=20, units=c("cm"),dpi=800) 
           
-      } 
+      } else{
+        ####[Plot] - Figure 3 - Map of changes in flood 10-Y RL driven by socioeconomic changes ----
+        titleX=paste0("Change in 10-year ",haz," attributed \nto ",driver," changes (% of 10y flood) -  1955-2015")
+        legend2="Change (%)"
+        ocrap<-ggplot(basemap) +
+          geom_sf(fill="white",color="darkgrey",size=0.5)+
+          geom_sf(data=pag,aes(fill=Rchange_rel.mean,geometry=geometry),alpha=0.6,color="transparent")+
+          geom_sf(data=points,aes(col=Y2015,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
+          
+          scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                              sep = " ")),
+                     breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+                     guide = "none")+
+          scale_fill_gradientn(
+            colors=palet,
+            breaks=br,limits=limi,trans=scales::modulus_trans(.3),
+            oob = scales::squish,na.value=colNA, name="Change (%)")   +
+          coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+          scale_color_gradientn(
+            colors=palet,
+            breaks=br,limits=limi,trans=scales::modulus_trans(.3),
+            oob = scales::squish,na.value="transparent", name="Change (%)")   +
+          labs(x="Longitude", y = "Latitude")+
+          guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14),
+                 fill = guide_colourbar(barwidth = 1.5, barheight = 14))+
+          theme(axis.title=element_text(size=tsize),
+                title = element_text(size=osize),
+                axis.text=element_text(size=osize),
+                panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+                panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+                legend.text = element_text(size=8),
+                legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
+                legend.spacing.x = unit(0.2, "cm"),
+                legend.position = "right",
+                legend.box = "vertical",  # Stack legends vertically
+                panel.grid.major = element_line(colour = "grey70"),
+                panel.grid.minor = element_line(colour = "grey90"),
+                legend.key = element_rect(fill = "transparent", colour = "transparent"),
+                legend.key.size = unit(1, "cm"))+
+          ggtitle(titleX)
+        
+        ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/maF_",
+                      driver,"_",haz,"_",it,".jpg"), 
+               ocrap, width=23, height=20, units=c("cm"),dpi=800) 
+      }
     }else if(haz=="Drought"){
         br=c(-50,-20,-10,-5,0,5,10,20,50)
         labels=br
@@ -1941,6 +2138,49 @@ for (driver in driverlist){
             ggtitle(titleX)
           
           ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapF_",driver,"_",haz,"_",it,".jpg"), ocrap, width=22, height=20, units=c("cm"),dpi=1000) 
+          
+        }
+        else if(driver=="reservoir"){
+          ####[Plot] - Figure 3 - Map of changes in drought 10-Y RL driven by socioeconomic changes ----
+          titleX=paste0("Change in 10-year ",haz," attributed \nto ", driver," changes (% of  10y drought) - 1955-2015")
+          ocrap<-ggplot(basemap) +
+            geom_sf(fill="white",color="darkgrey",size=0.5)+
+            geom_sf(data=pag,aes(fill=Rchange_rel.mean,geometry=geometry),alpha=0.6,color="transparent")+
+            geom_sf(data=points,aes(col=Y2015,geometry=geometry,size=upa),alpha=.9,stroke=0,shape=15)+ 
+            geom_sf(data=pointout,aes(geometry=geometry,size=res),alpha=.9,stroke=0,shape=16)+
+            scale_size(range = c(0.1, 0.5), trans="sqrt",name= expression(paste("Upstream area ", (km^2),
+                                                                                sep = " ")),
+                       breaks=c(101,1000,10000,100000,500000), labels=c("100","1000", "10 000", "100 000", "500 000"),
+                       guide = "none")+
+            scale_fill_gradientn(
+              colors=paletf,
+              breaks=br,limits=limi,labels = labels,trans=scales::modulus_trans(.3),
+              oob = scales::squish,na.value=colNA, name="Change (%)")   +
+            coord_sf(xlim = c(min(nco[,1]),max(nco[,1])), ylim = c(min(nco[,2]),max(nco[,2])))+
+            scale_color_gradientn(
+              colors=paletf,
+              breaks=br,limits=limi,labels = labels, trans=scales::modulus_trans(.3),
+              oob = scales::squish,na.value=colNA, name="Change (%)")   +
+            labs(x="Longitude", y = "Latitude")+
+            guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14),
+                   fill = guide_colourbar(barwidth = 1.5, barheight = 14))+
+            theme(axis.title=element_text(size=tsize),
+                  title = element_text(size=osize),
+                  axis.text=element_text(size=osize),
+                  panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
+                  panel.border = element_rect(linetype = "solid", fill = NA, colour="black"),
+                  legend.text = element_text(size=8),
+                  legend.title = element_text(size = osize, margin = margin(t = 2, r = 2, b = 6, l = 0)),
+                  legend.spacing.x = unit(0.2, "cm"),
+                  legend.position = "right",
+                  legend.box = "horizontal",  # Stack legends vertically
+                  panel.grid.major = element_line(colour = "grey70"),
+                  panel.grid.minor = element_line(colour = "grey90"),
+                  legend.key = element_rect(fill = "transparent", colour = "transparent"),
+                  legend.key.size = unit(1, "cm"))+
+            ggtitle(titleX)
+          
+          ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/mapF_",driver,"_",haz,"_",it,".jpg"), ocrap, width=23, height=20, units=c("cm"),dpi=1000) 
           
         }else{
           ####[Plot] - Figure 3 - Map of changes in drought 10-Y RL driven by socioeconomic changes ----
