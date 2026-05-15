@@ -30,6 +30,7 @@ library(sp)
 library(rnaturalearth)
 library(reshape2)
 library(scales)
+library(Hmisc)
 
 setwd("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/R/")
 source("functions_trends.R")
@@ -93,6 +94,7 @@ analyze_hazard_symmetric <- function(param_df,
     } else if (var_type == "Sigma") {
       # RATIO for Driver Sigma
       param_df$calc_val <- param_df[[curr_col_name]] / (param_df[[base_col_name]])
+      param_df$calc_val [param_df$calc_val > 10]=10
       
     } else if (var_type == "RP") {
       # Symmetric change for RP (Keeping this as requested previously, 
@@ -132,7 +134,6 @@ analyze_hazard_symmetric <- function(param_df,
         param_df$RP_val <- -calcGPDReturnLevel_Single(param_df$epsilonGPD, param_df$sigmaGPD, 
                                                       param_df$thresholdGPD, param_df$nPeaks, 
                                                       70, return_period)
-        param_df$thresholdGPD=-param_df$thresholdGPD
         print(length(which(param_df$RP_val<0))/length(param_df$RP_val)*100)
         param_df$RP_val[which(param_df$RP_val<0)]=0
       }else{
@@ -145,11 +146,15 @@ analyze_hazard_symmetric <- function(param_df,
     }
   }
   
+  if(haz=="Drought") param_df$thresholdGPD=-param_df$thresholdGPD
   # 4. Pivot and Aggregate
+
+  
   df_wide <- param_df %>%
     dplyr::select(catchment, Year, !!sym(active_var)) %>%
     pivot_wider(names_from = Year, values_from = !!sym(active_var)) %>%
     as.data.frame()
+
   
   data_cols <- setdiff(names(df_wide), "catchment")
   
@@ -161,10 +166,18 @@ analyze_hazard_symmetric <- function(param_df,
     if (var_type == "threshold" | var_type == "RP") {
       # (Year_X - Year_1955) / Mean(Year_X, Year_1955) * 100
       
+      
       vals <- (df_wide[, data_cols] - (row_init)) / ((df_wide[, data_cols] + (row_init)) / 2 + eps) * 100
+      #capping super high values
+      vals[vals > 1e3]=1e3
+      vals[vals < -1e3]=-1e3
       
     } else if (var_type == "Sigma") {
       vals <- df_wide[, data_cols] / row_init
+      #capping super high values
+      # max(vals,na.rm=T)
+      # length(which(vals[,70]>10))
+      vals[vals > 10]=10
     } else {
       vals <- df_wide[, data_cols]
     }
@@ -174,6 +187,7 @@ analyze_hazard_symmetric <- function(param_df,
     DataV_vals <- df_wide[, data_cols]
   }
   
+  DataV_vals[DataV_vals > 1e4] <- NA
   # 5. Final Assembly
   DataV <- data.frame(outl2 = df_wide$catchment, DataV_vals)
   DataO <- data_save_list[[1]][, -c(12:81)]
@@ -195,7 +209,7 @@ analyze_hazard_symmetric <- function(param_df,
 }
 
 
-aggregate_global_trends <- function(trend_df, 
+aggregate_global_trends <- function(trend_df,weight,
                                     decades = c(1955, 1965, 1975, 1985, 1995, 2005, 2015)) {
   require(reshape2)
   require(dplyr)
@@ -213,20 +227,35 @@ aggregate_global_trends <- function(trend_df,
     filter(yr %in% decades) %>%
     mutate(decad = yr)
   
+  hmatct=match(tr_filtered$HydroR,weight$reg)
+  tr_filtered$weight=weight$value[hmatct]
+  
   # 4. Global aggregation with statistics
-  tr_global <- aggregate(
-    list(value = tr_filtered$value),
-    by = list(yr = tr_filtered$decad),
-    FUN = function(x) {
-      c(mean = mean(x, na.rm = TRUE),
-        l    = length(x),
-        med  = median(x, na.rm = TRUE),
-        ql   = quantile(x, 0.25, na.rm = TRUE),
-        qh   = quantile(x, 0.75, na.rm = TRUE),
-        w1   = quantile(x, 0.025, na.rm = TRUE),
-        w2   = quantile(x, 0.975, na.rm = TRUE))
-    }
-  )
+  # tr_global <- aggregate(
+  #   list(value = tr_filtered$value),
+  #   by = list(yr = tr_filtered$decad),
+  #   FUN = function(x) {
+  #     c(mean = mean(x, na.rm = TRUE),
+  #       l    = length(x),
+  #       med  = median(x, na.rm = TRUE),
+  #       ql   = quantile(x, 0.25, na.rm = TRUE),
+  #       qh   = quantile(x, 0.75, na.rm = TRUE),
+  #       w1   = quantile(x, 0.025, na.rm = TRUE),
+  #       w2   = quantile(x, 0.975, na.rm = TRUE))
+  #   }
+  # )
+  
+  tr_global <- tr_filtered %>%
+    group_by(decad) %>%
+    summarise(
+      mean_w = weighted.mean(value, w = weight, na.rm = TRUE),
+      l      = n(),
+      med = wtd.quantile(value, weights = weight, probs = 0.5, na.rm = TRUE),
+      ql   = wtd.quantile(value, weights = weight, probs = 0.25, na.rm = TRUE),
+      qh   = wtd.quantile(value, weights = weight, probs = 0.75, na.rm = TRUE),
+      w1   = wtd.quantile(value, weights = weight, probs = 0.025, na.rm = TRUE),
+      w2   = wtd.quantile(value, weights = weight, probs = 0.975, na.rm = TRUE)
+    )
   
   # 5. Convert matrix output to a clean data frame
   tDataHuman <- do.call(data.frame, tr_global)
@@ -265,7 +294,7 @@ calcGPDReturnLevel_Single <- function(epsilon, sigma, threshold, nPeaks, sampleT
 process_hazard_data <- function(sub_dir = "SCFX", 
                                 hazard = "Flood", 
                                 base_data_dir = dataDir, 
-                                fileVar="Var_Trend_agg.Rdata",
+                                fileVar="Var_TrendX_agg.Rdata",
                                 hydro_base_dir = "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data" ) {
   
   require(dplyr)
@@ -276,7 +305,7 @@ process_hazard_data <- function(sub_dir = "SCFX",
   # 1. Determine the filename suffix based on sub_dir
   # This handles cases like SCF -> SocCF, Histo -> Histo, WStat -> WStat
   file_suffix <- case_when(
-    sub_dir == "SCFX"   ~ "SocCF2",
+    sub_dir == "SCFX"   ~ "SocCF2_revfF",
     sub_dir == "HistoX" ~ "Histo",
     sub_dir == "WStatX" ~ "WCF",
     sub_dir == "RWStatX" ~ "RWCF",
@@ -299,6 +328,8 @@ process_hazard_data <- function(sub_dir = "SCFX",
   message("Loading: ", param_path)
   load(param_path, envir = .GlobalEnv)
   
+  #fixing errors
+  #p43x=Paramsfl[which(Paramsfl$catchment==4304271),]
   # 3. Process Parameters (Paramsfl)
   # Selecting columns by index as per your original script
   rmcol=c("epsilonGEV", "sigmaGEV", "muGEV" ,"epsilonStdErrGEV",  "sigmaStdErrGEV"  ,  "muStdErrGEV"  ,"SampleTimeHorizon")
@@ -336,6 +367,7 @@ process_hazard_data <- function(sub_dir = "SCFX",
       threshold0 = (thresholdGPD - trend) / variability
     )
   
+  f2=final_df[which(final_df$Year==1951),]
   gc() # Clear memory after large loads
   return(final_df)
 }
@@ -524,6 +556,7 @@ message("All scenario data loaded.")
 #    Histo  -> suffix "H"   (historical)
 # ==============================================================================
 
+
 message("\n=== Merging scenarios into df_Main ===")
 
 df_Main <- attach_scenario_cols(df_SCF,   df_RWStat, "RW")
@@ -537,6 +570,15 @@ rm(df_Histo, df_SCF); gc()
 
 # Convert to data.table once for speed
 setDT(df_Main)
+df_Main$nsq=floor(df_Main$catchment/100000)
+s43=which(!is.na(match(df_Main$catchment,4304271)))
+p43=df_Main[s43,]
+duplicates <- p43 %>%
+  group_by(catchment, Year) %>%
+  summarise(n = n(), .groups = "drop") %>%
+  filter(n > 1)
+
+print(duplicates)
 
 message("df_Main ready: ", nrow(df_Main), " rows, ",
         length(unique(df_Main$catchment)), " catchments.")
@@ -559,6 +601,16 @@ message("\n=== Driver analysis ===")
 
 # Load DataSave (reference spatial metadata object used inside the function)
 load(file = paste0("D:/tilloal/Documents/LFRuns_utils/data/TSEVA/output_plots/Flood_pixChange_RL100_v1.Rdata"))
+
+#length of each HER for weight
+Dtweight=DataSave$Total
+Dtweight=aggregate(
+  list(value = Dtweight$outlets),
+  by = list(reg = Dtweight$HER),
+  FUN = function(x) {
+    c(l = length(x))}
+)
+
 
 # Map scenario labels to driver names
 scenario_driver_map <- list(
@@ -601,13 +653,13 @@ for (var_type in var_types) {
     message("  Scenario: ", sce, " | Driver: ", driver)
 
     res <- analyze_hazard_symmetric(
-      param_df      = df_Main,
-      data_save_list = DataSave,
-      var_type      = var_type,
+      param_df      = df_Main ,
+      data_save_list = DataSave ,
+      var_type      = var_type ,
       scenario      = sce,
       haz           = haz,
-      base_year     = 1955,
-      return_period = RETURN_PERIOD,
+      base_year     = 1955 ,
+      return_period = RETURN_PERIOD ,
       years_to_agg  = DECADES
     )
 
@@ -667,7 +719,7 @@ for (var_type in var_types) {
 
     # --- 5.4  Save map -----------------------------------------------------
 
-    map_file <- paste0(plotDir, "map_", var_type, "_", driver, "_", haz, ".jpg")
+    map_file <- paste0(plotDir, "map_", var_type, "_", driver, "_", haz, "_FINAL.jpg")
     ggsave(map_file, fmap, width = 22, height = 20, units = "cm", dpi = 800)
     message("  Map saved: ", map_file)
   }
@@ -683,19 +735,19 @@ message("\n=== Global trend aggregation ===")
 # Driver metadata for plotting
 driver_meta <- data.frame(
   scenario = c("SCF", "RWStat", "WStat", "Histo"),
-  driver   = c("Clim", "Res", "LUC", "WU"),
+  driver   = c("Clim", "LUC", "Res", "WU"),
   label    = DRIVER_LABELS,
   stringsAsFactors = FALSE
 )
 
 for (var_type in var_types) {
-
+ #var_type="threshold"
   message("\n--- Aggregating: ", var_type, " ---")
 
   if (var_type == "Sigma") {
     name  <- "scale"
     nplot <- "Scale parameter (ratio)"
-    br_p  <- seq(0, 2, by = 0.25)
+    br_p  <- seq(0, 10, by = 0.25)
   } else if (var_type == "threshold") {
     name  <- "location"
     nplot <- "Location parameter – relative difference (%)"
@@ -706,12 +758,13 @@ for (var_type in var_types) {
     br_p  <- seq(-50, 50, by = 10)
   }
 
+  popo=agg_results[[var_type]][[sce]]
   # Aggregate each scenario and bind
   trtF <- NULL
   for (i in seq_len(nrow(driver_meta))) {
     sce    <- driver_meta$scenario[i]
     drv    <- driver_meta$driver[i]
-    tx     <- aggregate_global_trends(agg_results[[var_type]][[sce]], decades = DECADES)
+    tx     <- aggregate_global_trends(agg_results[[var_type]][[sce]],weight=Dtweight, decades = DECADES)
     tx$driver <- drv
     trtF <- rbind(trtF, tx)
   }
@@ -831,6 +884,12 @@ for (s_name in names(rl_scenarios)) {
     )
   }
 
+  # colnames(RL100mat)[1] <- "1951"
+  RL100mat <- cbind(RL100mat, df_year$catchment)
+  colnames(RL100mat) <- paste0("Y", colnames(RL100mat))
+  colnames(RL100mat)[71] <- "unikout"
+  RLmat <- data.frame(RL100mat)
+  print(RLmat[1,])
   # Build output filename following existing convention
   out_name <- if (hazard == "Drought") {
     paste0("Drought.nonfrost.", s_name)
@@ -838,8 +897,8 @@ for (s_name in names(rl_scenarios)) {
     paste0("Flood.year.", s_name)
   }
 
-  out_file <- paste0(hydroDir, "/", hazard, "/RL100x.", out_name, ".Rdata")
-  save(RL100mat, file = out_file)
+  out_file <- paste0(hydroDir, "/", hazard, "/RL100xx.", out_name, ".Rdata")
+  save(RLmat, file = out_file)
   cat("\n  Saved:", out_file, "\n")
 }
 

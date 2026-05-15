@@ -12,15 +12,15 @@ hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
 
 
-hazard="Flood"
+hazard="Drought"
 
 rspace= read.csv(paste0(hydroDir,"/subspace_efas.csv"))
 rspace=rspace[,-1]
 
 dataDir=paste0("D:/tilloal/Documents/LFRuns_utils/data/",hazard,"/HPC/Calibrated/revision/TrendVar/")
 
-lsce=c("HistoX","SCFX","RWStatX","WStatX")
-lsce=c("RWStatX")
+lsce=c("HistoX")
+#lsce=c("RWStatX")
 
 for (sce in lsce){
   lf=list.files(path = paste0(dataDir,"/",sce,"/"), full.names = TRUE, recursive = TRUE)

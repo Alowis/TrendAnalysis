@@ -5,7 +5,7 @@
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 getwd()
 source("functions_trends.R")
-
+library(tseries)
 tsGetPOT_2 <- function(ms, pcts, desiredEventsPerYear,minEventsPerYear, minPeakDistanceInDays, tail) {
   
   if (minPeakDistanceInDays == -1) {
@@ -495,6 +495,7 @@ tsEVstatisticsX <- function(pointData, alphaCI = 0.95, gevMaxima = 'annual', gev
     iIN <- length(tmpmat)
     if (sum(iIN) >= minGEVSample) {
       tmp <- data.frame(yr=year(pointData$annualMaxDate),dt=tmpmat)
+      print(tmp)
       # Perform GEV/Gumbel fitting and computation of return levels
       if (gevType == "GEV"){
         stdfit=TRUE
@@ -508,6 +509,7 @@ tsEVstatisticsX <- function(pointData, alphaCI = 0.95, gevMaxima = 'annual', gev
         if(inherits(fit, "try-error")){
           stdfit=FALSE
           message("Not able to fit GEV with constrained parameters")
+          print(tmp)
           fit <- suppressWarnings(try(evd::fgev(x=tmp$dt,std.err = F),TRUE))
         }
         paramEsts <- c(mu=fit$par[1],sigma=fit$par[2],xi=fit$par[3])
@@ -651,6 +653,7 @@ TsEvaNsX<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDi
   
   #print(shape_bnd)
   timeStamps=as.POSIXct(timeAndSeries[,1])
+  #plot(timeAndSeries,ylim=c(0,.01))
   dt1=min(diff(timeStamps),na.rm=T)
   dt=as.numeric(dt1)
   tdim=attributes(dt1)$units
@@ -786,6 +789,7 @@ TsEvaNsX<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDi
     minEventsPerYear = 6
   }
   
+  plot(trasfData$stdDevSeries)
   
   dtn=min(diff(trasfData$timeStamps),na.rm=T)
   dtn=as.numeric(dtn)
@@ -802,6 +806,7 @@ TsEvaNsX<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDi
   }
   
   ms = data.frame(trasfData$timeStamps, trasfData$stationarySeries)
+
   minPeakDistance = minPeakDistanceInDays/dtn;
   st=adf.test(ms[-which(is.na(ms[,2])),2])$p.value
   if (st>0.05){
@@ -810,11 +815,12 @@ TsEvaNsX<- function(timeAndSeries, timeWindow, transfType='trendPeaks',minPeakDi
   #estimating the non stationary EVA parameters
   message('\nExecuting stationary eva')
   message(paste0('\n',gpdshape_bnd))
+ 
   pointData = tsEvaSampleDataX(ms, meanEventsPerYear=potEventsPerYear, minEventsPerYear, minPeakDistanceInDays,tail,gpdshape_bnd);
   evaAlphaCI = .68; # in a gaussian approximation alphaCI~68% corresponds to 1 sigma confidence
   # pointData$POT$pars
   eva = tsEVstatisticsX(pointData, evaAlphaCI, gevMaxima, gevType, evdType,gevshape_bnd);
-  eva$EVdata$GPDstat$parameters
+  eva$EVdata$GEVstat$parameters
   if (eva$isValid==FALSE) {
     message("problem in the computation of EVA statistics")
   }
@@ -1042,7 +1048,7 @@ var = "dis"
 outlets="RNetwork"
 outletname <- "/GeoData/efas_rnet_100km_01min"
 season="nonfrost"
-Nsq = 42
+Nsq = 43
 sce <- "SCF"
 
 
@@ -1106,7 +1112,7 @@ if (code=="h"){
   filename=paste0("dis_",Nsq,"_1951_2020_",code,"_RNetwork")
 }
 if (code=="scf"){
-  filename=paste0("dis_",Nsq,"_1951_2020_",code,"_RNetwork")
+  filename=paste0("dis_",Nsq,"_1951_2020_",code)
   shape_bnd_gpd=cbind(shape_EVD$GPDshape-0.01,shape_EVD$GPDshape+0.01)
   shape_bnd_gev=cbind(shape_EVD$GEVshape-0.01,shape_EVD$GEVshape+0.01)
 }
@@ -1155,24 +1161,24 @@ if (haz=="drought"){
 
 ThDir<-paste0(hydroDir,"/Thresholds")
 TH1=read.csv(paste0(ThDir,"/trenTH_Histo_",tail,"_",Nsq,".csv"))
-TH2=read.csv(paste0(ThDir,"/trenTH_SCF_",tail,"_",Nsq,".csv"))
-TH3=inner_join(TH1,TH2,by="cid")
+TH2=read.csv(paste0(ThDir,"/trenTH_newV_SCF_",tail,"_",Nsq,".csv"))
+TH3=TH2
 
 #retain thresholds fro historical run unless it is NA
-thresh_vec=data.frame(TH3$cid, TH3$Th_new.y)
-if(length(which(is.na(thresh_vec$TH3.Th_new.x)))>0){
-  print("corr")
-  thresh_vec$TH3.Th_new.x[which(is.na(thresh_vec$TH3.Th_new.x))]=TH3$Th_new.y[which(is.na(thresh_vec$TH3.Th_new.x))]
-}
+thresh_vec=data.frame(TH3$cid, TH3$Th_new)
+# if(length(which(is.na(thresh_vec$TH3.Th_new.x)))>0){
+#   print("corr")
+#   thresh_vec$TH3.Th_new.x[which(is.na(thresh_vec$TH3.Th_new.x))]=TH3$Th_new.y[which(is.na(thresh_vec$TH3.Th_new.x))]
+# }
 names(thresh_vec)=c("cid","th")
 thresh_vec$cid=as.numeric(thresh_vec$cid)
 Nsq=as.numeric(Nsq)
 thresh_vec$cid=thresh_vec$cid-Nsq*10000
 thresh_vec$cid=thresh_vec$cid+Nsq*100000
 
-startid=1
+startid=26
 endid=length(unikout)
-endid=20
+endid=28
 
 RetPerGPD=c()
 RetPerGEV=c()
@@ -1183,7 +1189,7 @@ peaklist=c()
 catlist=c()
 IRES=c()
 for (idfix in startid:endid){
-  #idfix=11
+  idfix=27
   start_time <- Sys.time()
   print(paste0("hazard:",haz," square: ", Nsq, " pixel: ",idfix,"/",endid))
   catch=as.numeric(unikout[idfix])
@@ -1285,7 +1291,7 @@ for (idfix in startid:endid){
                      minPeakDistanceInDays = minPeakDistanceInDays,lowdt=7,trans=trans,tail = tail,TrendTh = thresh,shape_bnd=NA)
     nonStationaryEvaParams=Nonstat[[1]]
     stationaryTransformData=Nonstat[[2]]
-    oo=nonStationaryEvaParams$potObj$parameters$epsilon[1]
+    oo=nonStationaryEvaParams$gevObj$parameters$epsilon[1]
     print(oo)
     
     stationaryTransformData$timeStampsDay=unique(as.Date(stationaryTransformData$timeStamps))

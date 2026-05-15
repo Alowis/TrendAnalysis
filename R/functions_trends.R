@@ -37,7 +37,8 @@ required_packages <- c(
   "ggnewscale",
   "pracma",
   "data.table",
-  "matrixStats"
+  "matrixStats",
+  "Hmisc"
 )
 
 #Install packages if missing and load them
@@ -811,6 +812,12 @@ calculatePoints <- function(trendPlot, yrlist, pointagg, Regio, GHshpp, datap) {
 processTrendData <- function(trendData, DataTr, id_var = "HydroR") {
   trtest <- suppressWarnings(melt(trendData, id.vars = id_var, variable.name = "variable", value.name = "value"))
   
+  weight=aggregate(
+    list(value = DataTr$outl2),
+    by = list(reg = DataTr$HER),
+    FUN = function(x) {
+      c(l = length(x))}
+  )
   # Convert variable to character and extract the year
   trtest$variable <- as.character(trtest$variable)
   craplife <- data.frame(strsplit(trtest$variable, ".Y"))
@@ -844,7 +851,12 @@ processTrendData <- function(trendData, DataTr, id_var = "HydroR") {
   valcol=c(wc,valcol)
   dfd=DataTr[,valcol]
   
-  dftest <- suppressWarnings(melt(dfd, id.vars = "Biogeo_id", variable.name = "variable", value.name = "value"))
+
+  
+  dftest <- suppressWarnings(melt(dfd, id.vars = "Biogeo_id", 
+                                  variable.name = "variable", 
+                                  value.name = "value"))
+  
   
   dftime <- aggregate(list(value = dftest$value),
                       by = list(yr = dftest$variable, loc = dftest[["Biogeo_id"]]),
@@ -858,18 +870,29 @@ processTrendData <- function(trendData, DataTr, id_var = "HydroR") {
   BgData <- do.call(data.frame, dftime)
   BgData$decad=seq(1950,2010,by=10)
   
-  
+  hmatct=match(trtest$HydroR,weight$reg)
+  trtest$weight=weight$value[hmatct]
   # Aggregate only by decade (without location)
-  trtime_global <- aggregate(list(value = trtest$value),
-                             by = list(yr = trtest$decad),
-                             FUN = function(x) c(mean = mean(x, na.rm = TRUE),
-                                                 l = length(x),
-                                                 med= median(x, na.rm=T),
-                                                 ql = quantile(x, 0.25, na.rm = TRUE),
-                                                 qh = quantile(x, 0.75, na.rm = TRUE),
-                                                 w1 = quantile(x, 0.025, na.rm = TRUE),
-                                                 w2 = quantile(x, 0.975, na.rm = TRUE)))
-  
+  # trtime_global <- aggregate(list(value = trtest$value),
+  #                            by = list(yr = trtest$decad),
+  #                            FUN = function(x) c( mean = weighted.mean(x, w = weight, na.rm = TRUE),
+  #                                                 l      = n(),
+  #                                                 med = wtd.quantile(x, weights = weight, probs = 0.5, na.rm = TRUE),
+  #                                                 ql   = wtd.quantile(x, weights = weight, probs = 0.25, na.rm = TRUE),
+  #                                                 qh   = wtd.quantile(x, weights = weight, probs = 0.75, na.rm = TRUE),
+  #                                                 w1   = wtd.quantile(x, weights = weight, probs = 0.025, na.rm = TRUE),
+  #                                                 w2   = wtd.quantile(x, weights = weight, probs = 0.975, na.rm = TRUE)))
+  trtime_global<-trtest %>%
+    group_by(decad) %>%
+    summarise(
+      mean = weighted.mean(value, w = weight, na.rm = TRUE),
+      l      = n(),
+      med = wtd.quantile(value, weights = weight, probs = 0.5, na.rm = TRUE),
+      ql   = wtd.quantile(value, weights = weight, probs = 0.25, na.rm = TRUE),
+      qh   = wtd.quantile(value, weights = weight, probs = 0.75, na.rm = TRUE),
+      w1   = wtd.quantile(value, weights = weight, probs = 0.025, na.rm = TRUE),
+      w2   = wtd.quantile(value, weights = weight, probs = 0.975, na.rm = TRUE)
+    )
   # Convert to a data frame
   tGlobal <- do.call(data.frame, trtime_global)
   # Return both the processed data with location (tData) and the global trend (tGlobal)

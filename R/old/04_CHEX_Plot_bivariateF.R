@@ -2549,6 +2549,7 @@ databipise$combined_category <-databipise$bi_class
 unique(databipise$combined_category)
 
 
+
 colors <- c(
   "1-1" = "#dd6a29",  # high x, low y
   "2-1" = "#d9926a",  # medium-high x, low y
@@ -2682,7 +2683,7 @@ databipi2$bi_class[which(is.na(databipi2$Y2015))]=NA
 databipi2$bi_class[which(is.na(databipi2$d2015))]=NA
 
 
-databipi2$trcat="Wetting"
+databipi2$trcat=NA
 databipi2$trcat[which(databipi2$bi_class=="2-2" | databipi2$bi_class=="3-2" |
                         databipi2$bi_class=="2-3" | databipi2$bi_class=="3-3")]="Stable"
 databipi2$trcat[which(databipi2$bi_class=="1-1" | databipi2$bi_class=="1-2" |

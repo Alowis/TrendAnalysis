@@ -3,10 +3,11 @@
 
 setwd(dirname(rstudioapi::getSourceEditorContext()$path))
 getwd()
-source("functions_trends2.R")
+setwd("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/R/")
+source("functions_trends.R")
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 
-
+library(data.table)
 # Load inputs from HPC computation ----------------------------------------
 
 RPGPDfl=c()
@@ -20,8 +21,8 @@ outf=c()
 hydroDir<-("D:/tilloal/Documents/LFRuns_utils/data")
 outlets="Rnet"
 scenario="SocCF2"
-hazard="Flood"
-season="year"
+hazard="Drought"
+season="nonfrost"
 mmx=""
 lf=list.files(path = paste0(hydroDir,"/TSEVA/",scenario,"/",hazard,"/",season,mmx), full.names = TRUE, recursive = TRUE)
 lf
@@ -106,6 +107,7 @@ for (file in lf){
   
   RPGPDfl=rbind(RPGPDfl,RetPerGPD)
   RLGPDfl=rbind(RLGPDfl,RetLevGPD)
+  if(length(Paramsfl)>0)colnames(parlist)=colnames(Paramsfl)
   Paramsfl=rbind(Paramsfl,parlist)
   Peakfoir=Results$Peaks
   myIDs=paste(Peakfoir$timeID,Peakfoir$catch,sep=" ")
@@ -124,9 +126,9 @@ print(paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,".
 saveout=T
 if (saveout==T){
   
-  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
-  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
-  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"_revF.Rdata"))
+  save(RLGPDfl,file=paste0(hydroDir,"/",hazard,"/RL100.",hazard,".",season,".",scenario,mmx,"_revFf.Rdata"))
+  save(Paramsfl,file=paste0(hydroDir,"/",hazard,"/params.",hazard,".",season,".",scenario,mmx,"_revFf.Rdata"))
+  save(Peaksave,file=paste0(hydroDir,"/",hazard,"/peaks.",hazard,".",season,".",scenario,mmx,"_revFf.Rdata"))
 }
 
 gc()

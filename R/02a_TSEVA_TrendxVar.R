@@ -380,8 +380,6 @@ for (idfix in startid:endid){
 TrendSave=data.frame(TrendSave)
 SdSave=data.frame(SdSave)
 colnames(TrendSave)=colnames(SdSave)=catlist
-ptn=(TrendSave$"4200002")
-plot(ptn)
 TrendSave=cbind(timeStamps,TrendSave)
 SdSave=cbind(timeStamps,SdSave)
 
