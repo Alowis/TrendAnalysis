@@ -151,26 +151,20 @@ if (haz=="drought"){
 }
 
 ThDir<-paste0(hydroDir,"/Thresholds")
-TH1=read.csv(paste0(ThDir,"/trenTH_Histo_",tail,"_",Nsq,".csv"))
-TH2=read.csv(paste0(ThDir,"/trenTH_SCF_",tail,"_",Nsq,".csv"))
-TH3=inner_join(TH2,TH1,by="cid")
 
-TH3[which(TH3$cid==420002),]
-#load directly extremes
-xtrempoints<-read.csv(paste0(ThDir,"/xtrempoints_SCF_",tail,"_",Nsq,".csv"))
+TH=read.csv(paste0(ThDir,"/trenTH_SCF_",tail,"_",Nsq,".csv"))
 
-#retain thresholds fro historical run unless it is NA
-thresh_vec=data.frame(TH3$cid, TH3$Th_new.x)
-if(length(which(is.na(thresh_vec$TH3.Th_new.x)))>0){
-  print("corr")
-  thresh_vec$TH3.Th_new.x[which(is.na(thresh_vec$TH3.Th_new.x))]=TH3$Th_new.y[which(is.na(thresh_vec$TH3.Th_new.x))]
-}
+#retain threshold from SCF run
+thresh_vec=data.frame(TH$cid,TH$Th_new)
 names(thresh_vec)=c("cid","th")
+
 thresh_vec$cid=as.numeric(thresh_vec$cid)
 Nsq=as.numeric(Nsq)
 thresh_vec$cid=thresh_vec$cid-Nsq*10000
 thresh_vec$cid=thresh_vec$cid+Nsq*100000
 
+#load directly extremes
+xtrempoints<-read.csv(paste0(ThDir,"/xtrempoints_SCF_",tail,"_",Nsq,".csv"))
 xtrempoints$cid=xtrempoints$cid-Nsq*10000
 xtrempoints$cid=xtrempoints$cid+Nsq*100000
 
@@ -191,7 +185,6 @@ for (idfix in startid:endid){
   
   timeStamps=txx
   xid=xtrempoints$id[which(xtrempoints$cid==catch)]
-  #xid=seriX$id
   thresh=thresh_vec[which(thresh_vec$cid==catch),]
   thresh=thresh$th
   frosttime=NA
@@ -199,7 +192,6 @@ for (idfix in startid:endid){
   timeAndSeries=data.frame(txx,df.disX$outlets)
   names(timeAndSeries)=c("date","Qs")
   rmv=which(as.integer(format(timeAndSeries$date, "%Y"))==1950)
-  #plot(timeAndSeries)
   if (length(rmv)>0){
     timeAndSeries=timeAndSeries[-rmv,]
   }
@@ -222,12 +214,10 @@ for (idfix in startid:endid){
     }else{
       frosttime=NA
     }
-    ciPercentile=80
     minPeakDistanceInDays=30
     tail="low"
   }else if (haz=="flood"){
     
-    ciPercentile=95
     minPeakDistanceInDays=7
     interflag=0
     timeAndSeries <- max_daily_value(timeAndSeries)
@@ -357,7 +347,6 @@ for (idfix in startid:endid){
     }
    
     trendS=trasfData$trendSeries
-    plot(trendS)
     if (tail=="low"){
       trendS=-trasfData$trendSeries
     }
@@ -384,3 +373,4 @@ TrendSave=cbind(timeStamps,TrendSave)
 SdSave=cbind(timeStamps,SdSave)
 
 Results=list(Trend=TrendSave,Variability=SdSave)
+save(Results, file=paste0(hydroDir,"TrendVar/TrendVarX_",outlets,haz,"_",Nsq,"_1951_2020.Rdata"))

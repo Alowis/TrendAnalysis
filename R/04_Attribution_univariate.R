@@ -1,5 +1,5 @@
 ## ============================================================
-##  03_CHEX_Plot_univariateF_rev.R
+##  04_Attribution_univariate.R
 ##  Reorganized: main figures first, supplementary below a flag
 ## ============================================================
 
@@ -16,7 +16,7 @@ RUN_SUPP <- FALSE   # set TRUE to generate all supplementary plots
 # =============================================================
 
 hydroDir  <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data"
-hydroDir2 <- "D:/tilloal/Documents/LFRuns_utils/data"
+# hydroDir2 <- "D:/tilloal/Documents/LFRuns_utils/data"
 plotDir   <- "D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots"
 
 haz    <- "Flood"          # "Flood" or "Drought"
@@ -256,16 +256,16 @@ max(UpArea$upa)
 # =============================================================
 # 2  LOAD MODEL RUNS
 # =============================================================
-haz="Flood"
+haz="Drought"
 # Filenames by hazard type
 run_names <- if (haz == "Flood") {
   list(H    = "flood.year.Histo",
-       SCF  = "Flood.year.socCF2_revFf",
+       SCF  = "Flood.year.socCF",
        RWCF = "flood.year.RWStat",
        WCF  = "flood.year.WStat")
 } else {
   list(H    = "Drought.nonfrost.Histo",
-       SCF  = "Drought.nonfrost.SocCF2_revFf",
+       SCF  = "Drought.nonfrost.SocCF",
        RWCF = "Drought.nonfrost.RWStat",
        WCF  = "Drought.nonfrost.WStat")
 }
@@ -334,7 +334,7 @@ if (haz == "Drought") {
     IRES_comb[[col]][is.na(IRES_comb[[col]])] <- 0
   IRES_comb$gen_IR <- ceiling(rowSums(IRES_comb[, grep("IRES", names(IRES_comb))]) / 4)
   names(IRES_comb)[2:5] <- c("Histo", "SCF", "WCF", "RWCF")
-  IR_locs <- which(IRES_comb$gen_IR >= 2)
+  IR_locs <- which(IRES_comb$SCF == 1)
   IRpoints <- UpArea
 } else {
   IRpoints <- UpArea
@@ -365,9 +365,6 @@ shp_bnd <- if (haz == "Flood") c(1, -0.5) else c(0, -1.5)
 get_shape <- function(Params) Params[, c(1, 2, 5)]
 
 ShapeparSCF <- get_shape(ParamsflSCF)
-
-# Shapepar3 <- get_shape(ParamsflRWCF)
-# Shapepar4 <- get_shape(ParamsflWCF)
 
 Shapeparf <- ShapeparSCF[ShapeparSCF$Year == 2015, ]
 
@@ -439,69 +436,23 @@ rmpixels    <- rmpixs
 # 5  DRIVER DATA PROCESSING
 # =============================================================
 
-## Helper: spatial smoothing loop (drought only) ---------------
-smooth_driver <- function(DataX, DataRSmooth, unikR, HydroRsf,
-                           rivermask, r, yrange) {
-  Change_smoothed <- loc_smoothed <- batar <- c()
-  for (rid in seq_along(unikR)) {
-    regioid  <- unikR[rid]
-    DataReI  <- DataX[DataX$Regio_id == regioid, ]
-    DataRefix <- DataRSmooth[DataRSmooth$HydroRegions_raster_WGS84 == regioid, ]
-    dm <- match(DataRefix$outl2, DataReI$outl2)
-    DataRefix$ch2015 <- DataReI$Y2015[dm]
-    DataRefix <- DataRefix[abs(DataRefix$ch2015) > 0.5, ]
-    if (length(DataRefix$x) > 1) {
-      points_sp <- DataReI[, c("x","y","Y2015")]; coordinates(points_sp) <- ~x + y
-      pointX_sp <- DataRefix[, c("x","y","ch2015")]; coordinates(pointX_sp) <- ~x + y
-      smoothed <- sapply(seq_len(length(pointX_sp)), function(i)
-        weighted_average(r, pointX_sp[i,], points_sp, rivermask, max_distance = 15))
-      rlocs <- match(DataRefix$llcoord, DataReI$llcoord)
-      Change_smoothed <- c(Change_smoothed, smoothed)
-      loc_smoothed    <- c(loc_smoothed, DataRefix$llcoord)
-      batar           <- c(batar, DataRefix$ch2015)
-    }
-  }
-  list(smoothed = Change_smoothed, locs = loc_smoothed, before = batar)
-}
-
-apply_smooth <- function(DataX, sm, yrange) {
-  ratio <- sm$smoothed / sm$before
-  ratio[is.nan(ratio) | is.infinite(ratio)] <- 1
-  rlocs <- match(sm$locs, DataX$llcoord)
-  DataX[rlocs, yrange] <- DataX[rlocs, yrange] * ratio
-  DataX
-}
-
 ## 5.1  Land use -----------------------------------------------
 DataL <- ComputeChange(Soctrend, unikout, DataI, outhybas07,
                        rmpixels, UpAvec, GHR_riv, HydroRsf, yrname, "socio", eps=0.1)
 yrange <- match(yrname, colnames(DataL))
 
-# if (haz == "Drought") {
-#   sm <- smooth_driver(DataL, DataRSmooth, unikR, HydroRsf, rivermask, r, yrange)
-#   DataL <- apply_smooth(DataL, sm, yrange)
-#   DataL <- DataL[, -c(85:89)]
-# }
 res_L <- aggregate_change(DataL, yrname); pointSoc <- res_L$point; trendSoc <- res_L$trend
 
 ## 5.2  Water demand -------------------------------------------
 DataW <- ComputeChange(Wutrend, unikout, DataI, outhybas07,
                        rmpixels, UpAvec, GHR_riv, HydroRsf, yrname, "socio", eps=0.1)
-# if (haz == "Drought") {
-#   sm <- smooth_driver(DataW, DataRSmooth, unikR, HydroRsf, rivermask, r, yrange)
-#   DataW <- apply_smooth(DataW, sm, yrange)
-#   DataW <- DataW[, -c(85:89)]
-# }
+
 res_W <- aggregate_change(DataW, yrname); pointWu <- res_W$point; trendWu <- res_W$trend
 
 ## 5.3  Total change -------------------------------------------
 DataT <- ComputeChange(Totaltrend, unikout, DataI, outhybas07,
                        rmpixels, UpAvec, GHR_riv, HydroRsf, yrname, "total", eps=0.1)
-# if (haz == "Drought") {
-#   sm <- smooth_driver(DataT, DataRSmooth, unikR, HydroRsf, rivermask, r, yrange)
-#   DataT <- apply_smooth(DataT, sm, yrange)
-#   DataT <- DataT[, -c(85:89)]
-# }
+
 res_T <- aggregate_change(DataT, yrname); pointTot <- res_T$point; trendTot <- res_T$trend
 
 ## 5.4  Climate ------------------------------------------------
@@ -513,13 +464,6 @@ res_C <- aggregate_change(DataC, yrname); pointClim <- res_C$point; trendClim <-
 DataR <- ComputeChange(Restrend, unikout, DataI, outhybas07,
                        rmpixels, UpAvec, GHR_riv, HydroRsf, yrname, "socio", eps=0.1)
 
-# Correction: zero out non-reservoir pixels with large spurious changes
-r_path          <- paste0(hydroDir2, "/reservoirs/")
-new_reservoirs  <- ReservoirOpen(r_path, "res_ratio_diff_2020-1951.nc", outf)
-inf_reservoirs  <- new_reservoirs[new_reservoirs$upa > 0, ]
-rmat            <- match(inf_reservoirs$outl2, DataR$outl2)
-Rcrap           <- DataR[-rmat, ]
-Rcrap           <- Rcrap[which(abs(Rcrap$Y2015) > 2 & !is.na(Rcrap$x)), ]
 
 res_R <- aggregate_change(DataR, yrname); pointRes <- res_R$point; trendRes <- res_R$trend
 
@@ -608,11 +552,11 @@ fig1 <- ggplot(trtF_EU) +
   ggtitle("Europe")
 
 fig1
-ggsave(paste0(plotDir, "/Fig1_bxp_EU_", haz, "_FINAL.jpg"),
-       fig1, width=30, height=20, units="cm", dpi=1000)
+# ggsave(paste0(plotDir, "/Fig1_bxp_EU_", haz, "_FINAL.jpg"),
+#        fig1, width=30, height=20, units="cm", dpi=1000)
+# 
+# write.csv(trtF_EU,file=paste0(plotDir,"/",haz,"_agchanges.csv"))
 
-
-write.csv(trtF_EU,file=paste0(plotDir,"/",haz,"_agchanges.csv"))
 ## ── Figures 2 & 3 ────────────────────────────────────────────
 ## Spatial maps: change per driver (loop)
 yrlist     <- 1951:2020
@@ -745,7 +689,7 @@ for (driver in driverlist) {
 ##    basemap, nco, haz, it, plotDir
 ##    trendClim/Soc/Res/Wu/Tot, DataC/L/R/W/T
 ##    pointClim/Soc/Res/Wu/Tot, Regio, GHshpp
-##    Rcrap, Dchangelist (filled below), pointsAD
+##    Dchangelist (filled below), pointsAD
 ##    map_theme()  (helper defined in main script)
 ##  Paths:
 ##    workDir  <- "D:/tilloal/Documents/06_Floodrivers"
@@ -863,7 +807,6 @@ res_ratioR_sf <- st_transform(
 ## 2.2  Background: reservoir RL change map --------------------
 
 datap_res        <- DataR
-datap_res$Y2015[match(Rcrap$outl2, datap_res$outl2)] <- 0
 Pplot_res        <- calculatePoints(trendRes, yrlist, pointRes, Regio, GHshpp, datap_res)
 Dchangelist      <- c(Dchangelist, list(Pplot_res))
 
@@ -1057,10 +1000,10 @@ ggsave(paste0(plotDir, "/Fig3_mapF_landuse_", haz, "_FINAL.jpg"),
 # =============================================================
 
 ## 4.1  Load water demand rasters & NUTS3 ----------------------
-nuts3_shp     <- read_sf(paste0(hydroDir2, "/Countries/NUTS3/NUTS3_modified.shp"))
-rast_wd_total <- raster(paste0(workDir, "/wateruse/all_ysum_ch20201951.tif"))
-rast_wd_2020  <- raster(paste0(workDir, "/wateruse/wateruse_sums/all_demands_2020.tif"))
-rast_wd_1951  <- raster(paste0(workDir, "/wateruse/wateruse_sums/all_demands_1951.tif"))
+nuts3_shp     <- read_sf(paste0(hydroDir, "/GeoData/NUTS3/NUTS3_modified.shp"))
+rast_wd_total <- raster(paste0(hydroDir, "/wateruse/all_ysum_ch20201951.tif"))
+rast_wd_2020  <- raster(paste0(hydroDir, "/wateruse/all_demands_2020.tif"))
+rast_wd_1951  <- raster(paste0(hydroDir, "/wateruse/all_demands_1951.tif"))
 
 # Project NUTS3 to raster CRS for extraction, then reproject to 3035 for plotting
 Wd_wgs <- st_transform(nuts3_shp, crs = st_crs(rast_wd_total))
@@ -1158,7 +1101,6 @@ SuorvaC=DataC[which(DataC$outl2==suorva),]
 SuorvaL=DataL[which(DataL$outl2==suorva),]
 SuorvaR=DataR[which(DataR$outl2==suorva),]
 SuorvaC=DataC[which(DataC$outl2==suorva),]
-
 plot(as.numeric(SuorvaR[,c(16:84)]))
 # =============================================================
 # 5  COLLECT AGGREGATED RESULTS  (feeds Section 8 in main script)
@@ -1565,34 +1507,8 @@ if (RUN_SUPP) {
   ggsave(paste0(plotDir, "/FigS8_dominantDriver_HER_", haz, ".jpg"),
          figS8, width=23, height=20, units="cm", dpi=1000)
 
-  ## ── S9 · Spatial smoothing status map (drought only) ─────
-  # if (haz == "Drought") {
-  #   mld <- match(DataRSmooth$outl2, IRpoints$outl2)
-  #   mli <- which(IRpoints$gen_IR == 2)
-  #   mlo <- match(rmp2, IRpoints$outl2)
-  #   IRpoints$status <- "original"
-  #   IRpoints$status[mld] <- "smoothed"
-  #   IRpoints$status[mli] <- "IRES"
-  #   IRpoints$status[mlo] <- "off-limit parameter"
-  # 
-  #   PiR <- st_transform(
-  #     st_as_sf(IRpoints, coords=c("Var1.x","Var2.x"), crs=4326), crs=3035)
-  #   figS9 <- ggplot(basemap) +
-  #     geom_sf(fill="gray90", color="darkgrey", size=0.5) +
-  #     geom_sf(data=PiR, aes(geometry=geometry, size=upa, col=status),
-  #             alpha=1, stroke=0, shape=15) +
-  #     scale_color_manual(values=c("original"="royalblue","smoothed"="darkorange",
-  #                                 "IRES"="darkred","off-limit parameter"="black"), name=" ") +
-  #     scale_size(range=c(0.1,0.5), trans="sqrt", guide="none") +
-  #     coord_sf(xlim=c(min(nco[,1]),max(nco[,1])), ylim=c(min(nco[,2]),max(nco[,2]))) +
-  #     guides(colour=guide_legend(override.aes=list(size=10))) +
-  #     labs(x="Longitude", y="Latitude") +
-  #     map_theme()
-  #   ggsave(paste0(plotDir, "/FigS9_smoothStatus_", haz, ".jpg"),
-  #          figS9, width=23, height=20, units="cm", dpi=1000)
-  # }
 
-} # end if (RUN_SUPP)
+} 
 
 
 # =============================================================
@@ -1610,9 +1526,9 @@ trendRegio <- rbind(trendClim, trendSoc, trendRes, trendWu, trendTot)
 outfile <- if (haz == "Flood") {
   Output_fl_year <- list(TrendPix=Alltrend, TrendRegio=trendRegio,
                           Out2020=pointsAD, DataI=DataI)
-  save(Output_fl_year, file=paste0(hydroDir2, "/TSEVA/output_plots/outputs_flood_year_relxHR_FINAL.Rdata"))
+  save(Output_fl_year, file=paste0( paste0(hydroDir, "/Flood/outputs_flood_year_relxHR_FINAL.Rdata")))
 } else {
   Output_dr_nonfrost <- list(TrendPix=Alltrend, TrendRegio=trendRegio,
                               Out2020=pointsAD, DataI=DataI)
-  save(Output_dr_nonfrost, file=paste0(hydroDir2, "/TSEVA/output_plots/outputs_drought_nonfrost_relxHR_FINAL.Rdata"))
+  save(Output_dr_nonfrost, file=paste0paste0(hydroDir, "/Drought/outputs_drought_nonfrost_relxHR_FINAL.Rdata"))
 }

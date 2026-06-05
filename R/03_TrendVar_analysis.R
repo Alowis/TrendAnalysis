@@ -305,22 +305,24 @@ process_hazard_data <- function(sub_dir = "SCFX",
   # 1. Determine the filename suffix based on sub_dir
   # This handles cases like SCF -> SocCF, Histo -> Histo, WStat -> WStat
   file_suffix <- case_when(
-    sub_dir == "SCFX"   ~ "SocCF2_revfF",
-    sub_dir == "HistoX" ~ "Histo",
-    sub_dir == "WStatX" ~ "WCF",
-    sub_dir == "RWStatX" ~ "RWCF",
+    sub_dir == "SCF"   ~ "SocCF",
+    sub_dir == "Histo" ~ "Histo",
+    sub_dir == "WStat" ~ "WCF",
+    sub_dir == "RWStat" ~ "RWCF",
     TRUE               ~ sub_dir  # For WStat and RWStat
   )
   
   if (hazard == "Drought") {
     namefile <- paste0("Drought.nonfrost.", file_suffix)
+    namefileSCF <- ("Drought.nonfrost.SocCF")
   } else {
     namefile <- paste0("Flood.year.", file_suffix)
+    namefileSCF <- ("Flood.year.SocCF")
   }
   
   # 2. Construct paths and Load Files
   res_path <- file.path(base_data_dir, sub_dir, fileVar)
-  param_path <- file.path(hydro_base_dir, hazard, paste0("params.", namefile, ".Rdata"))
+  param_path <- file.path(hydro_base_dir, hazard, paste0("params.", namefileSCF, ".Rdata"))
   
   message("Loading: ", res_path)
   load(res_path, envir = .GlobalEnv) 
@@ -399,14 +401,14 @@ attach_scenario_cols <- function(base_df, source_df, suffix) {
 # 1. PATHS & GLOBAL SETTINGS
 # ==============================================================================
 
-hazard   <- "Flood"    # "Flood" or "Drought"
+hazard   <- "Drought"    # "Flood" or "Drought"
 haz      <- tolower(hazard)
 
 # Root data directories
 hydroDir <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data"
 dataDir  <- switch(hazard,
-  Flood   = "D:/tilloal/Documents/LFRuns_utils/data/Flood/HPC/Calibrated/revision/TrendVar/",
-  Drought = "D:/tilloal/Documents/LFRuns_utils/data/Drought/HPC/Calibrated/revision/TrendVar/"
+  Flood   = "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data/Flood/",
+  Drought = "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data/Drought/"
 )
 plotDir  <- "D:/tilloal/Documents/LFRuns_utils/TAplots/"
 
@@ -527,19 +529,19 @@ UpArea <- UpAopen(hydroDir, "/GeoData/upArea_European_01min.nc", outf)
 
 message("\n=== Loading scenario data ===")
 
-df_SCF    <- process_hazard_data(sub_dir = "SCFX",   hazard = hazard,
+df_SCF    <- process_hazard_data(sub_dir = "SCF",   hazard = hazard,
                                  base_data_dir = dataDir,
                                  fileVar = "Var_TrendX_agg.Rdata")
 
-df_Histo  <- process_hazard_data(sub_dir = "HistoX", hazard = hazard,
+df_Histo  <- process_hazard_data(sub_dir = "Histo", hazard = hazard,
                                  base_data_dir = dataDir,
                                  fileVar = "Var_TrendX_agg.Rdata")
 
-df_WStat  <- process_hazard_data(sub_dir = "WStatX",  hazard = hazard,
+df_WStat  <- process_hazard_data(sub_dir = "WStat",  hazard = hazard,
                                  base_data_dir = dataDir,
                                  fileVar = "Var_TrendX_agg.Rdata")
 
-df_RWStat <- process_hazard_data(sub_dir = "RWStatX", hazard = hazard,
+df_RWStat <- process_hazard_data(sub_dir = "RWStat", hazard = hazard,
                                  base_data_dir = dataDir,
                                  fileVar = "Var_TrendX_agg.Rdata")
 
@@ -571,17 +573,30 @@ rm(df_Histo, df_SCF); gc()
 # Convert to data.table once for speed
 setDT(df_Main)
 df_Main$nsq=floor(df_Main$catchment/100000)
-s43=which(!is.na(match(df_Main$catchment,4304271)))
-p43=df_Main[s43,]
-duplicates <- p43 %>%
-  group_by(catchment, Year) %>%
-  summarise(n = n(), .groups = "drop") %>%
-  filter(n > 1)
-
-print(duplicates)
+# s43=which(!is.na(match(df_Main$catchment,4304271)))
+# p43=df_Main[s43,]
+# duplicates <- p43 %>%
+#   group_by(catchment, Year) %>%
+#   summarise(n = n(), .groups = "drop") %>%
+#   filter(n > 1)
+# 
+# print(duplicates)
 
 message("df_Main ready: ", nrow(df_Main), " rows, ",
         length(unique(df_Main$catchment)), " catchments.")
+
+
+#Small analysis on reservoirs
+
+
+# Correction: zero out non-reservoir pixels with large spurious changes
+r_path          <- paste0(hydroDir, "/reservoirs/")
+new_reservoirs  <- ReservoirOpen(r_path, "res_ratio_diff_2020-1951.nc", outf)
+inf_reservoirs  <- new_reservoirs[new_reservoirs$upa > 0, ]
+Rcrap<-read_sf("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/Reseveoir_WRchange.shp")
+rmat            <- which(!is.na(match(df_Main$catchment,Rcrap$outl2)))
+df_Rc          <- inner_join(df_Main,Rcrap,by=c("catchment"="outl2"))
+
 
 
 # ==============================================================================

@@ -14,7 +14,7 @@ RUN_SUPP <- FALSE   # set TRUE to produce all supplementary figures
 # =============================================================
 
 hydroDir <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data"
-plotDir  <- "D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots"
+plotDir  <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/plots"
 
 tsize <- 16; osize <- 12
 
@@ -473,7 +473,7 @@ databicrlw <- databiclim; databicrlw$x <- databiclim$x + databilu$x + databire$x
 
 
 
-for (obj in c("databicr","databicrl","databicrlw","databise")) {
+for (obj in c("databicr","databicrl","databicrlw")) {
   d <- get(obj); d$bi_class <- make_bi_class(d$x, d$y)
   d$combined_category <- d$bi_class; d$maxicat <- assign_trcat(d$combined_category)
   assign(obj, d)
@@ -487,35 +487,8 @@ databipicr   <- databipic; databipicr$x  <- databipic$x + databipilu$x;         
 databipicrl  <- databipic; databipicrl$x <- databipic$x + databipilu$x + databipire$x;                   databipicrl$y <- databipic$y + databipilu$y + databipire$y
 databipicrlw <- databipic; databipicrlw$x <- databipic$x + databipilu$x + databipire$x + databipiwd$x;   databipicrlw$y <- databipic$y + databipilu$y + databipire$y + databipiwd$y
 
-databipise        <- databipilu
-databipise$x      <- databipire$x + databipilu$x + databipiwd$x
-databipise$y      <- databipire$y + databipilu$y + databipiwd$y
-# databipise$bi_class <- make_bi_class(databipise$x, databipise$y)
-# databipise$bi_class[is.na(databipise$x) | is.na(databipise$y)] <- NA
 
-# alterclass=data.frame(databipise$x)
-# length(which(is.na(databipise$y)))
-# alterclass$class=NA
-# alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-# alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-# alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-# alterclass$class[which(alterclass[,1]>=breaker2)]=4
-# c1=alterclass$class
-# 
-# alterclass=data.frame(databipise$y)
-# alterclass$class=NA
-# alterclass$class[which(alterclass[,1]<=(-breaker2))]=1
-# alterclass$class[which(alterclass[,1]>(-breaker2) & alterclass[,1]<(breaker1))]=2
-# alterclass$class[which(alterclass[,1]>=(breaker1) & alterclass[,1]<(breaker2))]=3
-# alterclass$class[which(alterclass[,1]>=breaker2)]=4
-# c2=alterclass$class
-# 
-# 
-# cx=paste(c2,c1,sep="-")
-# databipise$bi_class=cx
-# Combine the main category and subcategory to make a label
-# databipise$combined_category <-databipise$bi_class
-
+#only socioeconomic drivers
 databise        <- databire
 databise$x      <- databire$x + databilu$x + databiwd$x
 databise$y      <- databire$y + databilu$y + databiwd$y
@@ -527,9 +500,7 @@ traj="Accelerating"
 bg="Atlantic"
 
 length(which(databipire$trcat==traj & databipire$Biogeo_id==bg))/length(databipire$trcat[which(databipire$Biogeo_id==bg)])
-
 length(which(databipise$trcat==traj & databipise$Biogeo_id==bg))/length(databipise$trcat[which(databipise$Biogeo_id==bg)])
-
 length(which(databipise$trcat=="Wetting"))
 
 for (obj in c("databipicr","databipicrl","databipicrlw","databipise")) {
@@ -789,18 +760,6 @@ ggsave(paste0(plotDir, "/Fig3_climchange_bvPIX_HR_FINAL.jpg"),
 ## ── Figure 5 ─────────────────────────────────────────────────
 ## Bivariate scatter: driver contribution per HER (coloured by driver)
 
-# # 2. Extract Specific Catchment
-# hybas_eu <- read_sf(paste0("D:/tilloal/Documents/LFRuns_utils/data", "/Catchments/hydrosheds/hybas_eu_lev05_v1c.shp"))
-# target_catchment <- hybas_eu %>% filter(HYBAS_ID == selectedHybas)
-# 
-# target_catchment  <- GHshpp[GHshpp$CODEB == 74,  ]
-# 
-# 
-# # Transform to LAEA and keep only regions that intersect the catchment
-# her_rhone <- st_transform(GHshpp, st_crs(hybas_eu)) %>%
-#   st_filter(target_catchment, .predicate = st_intersects)
-
-#her_rn=her_rhone$CODEB
 fig5 <- ggplot() +
   geom_vline(xintercept = 0, color = "black", linewidth = 1.5) +
   geom_hline(yintercept = 0, color = "black", linewidth = 1.5) +
@@ -969,16 +928,6 @@ fig_bv_bar <- ggplot(traj_counts,
             inherit.aes = FALSE,
             hjust = -0.15, size = 4.5, fontface = "bold", color = "grey20") +
   
-  # scale_fill_manual(
-  #   values = c(
-  #     "Drying"       = "#dd6a29",
-  #     "Decelerating" = "burlywood",
-  #     "Stable"       = "gray70",
-  #     "Wetting"      = "#169dd0",
-  #     "Accelerating" = "#174f28"
-  #   ),
-  #   name = "Bivariate trajectory"
-  # ) +
   scale_fill_manual(values = colorp) +
   scale_y_continuous(
     name   = "Share of river network (%)",
@@ -1343,7 +1292,7 @@ if (RUN_SUPP) {
 # 6  SAVE OUTPUTS
 # =============================================================
 
-write.csv(mbfH, file = paste0(plotDir, "/../Histo_res_bvHR_F.csv"),  row.names = FALSE)
-write.csv(mbfX, file = paste0(plotDir, "/../Drivers_res_bvHR_F.csv"), row.names = FALSE)
-save(databipise, file = paste0(hydroDir, "/SEchanges_bivariate_F.Rdata"))
-save(databipic, file = paste0(hydroDir, "/CLchanges_bivariate_F.Rdata"))
+write.csv(mbfH, file = paste0(hydroDir, "/Trajectories/Histo_res_bvHR_F.csv"),  row.names = FALSE)
+write.csv(mbfX, file = paste0(hydroDir, "/Trajectories/Drivers_res_bvHR_F.csv"), row.names = FALSE)
+save(databipise, file = paste0(hydroDir, "/Trajectories/SEchanges_bivariate_F.Rdata"))
+save(databipic, file = paste0(hydroDir, "/Trajectories/CLchanges_bivariate_F.Rdata"))
