@@ -489,19 +489,25 @@ databipicrlw <- databipic; databipicrlw$x <- databipic$x + databipilu$x + databi
 
 
 #only socioeconomic drivers
+databipise        <- databipire
+databipise$x      <- databipire$x + databipilu$x + databipiwd$x
+databipise$y      <- databipire$y + databipilu$y + databipiwd$y
+databipise$bi_class <- make_bi_class(databipise$x, databipise$y)
+databipise$bi_class[is.na(databipise$x) | is.na(databipise$y)] <- NA
+
 databise        <- databire
 databise$x      <- databire$x + databilu$x + databiwd$x
 databise$y      <- databire$y + databilu$y + databiwd$y
 databise$bi_class <- make_bi_class(databise$x, databise$y)
 databise$combined_category <- databise$bi_class
 
+length(which(databipire$trcat==traj & databipire$Biogeo_id==bg))/length(databipire$trcat[which(databipire$Biogeo_id==bg)])
+length(which(databipise$trcat==traj & databipise$Biogeo_id==bg))/length(databipise$trcat[which(databipise$Biogeo_id==bg)])
+length(which(databipise$trcat=="Wetting"))
 
 traj="Accelerating"
 bg="Atlantic"
 
-length(which(databipire$trcat==traj & databipire$Biogeo_id==bg))/length(databipire$trcat[which(databipire$Biogeo_id==bg)])
-length(which(databipise$trcat==traj & databipise$Biogeo_id==bg))/length(databipise$trcat[which(databipise$Biogeo_id==bg)])
-length(which(databipise$trcat=="Wetting"))
 
 for (obj in c("databipicr","databipicrl","databipicrlw","databipise")) {
   print(obj)
@@ -557,7 +563,7 @@ biogeof_merged <- biogeo %>%
   mutate(name    = if_else(name    %in% c("Pannonian","Steppic"), "Continental", name),
          pre_2012 = if_else(pre_2012 %in% c("PAN","STE"),         "CON",         pre_2012)) %>%
   group_by(name, pre_2012) %>%
-  summarize(geometry = st_union(geometry), .groups = "drop") %>%
+  dplyr::summarize(geometry = st_union(geometry), .groups = "drop") %>%
   st_make_valid()
 
 biogeof_clipped <- st_intersection(biogeof_merged, domain_union)
@@ -1040,6 +1046,7 @@ fig8 <- ggplot(basemap) +
   map_theme_bi(tsize, osize) +
   theme(legend.position = "right")
 
+fig8
 ggsave(paste0(plotDir, "/Fig8_Map_HRxBG_FINAL.jpg"),
        fig8, width=25, height=20, units="cm", dpi=300)
 
@@ -1049,11 +1056,11 @@ ggsave(paste0(plotDir, "/Fig8_Map_HRxBG_FINAL.jpg"),
 fig9 <- ggplot() +
   geom_vline(xintercept = 0, color = "black", linewidth = 1.5) +
   geom_hline(yintercept = 0, color = "black", linewidth = 1.5) +
-  geom_point(data = mbfH, aes(x = d_val.mean, y = f_val.mean, color = biogeo, size = d_val.l),
+  geom_point(data = mbfH, aes(x = x, y = y, color = biogeo, size = d_val.l),
              stroke = 0, alpha = .7) +
-  geom_text(data = mbfH, aes(x = d_val.mean, y = f_val.mean, label = CODEB),
+  geom_text(data = mbfH, aes(x = x, y = y, label = CODEB),
             size = 3, color = "black", fontface = "bold") +
-  geom_point(data = mbfHsig, aes(x = d_val.mean, y = f_val.mean, size = d_val.l),
+  geom_point(data = mbfHsig, aes(x = x, y = y, size = d_val.l),
              fill = NA, shape = 1, stroke = 1, col = "black", alpha = .8,
              show.legend = FALSE) +
   scale_color_manual(values = colx_bgr, name = "Regions") +
@@ -1253,17 +1260,7 @@ if (RUN_SUPP) {
   ## ── S7 · Bivariate map: socio-economic combined signal ────
   databipi$bi_class[databipi$bi_class == "NA-NA" | is.na(databipi$Y2015) |
                       is.na(databipi$y)] <- NA
-  databipise        <- databipire
-  databipise$x      <- databipire$x + databipilu$x + databipiwd$x
-  databipise$y      <- databipire$y + databipilu$y + databipiwd$y
-  databipise$bi_class <- make_bi_class(databipise$x, databipise$y)
-  databipise$bi_class[is.na(databipise$x) | is.na(databipise$y)] <- NA
-
-  databise        <- databire
-  databise$x      <- databire$x + databilu$x + databiwd$x
-  databise$y      <- databire$y + databilu$y + databiwd$y
-  databise$bi_class <- make_bi_class(databise$x, databise$y)
-  databise$combined_category <- databise$bi_class
+ 
 
   map_se <- ggplot(basemap) +
     geom_sf(fill="white") +
