@@ -14,12 +14,16 @@ library(cowplot)
 library(terra)
 library(dplyr)
 library(ggnewscale)
-source("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/R/functions_trends.R")
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+source("functions_trends.R")
+# source("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/R/functions_trends.R")
 
 # Directories
 hydroDir <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data"
 plotDir  <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/plots"
 
+
+#plot parameters
 palet2=c(hcl.colors(9, palette = "Blues", alpha = NULL, rev = TRUE, fixup = TRUE))
 outletname="GeoData/efas_rnet_100km_01min"
 outll=outletopen(hydroDir,outletname)
@@ -171,12 +175,6 @@ hill   <- terra::shade(slope, aspect, angle = 45, direction = 315)
 
 hill_df <- as.data.frame(hill, xy = TRUE, na.rm = TRUE)
 colnames(hill_df)[3] <- "shade"
-ggplot() +
-  geom_raster(data = hill_df, aes(x = x, y = y, fill = shade)) +
-  scale_fill_continuous(palette = "Light Grays",
-                       na.value = "transparent", guide = "none")
-
-#dem_df <- as.data.frame(dem_bbox_crop, xy = TRUE, na.rm = TRUE)
 
 # ── 2. Reproject the DEM to LAEA ───────────────────────────────
 # Use method = "bilinear" for continuous data like elevation
@@ -213,6 +211,8 @@ yrlist1 <- 1951:1980
 yrlist2 <- 1991:2020
 
 
+#Not run here, computation of Aridity index
+
 # # Run computation for Precip and ET (1951 - 2020)
 # mdir="D:/tilloal/Documents/06_Floodrivers/meteo/"
 # # 3. Execute for Precipitation and ET
@@ -225,6 +225,9 @@ yrlist2 <- 1991:2020
 # writeRaster((rast_delta_ai), paste0(hydroDir,"/trajectories/rast_delta_ai.tiff"), overwrite = TRUE)
 # 
 # rm(rast_delta_ai)
+
+
+
 #load rast_delta
 rast_delta_ai<-rast(paste0(hydroDir,"/trajectories/rast_delta_ai.tiff"))
 
@@ -358,6 +361,7 @@ print(paste("Points before:", nrow(databipic), "| Points after:", nrow(databipic
 
 # 3. Final Multi-Layer Map
 
+#test plot
 ggplot() +
   # LAYER 1: Bivariate Climate (P and ET combined)
   geom_sf(data = sub_catchments, aes(fill= AI_change),color="transparent") +
@@ -432,6 +436,29 @@ sub_catchments_laea <- st_transform(sub_catchments, target_crs)
 her_rhone_laea <-st_transform(her_rhone, target_crs)
 
 
+cities <- data.frame(
+  name = c("Lyon", "Geneva", "Marseille", "Avignon", "Grenoble", 
+           "Valence", "Bourg-en-Bresse", "Chambéry", "Dijon", "Alès"),
+  lon = c(4.8357, 6.1432, 5.3698, 4.8055, 5.7245, 
+          4.8924, 5.2272, 5.9175, 5.0222, 4.0328),
+  lat = c(45.7640, 46.2044, 43.2965, 43.9488, 45.1885, 
+          44.9334, 46.2052, 45.5646, 47.3220, 44.1272)
+)
+# cities <- data.frame(
+#   name = c("Alès", "Marseille", "Nice", "Barcelona"),
+#   lon  = c(4.0825, 5.3698, 7.2620, 2.1734),
+#   lat  = c(44.1275, 43.2965, 43.7102, 41.3851)
+# )
+# Convert to LAEA (3035) and extract coordinates for ggrepel
+cities_laea<- cities %>%
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  st_transform(3035)
+# Extract coordinates for repel
+cities_coords <- cities_laea %>%
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>%
+  st_drop_geometry()
+
 
 ## 1. Transform to SF and reproject
 
@@ -467,6 +494,24 @@ her_rhone_inside <- st_crop(
   (bbox_laea)
 )
 
+## 1. Transform to SF and reproject
+forest_sf_laea <- df_forest_high %>%
+  st_as_sf(coords = c("x", "y"), crs = 4326) %>%
+  st_transform(3035)
+
+# 2. Extract the new coordinates and convert BACK to a dataframe
+df_forest_laea <- forest_sf_laea %>%
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>%
+  st_drop_geometry() # This removes the 'spatial' part so it's a regular df
+
+# 3. Repeat for Sealed
+df_sealed_laea <- df_sealed_high %>%
+  st_as_sf(coords = c("x", "y"), crs = 4326) %>%
+  st_transform(3035) %>%
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>%
+  st_drop_geometry()
 
 s_plot=ggplot(Europe_laea) +
   # --- Layer 0: Europe Background ---
@@ -566,7 +611,7 @@ s_plot=ggplot(Europe_laea) +
        subtitle = "Land use (Pixels), water demand (NUTS3), reservoirs (Points)",
        x = "Longitude", y = "Latitude")
 s_plot
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/rhone_sechanges_FINAL.jpg"), width=20, height=20, units=c("cm"),dpi=1000)
+#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/rhone_sechanges_FINAL.jpg"), width=20, height=20, units=c("cm"),dpi=1000)
 
 
 
@@ -659,38 +704,13 @@ main_plot <- ggplot(Europe_laea) +
        x = "Longitude", y = "Latitude")
 
 main_plot
-ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/rhone_Cchanges_FINAL.jpg"),main_plot, width=24, height=24, units=c("cm"),dpi=1000)
+#ggsave(paste0("D:/tilloal/Documents/LFRuns_utils/TrendAnalysis/plots/rhone_Cchanges_FINAL.jpg"),main_plot, width=24, height=24, units=c("cm"),dpi=1000)
 
 
 # # 3. Create/Update the Legend
 
 library(patchwork)
 
-# legend_biv <- bi_legend(
-#   pal = colorp, 
-#   dim = 4,
-#   xlab = "  +  Drought  -  ",
-#   ylab = "  -  Flood  +  ",
-#   size = 10, # Adjusted for a sidebar fit
-#   arrows = FALSE
-# ) + 
-#   ggtitle( "Hydrological extremes") + 
-#   theme(
-#     plot.title = element_text(
-#       size = tsize, 
-#       face = "bold", 
-#       hjust = 0.5,           # Perfectly centered over the square
-#       margin = margin(b = 5) # Controls the gap between title and legend
-#     ),
-#     legend.title = element_text(size = tsize, face = "bold"),
-#     plot.background = element_rect(fill = "transparent", colour = NA),
-#     panel.background = element_rect(fill = "transparent", colour = NA),
-#     # Ensure the text matches your 'osize' and 'tsize'
-#     axis.title = element_text(size = osize - 2) 
-#   )
-
-
-# Your original legend (without xlab/ylab because we'll use corner labels)
 legend_biv <- bi_legend(
   pal = colorp, 
   dim = 4,
