@@ -258,7 +258,7 @@ pix_bidata <- function(FloodPix, DroughtPix, base_sf) {
 }
 
 ## Stacked barplot by biogeographic region
-biogeo_barplot <- function(databipi2, colorp, tsize = 22, osize = 28) {
+biogeo_barplot <- function(databipi2, colorp, tsize = 26, osize = 32) {
   databipi2$Biogeo_id[databipi2$Biogeo_id == "Pannonian"] <- "Continental"
   databipi3 <- databipi2[!is.na(databipi2$bi_class), ]
 
@@ -338,8 +338,8 @@ biogeo_barplot <- function(databipi2, colorp, tsize = 22, osize = 28) {
     geom_hline(yintercept = 0,
                color = "black", linewidth = 1)+
     theme(
-      axis.title      = element_text(size = 16, face = "bold"),
-      axis.text          = element_text(size = 15),
+      axis.title      = element_text(size = tsize, face = "bold"),
+      axis.text          = element_text(size = osize),
       axis.text.y        = element_text(face = "bold"),
       # axis.text.x        = element_blank(),
       axis.ticks         = element_blank(),
@@ -801,29 +801,29 @@ ggsave(paste0(plotDir, "/Fig5_Contribution_HR_FINAL.jpg"),
 ## Stacked barplot of trajectory by biogeoregion (total change, pixel level)
 databipi2      <- databipi
 databipi2$trcat <- assign_trcat(databipi2$bi_class)
-fig4 <- biogeo_barplot(databipi2, colorp)
-fig4
-ggsave(paste0(plotDir, "/Fig4_Regional_trajectories_tot_FINAL.jpg"),
-       fig4, width=20, height=20, units="cm", dpi=800)
+fig5b <- biogeo_barplot(databipi2, colorp,tsize=24, osize=20)
+fig5b
+ggsave(paste0(plotDir, "/Fig5_Regional_trajectories_tot_FINAL.jpg"),
+       fig5b, width=20, height=20, units="cm", dpi=800)
 
 ## ── Figure 6 ─────────────────────────────────────────────────
 ## Climate stacked barplot by biogeoregion
 databipic2      <- databipic
 length(which(is.na(databipic$bi_class)))/length(databipic$bi_class)
 databipic2$trcat <- assign_trcat(databipic2$bi_class)
-fig6 <- biogeo_barplot(databipic2, colorp)
-fig6
-ggsave(paste0(plotDir, "/Fig6_Regional_trajectories_clim_FINAL.jpg"),
-       fig6, width=20, height=20, units="cm", dpi=800)
+fig5x <- biogeo_barplot(databipic2, colorp,tsize=24, osize=20)
+fig5x
+ggsave(paste0(plotDir, "/Fig5_Regional_trajectories_clim_FINAL.jpg"),
+       fig5x, width=20, height=20, units="cm", dpi=800)
 
 ## ── S8 · Trajectory barplot – socioeconomic combined signal
 databipi2se       <- databipise
 databipi2se$trcat <- assign_trcat(databipi2se$bi_class)
 length(which(databipi2se$trcat=="Wetting"))
-figS8 <- biogeo_barplot(databipi2se, colorp)
-figS8
+fig5c <- biogeo_barplot(databipi2se, colorp,tsize=24, osize=20)
+fig5c
 ggsave(paste0(plotDir, "/Fig5_Regional_trajectories_SE_FINAL.jpg"),
-       figS8, width=20, height=20, units="cm", dpi=800)
+       fig5c, width=20, height=20, units="cm", dpi=800)
 
 ## ── Figure 7 ─────────────────────────────────────────────────
 ## Sankey at HER level (cumulative driver addition)
@@ -864,7 +864,7 @@ count_traj <- function(data, driver_name) {
 
 
 traj_counts <- bind_rows(
-  count_traj(databipise,   "All socioeconomics"),
+  count_traj(databipise,   "All \nsocioeconomics"),
   count_traj(databipic,  "Climate"),
   count_traj(databipilu, "Land use"),
   count_traj(databipire, "Reservoirs"),
@@ -932,7 +932,7 @@ fig_bv_bar <- ggplot(traj_counts,
             aes(x = driver, y = total_pct,
                 label = paste0(round(total_pct, 0), "%")),
             inherit.aes = FALSE,
-            hjust = -0.15, size = 4.5, fontface = "bold", color = "grey20") +
+            hjust = -0.15, size = 5.5, fontface = "bold", color = "grey20") +
   
   scale_fill_manual(values = colorp) +
   scale_y_continuous(
@@ -946,8 +946,8 @@ fig_bv_bar <- ggplot(traj_counts,
   # scale_x_discrete(name = NULL) +
   coord_flip() +
   theme(
-    axis.title.x       = element_text(size = 14, face = "bold"),
-    axis.text          = element_text(size = 13),
+    axis.title.x       = element_text(size = 24, face = "bold"),
+    axis.text          = element_text(size = 20),
     axis.text.y        = element_text(face = "bold"),
     axis.text.x        = element_blank(),
     axis.ticks         = element_blank(),
@@ -965,7 +965,7 @@ fig_bv_bar <- ggplot(traj_counts,
 
 fig_bv_bar
 
-ggsave(paste0(plotDir, "/FigX_bv_traj_barplotv2_FINAL.jpg"),
+ggsave(paste0(plotDir, "/Fig5e_FINAL.jpg"),
        fig_bv_bar, width = 16, height = 22, units = "cm", dpi = 1000)
 
 ## ── Figure Supp ─────────────────────────────────────────────────

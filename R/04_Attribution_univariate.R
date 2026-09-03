@@ -36,10 +36,11 @@ clabels <- c("Climate", "Land use", "Reservoirs", "Water demand")
 # Helper: shared map theme
 map_theme <- function(tsize = 16, osize = 12, pos="right") {
   theme(
-    axis.title  = element_text(size = tsize),
-    axis.text   = element_text(size = osize),
+    axis.title  = element_blank(),
+    axis.text   = element_blank(),
+    axis.ticks = element_blank(),
     panel.background = element_rect(fill = "aliceblue", colour = "grey1"),
-    panel.border     = element_rect(linetype = "solid", fill = NA, colour = "black"),
+    panel.border     = element_rect(linetype = "solid", fill = NA, colour = "black",linewidth = 1),
     legend.title     = element_text(size = osize, margin = margin(t=2,r=2,b=6,l=0)),
     legend.text      = element_text(size = osize),
     legend.spacing.x = unit(0.2, "cm"),
@@ -226,10 +227,10 @@ catmap     <- cst7
 rm(cst7)
 
 ## 1.6  Reservoirs ---------------------------------------------
-res2020 <- resOpen(hydroDir2, "/reservoirs/reservoirs_volumes_2020_Domain2.nc")
+res2020 <- resOpen(hydroDir, "/reservoirs/reservoirs_volumes_2020_Domain2.nc")
 res2020$idla  <- 2970 - res2020$idla + 1
 res2020$idlalo <- paste(res2020$idlo, res2020$idla, sep = " ")
-res1951 <- resOpen(hydroDir2, "/reservoirs/reservoirs_volumes_1951.nc")
+res1951 <- resOpen(hydroDir, "/reservoirs/reservoirs_volumes_1951.nc")
 
 matres  <- na.omit(match(res1951$idlalo, res2020$idlalo))
 res_old <- res2020[ matres, ];  res_old$status <- "old"
@@ -256,7 +257,7 @@ max(UpArea$upa)
 # =============================================================
 # 2  LOAD MODEL RUNS
 # =============================================================
-haz="Drought"
+
 # Filenames by hazard type
 run_names <- if (haz == "Flood") {
   list(H    = "flood.year.Histo",
@@ -541,7 +542,7 @@ fig1 <- ggplot(trtF_EU) +
   geom_rect(aes(xmin=year-4.5, xmax=year+4.5, ymin=med-1e-1, ymax=med+1e-1,
                 fill=factor(driver), group=factor(driver)),
             alpha = 1, position = position_dodge(width = 9)) +
-  scale_y_continuous(name = "Mean change (% 10yRL)", breaks = br_bxp,
+  scale_y_continuous(name = "Change (% 10-y RL)", breaks = br_bxp,
                      trans = scales::modulus_trans(.6)) +
   scale_x_continuous(breaks = xlabs, labels = xlabs, name = "Decades",
                      minor_breaks = seq(1955,2005,10), expand = c(.01,.01)) +
@@ -549,11 +550,15 @@ fig1 <- ggplot(trtF_EU) +
   scale_color_manual(values = colorz, name = "Drivers", labels = clabels) +
   guides(color = guide_legend(override.aes = list(color = colorz))) +
   bxp_theme() +
-  ggtitle("Europe")
+  theme(axis.text.x = element_text(size=18),
+        axis.text.y = element_text(size=18),
+        axis.title.x = element_text(size=22),
+        axis.title.y = element_text(size=26))
+
 
 fig1
-# ggsave(paste0(plotDir, "/Fig1_bxp_EU_", haz, "_FINAL.jpg"),
-#        fig1, width=30, height=20, units="cm", dpi=1000)
+ggsave(paste0(plotDir, "/Fig1_bxp_EU_", haz, "_F2.jpg"),
+       fig1, width=30, height=20, units="cm", dpi=400)
 # 
 # write.csv(trtF_EU,file=paste0(plotDir,"/",haz,"_agchanges.csv"))
 
@@ -674,7 +679,7 @@ for (driver in driverlist) {
   }
 
   fname <- if (haz=="Flood" && driver %in% c("climate","all")) "Fig2" else "Fig3"
-  ggsave(paste0(plotDir, "/", fname, "_mapF_", driver, "_", haz, "_FINAL.jpg"),
+  ggsave(paste0(plotDir, "/", fname, "_mapF_", driver, "_", haz, "_F2.jpg"),
          fig_map, width=23, height=20, units="cm", dpi=1000)
 }
 
@@ -839,8 +844,8 @@ fig_res <- ggplot(basemap) +
   new_scale("size")+
   # New reservoirs: diamonds sized by volume
   geom_sf(data = res_new_sf, aes( size=res,geometry = geometry),
-          color = "black", fill = "orange", shape = 23, alpha = 0.55, stroke = 0.4) +
-  scale_size(range = c(0.1, 1), trans = "sqrt",
+          color = "black", fill = "orange", shape = 23, alpha = 0.5, stroke = 0.4) +
+  scale_size(range = c(0.1, 4), trans = "sqrt",
              name = expression(paste("Reservoir volume (m"^3, ")")),
              breaks = c(1e5, 1e6, 1e7, 1e8, 1e9),
              labels = c("100 k", "1 M", "10 M", "100 M", "1 B"),
@@ -851,12 +856,14 @@ fig_res <- ggplot(basemap) +
   coord_sf(xlim = c(min(nco[, 1]), max(nco[, 1])),
            ylim = c(min(nco[, 2]), max(nco[, 2]))) +
 
-  labs(x = "Longitude", y = "Latitude") +
+
+  #labs(x = "Longitude", y = "Latitude") +
   guides(colour = guide_colourbar(barwidth = 1.5, barheight = 14)) +
   map_theme(tsize_m, osize_m) +
+  theme(legend.box = "vertical")+ # Stacks the multiple legends)
   ggtitle(titleX_res)
 
-ggsave(paste0(plotDir, "/Fig3_mapF_reservoirs_", haz, "_FINAL.jpg"),
+ggsave(paste0(plotDir, "/Fig3_mapF_reservoirs_", haz, "_F2.jpg"),
        fig_res, width = 23, height = 20, units = "cm", dpi = 800)
 
 
@@ -991,7 +998,7 @@ fig_lu <- ggplot(basemap) +
   theme(legend.box = "vertical")+ # Stacks the multiple legends)
   ggtitle(titleX_lu)
 
-ggsave(paste0(plotDir, "/Fig3_mapF_landuse_", haz, "_FINAL.jpg"),
+ggsave(paste0(plotDir, "/Fig3_mapF_landuse_", haz, "_F2.jpg"),
        fig_lu, width = 23, height = 20, units = "cm", dpi = 1000)
 
 
@@ -1088,9 +1095,10 @@ fig_wu <- ggplot(basemap) +
            ylim = c(min(nco[, 2]), max(nco[, 2]))) +
   labs(x = "Longitude", y = "Latitude") +
   map_theme(tsize_m, osize_m) +
+  theme(legend.box = "vertical")+ # Stacks the multiple legends)
   ggtitle(titleX_wu)
 
-ggsave(paste0(plotDir, "/Fig3_mapF_wateruse_", haz, "_FINAL.jpg"),
+ggsave(paste0(plotDir, "/Fig3_mapF_wateruse_", haz, "_F2.jpg"),
        fig_wu, width = 23, height = 20, units = "cm", dpi = 1000)
 
 
