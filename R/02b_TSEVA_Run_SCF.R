@@ -530,9 +530,11 @@ tsGetPOTX <- function(ms, pcts, desiredEventsPerYear, minEventsPerYear, minPeakD
       penalty_factor <- 1 + (deficit^2 * penalty_strength)
     }
     if (numperyear[ipp] <= (desiredEventsPerYear + 1)) {
-      fgpd <- suppressWarnings(try(POT::fitgpd(pks[, 1], threshold = thrsdt, est = "mle",
+      fgpd <- suppressWarnings(try(POT::fitgpd(pks[, 1],
+        threshold = thrsdt, est = "mle",
         method = "L-BFGS-B", lower = c(1e-6, shape_bnd[1]), upper = c(Inf, shape_bnd[2]),
-        std.err.type = "observed"), silent = TRUE))
+        std.err.type = "observed"
+      ), silent = TRUE))
       fitlist[[ipp]] <- fgpd
       if (inherits(fgpd, "try-error")) {
         devpp[ipp] <- 1e9
@@ -723,7 +725,11 @@ interid <- function(data, trans, WindowSize) {
   }
   if (length(which(is.na(data$Q7))) == length(data$Q7)) {
     print("no data in this pixel")
-    list0 <- NA; dis07 <- data; l0 <- NA; fl <- NA; mindis <- NA
+    list0 <- NA
+    dis07 <- data
+    l0 <- NA
+    fl <- NA
+    mindis <- NA
   } else {
     if (length(which(is.na(data$Qs))) > 0) print("Na alert")
     mindis <- min(data$Q7, na.rm = T)
@@ -776,41 +782,50 @@ UpAopen <- function(dir, outletname, Sloc_final) {
 
 ###########################  ARGUMENTS   #################################################
 
+# --- Path config -------------------------------------------------------------
+# This script defines its own functions inline (self-contained for the HPC),
+# but the data root is taken from config_paths.R so it stays in sync with the
+# rest of the pipeline. Resolve the config location without rstudioapi so it
+# also works under Rscript.
+.cfg_dir <- {
+  a <- commandArgs(FALSE)
+  fa <- grep("^--file=", a, value = TRUE)
+  if (length(fa) > 0) dirname(normalizePath(sub("^--file=", "", fa[1]))) else getwd()
+}
+source(file.path(.cfg_dir, "config_paths.R"))
+workDir <- hydroDir # canonical data root (no trailing slash; use file.path)
+
 # --- HPC mode: arguments passed via command line ---
-# To run on HPC: Rscript script.R <Nsq> <haz> <outlets> <startid> <endid> <Quarter> <sce> <foldin> <season>
-# --- Local mode: comment the commandArgs block and uncomment the lines below ---
-
-# args <- commandArgs(TRUE)
-# argus <- as.vector(unlist(strsplit(args, split = " ")))
-# Nsq     <- argus[1]
-# haz     <- argus[2]
-# outlets <- argus[3]
-# startid <- argus[4]
-# endid   <- argus[5]
-# Quarter <- argus[6]
-# sce     <- argus[7]
-# foldin  <- argus[8]
-# season  <- argus[9]
-
-# --- Local hardcoded values (uncomment to run locally) ---
+# To run on HPC: Rscript script.R <Nsq> <haz> <sce> <startid> <endid>
+args <- commandArgs(TRUE)
+if (length(args) >= 1) {
+  argus <- as.vector(unlist(strsplit(args, split = " ")))
+  Nsq <- as.numeric(argus[1])
+  haz <- ifelse(length(argus) >= 2, argus[2], "drought")
+  sce <- ifelse(length(argus) >= 3, argus[3], "SCF")
+  startid <- ifelse(length(argus) >= 4, as.numeric(argus[4]), 1)
+  endid <- ifelse(length(argus) >= 5, as.numeric(argus[5]), NA)
+} else {
+  # --- Local defaults ---
+  haz <- "drought"
+  Nsq <- 42
+  sce <- "SCF"
+  startid <- 1
+  endid <- NA
+}
 tail <- "high"
-haz <- "drought"
 var <- "dis"
 outlets <- "RNetwork"
-outletname <- "/GeoData/efas_rnet_100km_01min"
+outletname <- "GeoData/efas_rnet_100km_01min"
 season <- "nonfrost"
-Nsq <- 42
-sce <- "SCF"
-
-workDir <- "D:/tilloal/Documents/LFRuns_utils/ChangingHydroExtremes/data/"
 
 
-rspace <- read.csv(paste0(workDir, "subspace_efas.csv"))
+rspace <- read.csv(file.path(workDir, "subspace_efas.csv"))
 rspace <- rspace[, -1]
 nrspace <- rspace[Nsq, ]
 print(nrspace)
 outhybas <- outletopen(workDir, outletname, nrspace)
-Idstart <- as.numeric(Nsq) * 100000
+Idstart <- as.numeric(Nsq) * ID_MULT
 if (length(outhybas$outlets) > 0) {
   outhybas$outlets <- seq((Idstart + 1), (Idstart + length(outhybas$outlets)))
 }
@@ -819,19 +834,19 @@ outhybas$latlong <- paste(round(outhybas$Var1, 4), round(outhybas$Var2, 4), sep 
 
 UpArea <- UpAopen(workDir, "/GeoData/upArea_European_01min.nc", outhybas)
 outhybas$upa <- UpArea$upa
-# 
+#
 # # Load SocCF results
 # if (haz == "drought") namefile <- "Drought.nonfrost.SocCF"
 # if (haz == "flood") namefile <- "flood.year.SocCF"
 # load(file = paste0(workDir, "/", haz, "/peaks.", namefile, ".Rdata"))
 # load(file = paste0(workDir, "/", haz, "/params.", namefile, ".Rdata"))
-# 
+#
 # Paramsfl$square <- round(Paramsfl$catchment / 100000)
 # Paramsfl <- Paramsfl[which(Paramsfl$square == Nsq), ]
 # Peaksave$square <- round(Peaksave$catch / 100000)
 # Peaksave <- Peaksave[which(Peaksave$square == Nsq), ]
 
-filename <- paste0("RiverData/dis_", Nsq, "_1951_2020_scf_RNetwork")
+filename <- file.path("RiverData", paste0("dis_", Nsq, "_1951_2020_scf_RNetwork"))
 
 dists <- disNcopenloc(filename, workDir, outhybas, 1)
 df.dis <- dists
@@ -842,15 +857,15 @@ df.dis$timeStamps <- txx
 names(df.dis)[c(1, 2)] <- c("dis", "outlets")
 
 # Load drought-specific data
-haz="drought"
+haz <- "drought"
 if (haz == "drought") {
-  load(file = paste0(workDir, "/Drought/catchment_frost.Rdata"))
+  load(file = file.path(droughtDir, "catchment_frost.Rdata"))
   frostcat <- frostcat[-which(year(frostcat$time) == 1950), ]
   frostcat <- frostcat[-1, ]
-  Catchmentrivers7 <- read.csv(paste0(workDir, "/GeoData/HYBAS07/from_hybas_eu_onlyid.csv"), encoding = "UTF-8", header = T, stringsAsFactors = F)
+  Catchmentrivers7 <- read.csv(file.path(geoDir, "HYBAS07/from_hybas_eu_onlyid.csv"), encoding = "UTF-8", header = T, stringsAsFactors = F)
   outhyb07 <- outletopen(workDir, "GeoData/HYBAS07/outletsv8_hybas07_01min", nrspace)
   mycat <- Catchmentrivers7[match(outhyb07$outlets, Catchmentrivers7$pointid), ]
-  hybas07 <- read_sf(dsn = paste0(workDir, "/GeoData/HYBAS07/hybas_eu_lev07_v1c.shp"))
+  hybas07 <- read_sf(dsn = file.path(geoDir, "HYBAS07/hybas_eu_lev07_v1c.shp"))
   Catamere07 <- inner_join(fortify(hybas07), Catchmentrivers7, by = "HYBAS_ID")
   Catamere07$llcoord <- paste(round(Catamere07$POINT_X, 4), round(Catamere07$POINT_Y, 4), sep = " ")
   Catf7 <- inner_join(Catamere07, outhybas, by = c("llcoord" = "latlong"))
@@ -860,32 +875,38 @@ if (haz == "drought") {
 
 
 
-# Load and merge thresholds
-ThDir <- paste0(workDir, "/Thresholds")
-TH1 <- read.csv(paste0(ThDir, "/trenTH_Histo_newV", tail, "_", Nsq, ".csv"))
-TH2 <- read.csv(paste0(ThDir, "/trenTH_SCF_newV", tail, "_", Nsq, ".csv"))
-TH3 <- inner_join(TH2, TH1, by = "cid")
+# Load and merge thresholds (produced by 01_TSEVA_TrendThresholdSel.R).
+# 01 writes files named trenTH_x_<sce>_<tail>_<Nsq>.csv using the ID_MULT
+# scheme, so no id remapping is needed here.
 
-#retain thresholds from SCF run unless it is NA
-thresh_vec=data.frame(TH3$cid,TH3$Th_new.x)
+TH2 <- read.csv(file.path(threshDir, paste0("trenTH_SCF_", tail, "_", Nsq, ".csv")))
+TH3 <- TH2
 
-names(thresh_vec)=c("cid","th")
-Nsq=as.numeric(Nsq)
-thresh_vec$cid <- as.numeric(thresh_vec$cid) - Nsq * 10000 + Nsq * 100000
+# retain thresholds from SCF run unless it is NA
+thresh_vec <- data.frame(TH3$cid, TH3$Th_new)
 
-startid=1
-endid=length(unikout)
-endid=7
-RetPerGPD <- c(); RetPerGEV <- c()
-RetLevGEV <- c(); RetLevGPD <- c()
-parlist <- c(); peaklist <- c()
-catlist <- c(); IRES <- c()
+names(thresh_vec) <- c("cid", "th")
+#id conversion for matching
+thresh_vec$cid <- as.numeric(thresh_vec$cid - Nsq*10000 + Nsq*100000)
+Nsq <- as.numeric(Nsq)
+
+# Loop bounds: honour command-line args, else run the whole square
+if (is.na(endid)) endid <- length(unikout)
+ endid <- 7   # (debug) limit to first pixels
+RetPerGPD <- c()
+RetPerGEV <- c()
+RetLevGEV <- c()
+RetLevGPD <- c()
+parlist <- c()
+peaklist <- c()
+catlist <- c()
+IRES <- c()
 
 for (idfix in startid:endid) {
   start_time <- Sys.time()
   print(paste0("hazard:", haz, " square: ", Nsq, " pixel: ", idfix, "/", endid))
   catch <- as.numeric(unikout[idfix])
-  upa   <- as.numeric(outhybas$upa[idfix])
+  upa <- as.numeric(outhybas$upa[idfix])
 
   timeStamps <- txx
   thresh <- thresh_vec$th[which(thresh_vec$cid == catch)]
@@ -917,7 +938,7 @@ for (idfix in startid:endid) {
     tail <- "low"
   } else if (haz == "flood") {
     ciPercentile <- 95
-    minPeakDistanceInDays <- 5 + log(upa / 2.59)  # dynamic peak distance based on upstream area
+    minPeakDistanceInDays <- 5 + log(upa / 2.59) # dynamic peak distance based on upstream area
     interflag <- 0
     series <- max_daily_value(series)
     tail <- "high"
@@ -937,7 +958,6 @@ for (idfix in startid:endid) {
 
   nv <- length(unique(series$dis))
   if (length(na.omit(series$dis)) > 1 & interflag < 3 & nv > 15) {
-
     if (length(which(is.na(series$dis))) > 0) {
       print("Na alert")
       series$dis <- tsEvaFillSeries(series$timestamp, series$dis)
@@ -945,7 +965,7 @@ for (idfix in startid:endid) {
     timeAndSeries <- series
     names(timeAndSeries) <- c("timestamp", "data")
 
-    if (haz == "drought" & length(!is.na(frosttime)) > 1) {
+    if (haz == "drought" & length(frosttime[!is.na(frosttime)]) > 1) {
       if (season == "nonfrost") {
         print("nonfrost season")
         timeAndSeries$data[frosttime] <- NA
@@ -966,20 +986,22 @@ for (idfix in startid:endid) {
     timeStamps <- timeAndSeries$timestamp
     cat(paste0("\nsquare: ", Nsq, " pixel: ", idfix, "/", endid))
 
-    Nonstat <- TsEvaNs(timeAndSeries, timeWindow, transfType = "trendPeaks",
+    Nonstat <- TsEvaNs(timeAndSeries, timeWindow,
+      transfType = "trendPeaks",
       ciPercentile = ciPercentile, minPeakDistanceInDays = minPeakDistanceInDays,
-      lowdt = 7, trans = trans, tail = tail, TrendTh = thresh)
+      lowdt = 7, trans = trans, tail = tail, TrendTh = thresh
+    )
     nonStationaryEvaParams <- Nonstat[[1]]
     stationaryTransformData <- Nonstat[[2]]
 
     stationaryTransformData$timeStampsDay <- unique(as.Date(stationaryTransformData$timeStamps))
     pikos <- data.frame(
-      value   = nonStationaryEvaParams$potObj$parameters$peaks,
-      timeID  = nonStationaryEvaParams$potObj$parameters$peakID,
+      value = nonStationaryEvaParams$potObj$parameters$peaks,
+      timeID = nonStationaryEvaParams$potObj$parameters$peakID,
       tIDstart = nonStationaryEvaParams$potObj$parameters$peakST,
-      tIDend  = nonStationaryEvaParams$potObj$parameters$peakEN
+      tIDend = nonStationaryEvaParams$potObj$parameters$peakEN
     )
-    pikos$time  <- timeStamps[pikos$timeID]
+    pikos$time <- timeStamps[pikos$timeID]
     pikos$catch <- catch
 
     dt1 <- min(diff(timeStamps), na.rm = T)
@@ -1008,10 +1030,10 @@ for (idfix in startid:endid) {
       params[, 5] <- interflag
       colnames(params) <- if (is.null(colnames(parlist))) rep("nom", 19) else colnames(parlist)
     } else {
-      RLgev  <- RLevs100$ReturnLevels[2]
-      RLgpd  <- RLevs100$ReturnLevels[3]
-      ERgev  <- RLevs100$ReturnLevels[4]
-      ERgpd  <- RLevs100$ReturnLevels[5]
+      RLgev <- RLevs100$ReturnLevels[2]
+      RLgpd <- RLevs100$ReturnLevels[3]
+      ERgev <- RLevs100$ReturnLevels[4]
+      ERgpd <- RLevs100$ReturnLevels[5]
       nRPgev <- nRPgpd <- 10
       params <- c()
       for (t in 2:length(Impdates)) {
@@ -1020,23 +1042,28 @@ for (idfix in startid:endid) {
         params <- c(catch, year(Impdates[t]), timeIndex, minPeakDistanceInDays, RLevs100i$Params, nonStationaryEvaParams$potObj$parameters$percentile)
         names(params)[1:4] <- c("catchment", "Year", "timeIndex", "minpeakdistance")
         names(params)[19] <- "percentile"
-        Rper   <- RPcalc(params, RPiGEV = RLevs100$ReturnLevels[2], RPiGPD = RLevs100$ReturnLevels[3])
+        Rper <- RPcalc(params, RPiGEV = RLevs100$ReturnLevels[2], RPiGPD = RLevs100$ReturnLevels[3])
         nRPgpd <- c(nRPgpd, Rper[2])
         nRPgev <- c(nRPgev, Rper[1])
-        RLgev  <- cbind(RLgev, RLevs100i$ReturnLevels[2])
-        RLgpd  <- cbind(RLgpd, RLevs100i$ReturnLevels[3])
-        ERgev  <- cbind(ERgev, RLevs100i$ReturnLevels[4])
-        ERgpd  <- cbind(ERgpd, RLevs100i$ReturnLevels[5])
+        RLgev <- cbind(RLgev, RLevs100i$ReturnLevels[2])
+        RLgpd <- cbind(RLgpd, RLevs100i$ReturnLevels[3])
+        ERgev <- cbind(ERgev, RLevs100i$ReturnLevels[4])
+        ERgpd <- cbind(ERgpd, RLevs100i$ReturnLevels[5])
         if (length(parlist) > 1) colnames(parlist) <- names(params)
         parlist <- rbind(parlist, params)
       }
-      RLgev <- as.data.frame(RLgev); names(RLgev) <- year(Impdates); rownames(RLgev) <- RPgoal
-      RLgpd <- as.data.frame(RLgpd); names(RLgpd) <- year(Impdates); rownames(RLgpd) <- RPgoal
-      nRPgev <- as.data.frame(t(nRPgev)); names(nRPgev) <- year(Impdates)
-      nRPgpd <- as.data.frame(t(nRPgpd)); names(nRPgpd) <- year(Impdates)
+      RLgev <- as.data.frame(RLgev)
+      names(RLgev) <- year(Impdates)
+      rownames(RLgev) <- RPgoal
+      RLgpd <- as.data.frame(RLgpd)
+      names(RLgpd) <- year(Impdates)
+      rownames(RLgpd) <- RPgoal
+      nRPgev <- as.data.frame(t(nRPgev))
+      names(nRPgev) <- year(Impdates)
+      nRPgpd <- as.data.frame(t(nRPgpd))
+      names(nRPgpd) <- year(Impdates)
       peaklist <- rbind(peaklist, pikos)
     }
-
   } else {
     cat(paste0("\n No values in this pixel ", idfix, " \n or intermittent river (flag = ", interflag, ")"))
     if (is.na(interflag)) interflag <- -9999
@@ -1058,7 +1085,12 @@ for (idfix in startid:endid) {
     params[, 2] <- year(Impdates)[-1]
     params[, 5] <- interflag
     print(colnames(parlist))
-    colnames(params) <- if (is.null(colnames(parlist))) { print("hello"); rep("nom", 19) } else colnames(parlist)
+    colnames(params) <- if (is.null(colnames(parlist))) {
+      print("hello")
+      rep("nom", 19)
+    } else {
+      colnames(parlist)
+    }
     parlist <- as.data.frame(rbind(parlist, params))
     pikos <- data.frame(matrix(ncol = 6, nrow = 1))
     pikos[, 1] <- NA
@@ -1069,7 +1101,7 @@ for (idfix in startid:endid) {
   }
 
   catlist <- c(catlist, catch)
-  IRES    <- c(IRES, interflag)
+  IRES <- c(IRES, interflag)
   RetLevGEV <- rbind(RetLevGEV, RLgev)
   RetLevGPD <- rbind(RetLevGPD, RLgpd)
   RetPerGEV <- rbind(RetPerGEV, nRPgev)
@@ -1084,9 +1116,12 @@ Results <- list(
   Peaks = peaklist, catrest = data.frame(catlist, IRES)
 )
 
-save(Results, file = paste0(workDir,"/",haz, "/ResCat6h_", outlets, "_", Nsq, "_1951_2020_revFt.Rdata"))
+hazDir <- file.path(hydroDir, haz)
+if (!dir.exists(hazDir)) dir.create(hazDir, recursive = TRUE, showWarnings = FALSE)
 
-#for subsequent analysis
-save(parlist, file = paste0(workDir,"/",haz, "/Params_",haz,".",season,"_", Nsq, "_SocCF.Rdata"))
-save(parlist, file = paste0(workDir,"/",haz, "/RL100x_",haz,".",season,"_", Nsq, "_SocCF.Rdata"))
-save(parlist, file = paste0(workDir,"/",haz, "/peaks_",haz,".",season,"_", Nsq, "_SocCF.Rdata"))
+save(Results, file = file.path(hazDir, paste0("ResCat6h_", outlets, "_", Nsq, "_1951_2020_revFt.Rdata")))
+
+# for subsequent analysis
+save(parlist, file = file.path(hazDir, paste0("Params_", haz, ".", season, "_", Nsq, "_SocCF.Rdata")))
+save(parlist, file = file.path(hazDir, paste0("RL100x_", haz, ".", season, "_", Nsq, "_SocCF.Rdata")))
+save(parlist, file = file.path(hazDir, paste0("peaks_", haz, ".", season, "_", Nsq, "_SocCF.Rdata")))
