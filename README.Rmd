@@ -11,13 +11,13 @@ knitr::opts_chunk$set(
 )
 ```
 
-# Codes of "Climatic and socioeconomic drivers of changing hydrological extremes in Europe"
+# Codes of "Attribution of changes in European flood and drought magnitudes to climatic and socioeconomic drivers"
 
 <!-- badges: start -->
 <!-- badges: end -->
 
 This repository contains the codes used to analyse discharge data from the HERA hydrological reanalysis and to 
-reproduce the different steps and figures in the article: "Climatic and socioeconomic drivers of changing hydrological extremes in Europe".
+reproduce the different steps and figures in the article: "Attribution of changes in European flood and drought magnitudes to climatic and socioeconomic drivers".
 
 ## Introduction
 
@@ -36,17 +36,53 @@ to four drivers:
 
 ## Content 
 
-The repository is composed of R scripts under the /R folder.
-Inside the /R folder, one can find 5 scripts representing the 4 main steps of the analysis:
+The repository is composed of R scripts under the `/R` folder.
+Inside the `/R` folder, the numbered scripts represent the successive steps of the analysis:
 
-1. [Thresold definition for non-stationnary analysis](#thresold-definition)
-2. [Non-stationnary EVA (TSEVA)](#tseva)
-3. [Changing Hydrological Extremes - univariate analysis](#che-u)
-4. [Changing Hydrological Extremes - bivariate analysis](#che-b)
-5. [Functions](#functions)
+1. [Threshold definition for non-stationary analysis](#thresold-definition) — `01_TSEVA_TrendThresholdSel.R`
+2. [Non-stationary EVA (TSEVA)](#tseva) — `02a_TSEVA_TrendxVar.R` and `02b_TSEVA_Run_SCF.R`
+3. [Trend and variability analysis](#trendvar) — `03_TrendVar_analysis.R`
+4. [Changing Hydrological Extremes - univariate attribution](#che-u) — `04_Attribution_univariate.R`
+5. [Changing Hydrological Extremes - bivariate attribution](#che-b) — `05_Attribution_bivariate.R`
+6. [Intra-catchment trajectories](#intracatch) — `06_IntraCatchment_trajs.R`
+7. [Functions](#functions) — `functions_trends.R`
 
-A set of supplementary functions is also provided under /Pre-PostProcess, 
-notably functions to determine the frost season of European catchments and to maps reservoirs used in HERA.
+Two additional helper files support all scripts:
+
+- `functions_trends.R`: the shared library of analysis functions, sourced at the top of every script.
+- `config_paths.R`: a single source of truth for all data and output paths (see [Paths and configuration](#paths)).
+
+A set of supplementary scripts is also provided under `/Pre-PostProcess`, 
+notably scripts to determine the frost season of European catchments and to map reservoirs used in HERA.
+Superseded versions of the scripts are kept under `/R/old`.
+
+## Paths and configuration <a id="paths"></a>
+
+All scripts resolve their own location automatically (they work both interactively in
+RStudio and via `Rscript` on an HPC) and then source `config_paths.R`, which defines every
+data and output directory from a single project root.
+
+The canonical data directory is `<PROJECT_ROOT>/ChangingHydroExtremes/data`. The project root
+defaults to a local path but can be overridden with the `TREND_PROJECT_ROOT` environment
+variable so the same code runs unchanged locally and on the HPC:
+
+```
+# HPC example
+export TREND_PROJECT_ROOT=/scratch/.../LFRuns_utils
+```
+
+`config_paths.R` also exposes the derived sub-directories (`geoDir`, `threshDir`, `trendVarDir`,
+`droughtDir`, `floodDir`, `riverDir`, `resDir`, `plotDir`) and the pixel-ID multiplier `ID_MULT`,
+which is shared across scripts so that identifiers produced in step 1 line up with those used in
+the later steps.
+
+The HPC-oriented scripts (`01`, `02a`, `02b`) also accept command-line arguments, e.g.:
+
+```
+Rscript 01_TSEVA_TrendThresholdSel.R <Nsq> <tail> <sce>
+Rscript 02a_TSEVA_TrendxVar.R <Nsq> <haz> <sce>
+Rscript 02b_TSEVA_Run_SCF.R "<Nsq> <haz> <sce> <startid> <endid>"
+```
 
 ### 1. Threshold definition <a id="thresold-definition"></a>
 
@@ -58,14 +94,11 @@ This script identifies thresholds for extreme trend assessment using the TSEVA (
 #### Script Overview
 
 - **Set Working Directory and Load Functions**:
-   - Sets the working directory to the location of the script.
-   - Sources the `functions_trends.R` file to load necessary functions.
-
-- **Set Data Directory**:
-   - Specifies the directory containing the hydrodynamic data.
+   - Resolves the script location (works interactively and under `Rscript`).
+   - Sources `functions_trends.R` and `config_paths.R`.
 
 - **Define Parameters**:
-   - Specifies the square number (`Nsq`), tail type (`tail`), scenario (`sce`), outlets, and variable (`var`).
+   - Reads the square number (`Nsq`), tail type (`tail`) and scenario (`sce`) from the command line (HPC) or from local defaults.
    - Loads metadata about the spatial division of the domain into chunks.
 
 - **Load River Pixel Locations**:
@@ -81,7 +114,7 @@ This script identifies thresholds for extreme trend assessment using the TSEVA (
 
 - **Parallel Processing**:
    - Iterates over the river pixels using a parallel loop to find the trend threshold for each pixel.
-   - Saves the results to a CSV file.
+   - Saves the results to CSV files (`trenTH_x_*` and `xtrempoints_*`) under `threshDir`.
 
 #### Key Functions Used
 
@@ -92,49 +125,48 @@ This script identifies thresholds for extreme trend assessment using the TSEVA (
 
 #### Output
 
-The script outputs a CSV file containing the trend thresholds for the specified scenarios and tail types.
+The script outputs CSV files containing the trend thresholds and the extreme points for the specified scenarios and tail types.
 
 
-### 2. Non-stationnary EVA (TSEVA) <a id="tseva"></a>
+### 2. Non-stationary EVA (TSEVA) <a id="tseva"></a>
 
-#### Script: *02_TSEVA_Run.R*
+#### Scripts: *02a_TSEVA_TrendxVar.R* and *02b_TSEVA_Run_SCF.R*
 
-#### Script Description
-This script is designed to run one square of the HERA (Hydrological Ensemble Prediction System) domain on a High-Performance Computing (HPC) cluster. It performs extreme trend assessment for either drought or flood hazards using the TSEVA (Time Series Extreme Value Analysis) method.
+This step is split into two scripts. Both are designed to run one square of the HERA
+domain on a High-Performance Computing (HPC) cluster and perform extreme trend assessment
+for either drought or flood hazards using the TSEVA (Time Series Extreme Value Analysis) method.
 
-#### Script Overview
+#### 2a. Trend and variability per variable — *02a_TSEVA_TrendxVar.R*
 
-1. **Set Working Directory and Load Functions**:
-   - Sets the working directory to the location of the script.
-   - Sources the `functions_trends.R` file to load necessary functions.
+This script extracts, for each river pixel of a square, the long-term trend and variability of
+the extremes using the thresholds produced in step 1. It reuses the extreme points identified in
+the socioeconomic counterfactual so that all scenarios share a common set of events.
 
-2. **Set Data Directory**:
-   - Specifies the directory containing the hydrodynamic data.
+**Overview**
 
-3. **Define Parameters**:
-   - Specifies the tail type (`tail`), hazard type (`haz`), variable (`var`), outlets, outlet name, season, square number (`Nsq`), and scenario (`sce`).
-   - Loads metadata about the spatial division of the domain into chunks.
+1. **Setup**: resolves the script location, sources `functions_trends.R` and `config_paths.R`, and reads `Nsq`, `haz` and `sce` from the command line or local defaults.
+2. **Load river pixel locations** with `outletopen` and upstream areas with `UpAopen`.
+3. **Scenario differentiation** (Historical, SCF, Water demand, Reservoir+Water demand).
+4. **Load discharge data** for the scenario and square.
+5. **Load frost data** (for drought) and read the thresholds/extreme points from step 1.
+6. **Loop over pixels**: compute the trend and standard-deviation series on the extremes.
+7. **Save** the trend and variability series to `trendVarDir` (`TrendVarX_*.Rdata`).
 
-4. **Load River Pixel Locations**:
-   - Loads river pixel locations and identifiers using the `outletopen` function.
+#### 2b. Full non-stationary EVA run — *02b_TSEVA_Run_SCF.R*
 
-5. **Scenario Differentiation**:
-   - Differentiates between scenarios (Historical, Socioeconomic counterfactual, Water demand counterfactual, Reservoir+Water demand counterfactual).
+This script performs the complete non-stationary EVA fit for one square, producing GEV/GPD
+parameters, return levels and return periods per pixel and per year.
 
-6. **Load Discharge Data**:
-   - Loads discharge data for the specified scenario and square.
-   - Prepares the discharge data for trend analysis, including time stamps and series extraction.
+**Overview**
 
-7. **Load Frost Data (for drought analysis)**:
-   - Loads frost data for drought analysis and prepares it for further processing.
-
-8. **Threshold Identification**:
-   - Reads threshold files for historical and socioeconomic counterfactual scenarios.
-   - Retains thresholds from the historical run unless they are NA.
-
-9. **Parallel Processing**:
-   - Iterates over the river pixels to compute return periods and levels using the TSEVA method.
-   - Saves the results, including parameters, return levels, and peaks.
+1. **Setup**: sources `config_paths.R` (the data root) and reads arguments (`Nsq`, `haz`, `sce`, `startid`, `endid`).
+2. **Load river pixel locations** with `outletopen`.
+3. **Scenario differentiation**.
+4. **Load discharge data** for the scenario and square.
+5. **Load frost data** (for drought analysis).
+6. **Threshold identification**: reads the SCF and Historical threshold files from step 1 and retains the SCF threshold unless it is NA.
+7. **Loop over pixels**: detects intermittent rivers, runs `TsEvaNs`, and computes return periods and levels.
+8. **Save** the results (parameters, return levels, return periods, peaks) under the hazard folder.
 
 #### Key Functions Used
 
@@ -147,11 +179,45 @@ This script is designed to run one square of the HERA (Hydrological Ensemble Pre
 
 #### Output
 
-The script outputs a list containing parameters, return levels, return periods, peaks, and catchment rest data for further analysis.
+`02a` outputs the trend and variability series per square. `02b` outputs a list containing
+parameters, return levels, return periods, peaks, and catchment rest data for further analysis.
 
-### 3. Changing Hydrological Extremes - univariate analysis <a id="che-u"></a>
+### 3. Trend and variability analysis <a id="trendvar"></a>
 
-#### Script: *03_CHEX_Plot_univariateF.R* 
+#### Script: *03_TrendVar_analysis.R*
+
+#### Script Description
+This script assembles the per-square trend and variability outputs from step 2 across all
+scenarios, attributes changes in the location, scale and return-level parameters to the four
+drivers, and produces the associated pan-European maps and aggregated trend plots.
+
+#### Key Steps
+
+1. **Setup**: resolves the script location and sources `functions_trends.R` and `config_paths.R`.
+2. **Spatial data**: reads outlets for all squares, HydroBASINS level 7 catchments, European biogeographic regions, HydroEcoRegions, the base map and upstream areas.
+3. **Load scenario data** with `process_hazard_data()` for SCF, Historical, WStat and RWStat.
+4. **Merge scenarios** into a single `df_Main` with `attach_scenario_cols()`.
+5. **Driver analysis** with `analyze_hazard_symmetric()` for the location parameter (threshold), scale parameter (Sigma) and return level (RP).
+6. **Aggregate global trends** by HydroRegion with `aggregate_global_trends()`.
+7. **Save** driver maps and aggregation plots to `plotDir`, and the return-level matrices under the hazard folder.
+
+#### Key Functions Used
+
+- **`outletopen`**, **`UpAopen`**, **`ReservoirOpen`**: spatial data extraction from netCDF files.
+- **`process_hazard_data`**: loads and reshapes the per-scenario trend/variability and parameter files.
+- **`attach_scenario_cols`**: joins scenario-specific parameters onto the main table.
+- **`analyze_hazard_symmetric`**: computes symmetric relative changes per driver and variable.
+- **`aggregate_global_trends`**: weighted aggregation of trends by HydroRegion.
+- **`calcGPDReturnLevel_Single`**: vectorised GPD/Gumbel return-level computation.
+
+#### Output
+
+Driver maps (threshold, Sigma, RP) per driver and hazard, global trend aggregation plots, and
+saved return-level matrices for each scenario.
+
+### 4. Changing Hydrological Extremes - univariate attribution <a id="che-u"></a>
+
+#### Script: *04_Attribution_univariate.R* 
 
 #### Script Description
 This script is designed to load and process pre-loaded results for analyzing river discharge data across various scenarios and hazards (flood and drought). It performs several key steps, including loading spatial data, fitting results, and computing changes in return levels due to different drivers such as climate, land use, reservoirs, and water demand. The script also handles data cleaning, spatial smoothing, and aggregation for further analysis and visualization.
@@ -159,17 +225,13 @@ This script is designed to load and process pre-loaded results for analyzing riv
 #### Key Steps
 
 1. **Set Working Directory and Load Functions**:
-   - Sets the working directory to the location of the script.
-   - Sources the `functions_trends.R` file to load necessary functions.
+   - Resolves the script location and sources `functions_trends.R` and `config_paths.R`.
 
-2. **Set Data Directory**:
-   - Specifies the directory containing the hydrodynamic data.
-
-3. **Load Outlets Data**:
+2. **Load Outlets Data**:
    - Reads and processes outlet data for all squares in the HERA domain.
    - Loads river pixel locations and identifiers.
 
-4. **Load Spatial Data for Catchments**:
+3. **Load Spatial Data for Catchments**:
    - Loads metadata about the domain's spatial division into chunks.
    - Loads spatial data for catchments, including Hybas07 and European Biogeo regions.
 
@@ -288,9 +350,9 @@ The script performs a comprehensive analysis of river discharge data and generat
    - `Output_fl_year` and `Output_dr_nonfrost`: Saved lists containing trend data at the pixel and regional levels, output for 2020, and initial data for flood and drought scenarios, respectively.
 
 
-### 4. Changing Hydrological Extremes - bivariate analysis <a id="che-b"></a>
+### 5. Changing Hydrological Extremes - bivariate attribution <a id="che-b"></a>
 
-#### Script: *04_CHEX_Plot_bivariateF.R* 
+#### Script: *05_Attribution_bivariate.R* 
 
 #### Script Description
 
@@ -299,7 +361,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
 ### Key Steps
 
 1. **Library Calling and Data Loading**:
-   - Sets the working directory and sources necessary functions.
+   - Resolves the script location and sources `functions_trends.R` and `config_paths.R`.
    - Loads pre-loaded results for flood and drought hazards from previous analyses.
 
 2. **Bivariate Results Plot**:
@@ -361,13 +423,48 @@ This script performs bivariate analysis on river discharge data for flood and dr
 
 2. **Saved outputs**:
    - `mbfX`: Data frame containing aggregated changes by HydroRegions for different drivers and `mbfH`: Data frame containing historical changes by HydroRegions.
+   - Bivariate change objects (`CLchanges_bivariate_F.Rdata`, `SEchanges_bivariate_F.Rdata`) saved under the `Trajectories` folder for use in step 6.
   
 
-### 5. Functions <a id="functions"></a>
+### 6. Intra-catchment trajectories <a id="intracatch"></a>
 
-#### 5.1 Miscellaneous Functions
+#### Script: *06_IntraCatchment_trajs.R*
 
-##### 5.1.1 Functions for TSEVA
+#### Script Description
+
+This script produces a detailed intra-catchment case study (the Rhône basin by default) that
+overlays the climatic and socioeconomic drivers of change on a single catchment. It combines a
+digital elevation model, an aridity-index change layer, land-use and water-demand changes,
+new reservoirs, and the bivariate hydrological trajectories from step 5 into two side-by-side maps.
+
+#### Key Steps
+
+1. **Setup**: resolves the script location and sources `functions_trends.R` and `config_paths.R`.
+2. **Extract the target catchment** and its sub-catchments from the HydroBASINS layers.
+3. **Prepare the DEM** (crop, reproject to LAEA, hillshade).
+4. **Load / compute the aridity-index change** raster.
+5. **Load land use, water demand (NUTS3) and reservoir layers** and clip them to the catchment.
+6. **Load the bivariate trajectories** (`CLchanges_bivariate_F.Rdata`, `SEchanges_bivariate_F.Rdata`) and crop them to the catchment.
+7. **Build the maps**: a climatic-changes panel and a socioeconomic-changes panel, combined with a bivariate legend.
+8. **Save** the combined figure to `plotDir`.
+
+#### Key Functions Used
+
+- **`outletopen`**, **`resOpen`**: spatial data extraction from netCDF files.
+- **`sens.slope`** / **`mmkh`** (from `modifiedmk`/`trend`): pixel-wise trend estimation.
+- **`exact_extract`** (from `exactextractr`): zonal statistics for water demand.
+- Standard `terra`/`raster`/`sf`/`ggplot2` spatial and plotting functions.
+
+#### Output
+
+A combined multi-panel JPEG (climatic and socioeconomic changes for the case-study catchment)
+saved under `plotDir`.
+
+### 7. Functions <a id="functions"></a>
+
+#### 7.1 Miscellaneous Functions
+
+##### 7.1.1 Functions for TSEVA
 
 - **`check_timeserie2`**: Checks if there are not gaps bigger than two years in extreme value time series.
 
@@ -379,7 +476,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
 
 - **`GPDLargeRLs`**: Computes return levels for any return period using Generalized Pareto Distribution (GPD) parameters.
 
-##### 5.1.2 Data Extraction Functions
+##### 7.1.2 Data Extraction Functions
 
 - **`UpAopen`**: Opens upstream area files for selected pixels and returns a data frame with upstream area information.
 
@@ -389,7 +486,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
 
 - **`disNcopenloc`**: Extracts discharge time series data for a specific location from netCDF files.
 
-##### 5.1.3 Miscellaneous Calculations
+##### 7.1.3 Miscellaneous Calculations
 
 - **`RPcalc`**: Calculates return periods associated with a return level using Generalized Extreme Value (GEV) and Generalized Pareto Distribution (GPD) parameters.
 
@@ -397,7 +494,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
 
 - **`interid`**: Detects intermittent rivers by identifying periods of low or zero discharge and classifies them based on specified criteria.
 
-#### 5.2 Univariate Analysis
+#### 7.2 Univariate Analysis
 
 - **`calculate_return_levels`**: Calculates return levels and their errors based on Generalized Pareto Distribution (GPD) parameters.
 
@@ -413,7 +510,7 @@ This script performs bivariate analysis on river discharge data for flood and dr
 
 - **`UpATrendData`**: Processes trend data for upstream areas and aggregates it by upstream area groups.
 
-#### 5.3 Bivariate Analysis
+#### 7.3 Bivariate Analysis
 
 - **`calculateTrendSig`**: Calculates trend significance using the Mann-Kendall test and categorizes changes based on significance levels.
 
