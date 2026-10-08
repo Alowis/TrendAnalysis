@@ -445,7 +445,7 @@ yy <- yy - 0.3
 # Section header: Human activities (with combined % of river network changed)
 rows <- add_row(
   rows, yy, "header", "Human activities",
-  "Push rivers in the same direction across most of Europe",
+  "Driving consistent local trajectories",
   pct = pct_human
 )
 yy <- yy - 1
@@ -634,7 +634,7 @@ caption_panel <- ggplot() +
   )
 
 infographic <- (map_panel | table_panel) +
-  plot_layout(widths = c(1, 1)) &
+  plot_layout(widths = c(.9, 1)) &
   theme(
     plot.background = element_rect(fill = NA, color = NA),
     plot.margin = margin(t = 8, r = 8, b = 8, l = 8)
